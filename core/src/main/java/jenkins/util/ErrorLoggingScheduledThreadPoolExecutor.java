@@ -66,9 +66,8 @@ class ErrorLoggingScheduledThreadPoolExecutor extends ScheduledThreadPoolExecuto
             if (f.isDone()) { // TODO super Javadoc does not suggest this, but without it, we hang in FutureTask.awaitDone!
                 try {
                     f.get(/* just to be on the safe side, do not wait */0, TimeUnit.NANOSECONDS);
-                } catch (TimeoutException x) {
-                    // should not happen, right?
-                } catch (CancellationException x) {
+                } catch (CancellationException | TimeoutException x) {
+					// should not happen, right?
                     // probably best to ignore this
                 } catch (ExecutionException x) {
                     t = x.getCause();

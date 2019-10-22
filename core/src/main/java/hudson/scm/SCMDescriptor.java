@@ -42,13 +42,15 @@ import java.util.logging.Logger;
  * @author Kohsuke Kawaguchi
  */
 public abstract class SCMDescriptor<T extends SCM> extends Descriptor<SCM> {
-    /**
+    private static final Logger LOGGER = Logger.getLogger(SCMDescriptor.class.getName());
+
+	/**
      * If this SCM has corresponding {@link RepositoryBrowser},
      * that type. Otherwise this SCM will not have any repository browser.
      */
-    public transient final Class<? extends RepositoryBrowser> repositoryBrowser;
+    public final transient Class<? extends RepositoryBrowser> repositoryBrowser;
 
-    /**
+	/**
      * Incremented every time a new {@link SCM} instance is created from this descriptor. 
      * This is used to invalidate cache of {@link SCM#getEffectiveBrowser}. Due to the lack of synchronization and serialization,
      * this field doesn't really count the # of instances created to date,
@@ -58,12 +60,12 @@ public abstract class SCMDescriptor<T extends SCM> extends Descriptor<SCM> {
     @Deprecated
     public volatile int generation = 1;
 
-    protected SCMDescriptor(Class<T> clazz, Class<? extends RepositoryBrowser> repositoryBrowser) {
+	protected SCMDescriptor(Class<T> clazz, Class<? extends RepositoryBrowser> repositoryBrowser) {
         super(clazz);
         this.repositoryBrowser = repositoryBrowser;
     }
 
-    /**
+	/**
      * Infers the type of the corresponding {@link SCM} from the outer class.
      * This version works when you follow the common convention, where a descriptor
      * is written as the static nested class of the describable class.
@@ -74,7 +76,7 @@ public abstract class SCMDescriptor<T extends SCM> extends Descriptor<SCM> {
         this.repositoryBrowser = repositoryBrowser;
     }
 
-    // work around HUDSON-4514. The repositoryBrowser field was marked as non-transient until 1.325,
+	// work around HUDSON-4514. The repositoryBrowser field was marked as non-transient until 1.325,
     // causing the field to be persisted and overwritten on the load method.
     @SuppressWarnings({"ConstantConditions"})
     @Override
@@ -92,7 +94,7 @@ public abstract class SCMDescriptor<T extends SCM> extends Descriptor<SCM> {
         }
     }
 
-    /**
+	/**
      * Optional method used by the automatic SCM browser inference.
      *
      * <p>
@@ -109,7 +111,7 @@ public abstract class SCMDescriptor<T extends SCM> extends Descriptor<SCM> {
         return false;
     }
 
-    /**
+	/**
      * Allows {@link SCMDescriptor}s to choose which projects it wants to be configurable against.
      *
      * <p>
@@ -126,7 +128,7 @@ public abstract class SCMDescriptor<T extends SCM> extends Descriptor<SCM> {
         }
     }
 
-    @Deprecated
+	@Deprecated
     public boolean isApplicable(AbstractProject project) {
         if (Util.isOverridden(SCMDescriptor.class, getClass(), "isApplicable", Job.class)) {
             return isApplicable((Job) project);
@@ -135,7 +137,7 @@ public abstract class SCMDescriptor<T extends SCM> extends Descriptor<SCM> {
         }
     }
 
-    /**
+	/**
      * Returns the list of {@link RepositoryBrowser} {@link Descriptor}
      * that can be used with this SCM.
      *
@@ -143,9 +145,9 @@ public abstract class SCMDescriptor<T extends SCM> extends Descriptor<SCM> {
      *      can be empty but never null.
      */
     public List<Descriptor<RepositoryBrowser<?>>> getBrowserDescriptors() {
-        if(repositoryBrowser==null)     return Collections.emptyList();
+        if(repositoryBrowser==null) {
+			return Collections.emptyList();
+		}
         return RepositoryBrowsers.filter(repositoryBrowser);
     }
-
-    private static final Logger LOGGER = Logger.getLogger(SCMDescriptor.class.getName());
 }

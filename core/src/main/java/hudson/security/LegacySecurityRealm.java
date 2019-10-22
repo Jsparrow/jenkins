@@ -47,22 +47,32 @@ import javax.servlet.FilterConfig;
  * @author Kohsuke Kawaguchi
  */
 public final class LegacySecurityRealm extends SecurityRealm implements AuthenticationManager {
-    @DataBoundConstructor
+    /**
+     * @deprecated as of 2.0
+     *      Don't use this field, use injection.
+     */
+    @Restricted(NoExternalUse.class)
+    public static /*almost final*/ Descriptor<SecurityRealm> DESCRIPTOR;
+
+	@DataBoundConstructor
     public LegacySecurityRealm() {
     }
 
-    public SecurityComponents createSecurityComponents() {
+	@Override
+	public SecurityComponents createSecurityComponents() {
         return new SecurityComponents(this);
     }
 
-    public Authentication authenticate(Authentication authentication) throws AuthenticationException {
-        if(authentication instanceof ContainerAuthentication)
-            return authentication;
-        else
-            return null;
+	@Override
+	public Authentication authenticate(Authentication authentication) {
+        if(authentication instanceof ContainerAuthentication) {
+			return authentication;
+		} else {
+			return null;
+		}
     }
 
-    /**
+	/**
      * To have the username/password authenticated by the container,
      * submit the form to the URL defined by the servlet spec.
      */
@@ -71,12 +81,12 @@ public final class LegacySecurityRealm extends SecurityRealm implements Authenti
         return "j_security_check";
     }
 
-    @Override
+	@Override
     public String getLoginUrl() {
         return "loginEntry";
     }
 
-    /**
+	/**
      * Filter to run for the LegacySecurityRealm is the
      * ChainServletFilter legacy from /WEB-INF/security/SecurityFilters.groovy.
      */
@@ -94,20 +104,14 @@ public final class LegacySecurityRealm extends SecurityRealm implements Authenti
         return (Filter) context.getBean("legacy");
     }
 
-    /**
-     * @deprecated as of 2.0
-     *      Don't use this field, use injection.
-     */
-    @Restricted(NoExternalUse.class)
-    public static /*almost final*/ Descriptor<SecurityRealm> DESCRIPTOR;
-
-    @Extension @Symbol("legacy")
+	@Extension @Symbol("legacy")
     public static class DescriptorImpl extends  Descriptor<SecurityRealm> {
         public DescriptorImpl() {
             DESCRIPTOR = this;
         }
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.LegacySecurityRealm_Displayname();
         }
     }

@@ -118,9 +118,7 @@ public interface SimpleBuildStep extends BuildStep {
             List<Action> actions = new LinkedList<>();
             Run r = j.getLastSuccessfulBuild();
             if (r != null) {
-                for (LastBuildAction a : r.getActions(LastBuildAction.class)) {
-                    actions.addAll(a.getProjectActions());
-                }
+                r.getActions(LastBuildAction.class).forEach(a -> actions.addAll(a.getProjectActions()));
             }
             // TODO should there be an option to check lastCompletedBuild even if it failed?
             // Not useful for, say, TestResultAction, since if you have a build that fails before recording test

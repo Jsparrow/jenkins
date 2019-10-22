@@ -161,11 +161,11 @@ public abstract class Telemetry implements ExtensionPoint {
             }
             Telemetry.all().forEach(telemetry -> {
                 if (telemetry.getStart().isAfter(LocalDate.now())) {
-                    LOGGER.config("Skipping telemetry for '" + telemetry.getId() + "' as it is configured to start later");
+                    LOGGER.config(new StringBuilder().append("Skipping telemetry for '").append(telemetry.getId()).append("' as it is configured to start later").toString());
                     return;
                 }
                 if (telemetry.getEnd().isBefore(LocalDate.now())) {
-                    LOGGER.config("Skipping telemetry for '" + telemetry.getId() + "' as it is configured to end in the past");
+                    LOGGER.config(new StringBuilder().append("Skipping telemetry for '").append(telemetry.getId()).append("' as it is configured to end in the past").toString());
                     return;
                 }
 
@@ -173,11 +173,11 @@ public abstract class Telemetry implements ExtensionPoint {
                 try {
                     data = telemetry.createContent();
                 } catch (Exception e) {
-                    LOGGER.log(Level.WARNING, "Failed to build telemetry content for: '" + telemetry.getId() + "'", e);
+                    LOGGER.log(Level.WARNING, new StringBuilder().append("Failed to build telemetry content for: '").append(telemetry.getId()).append("'").toString(), e);
                 }
 
                 if (data == null) {
-                    LOGGER.log(Level.CONFIG, "Skipping telemetry for '" + telemetry.getId() + "' as it has no data");
+                    LOGGER.log(Level.CONFIG, new StringBuilder().append("Skipping telemetry for '").append(telemetry.getId()).append("' as it has no data").toString());
                     return;
                 }
 
@@ -208,13 +208,14 @@ public abstract class Telemetry implements ExtensionPoint {
                         writer.append(body);
                     }
 
-                    LOGGER.config("Telemetry submission received response '" + http.getResponseCode() + " " + http.getResponseMessage() + "' for: " + telemetry.getId());
+                    LOGGER.config(new StringBuilder().append("Telemetry submission received response '").append(http.getResponseCode()).append(" ").append(http.getResponseMessage()).append("' for: ")
+							.append(telemetry.getId()).toString());
                 } catch (MalformedURLException e) {
-                    LOGGER.config("Malformed endpoint URL: " + ENDPOINT + " for telemetry: " + telemetry.getId());
+                    LOGGER.config(new StringBuilder().append("Malformed endpoint URL: ").append(ENDPOINT).append(" for telemetry: ").append(telemetry.getId()).toString());
                 } catch (IOException e) {
                     // deliberately low visibility, as temporary infra problems aren't a big deal and we'd
                     // rather have some unsuccessful submissions than admins opting out to clean up logs
-                    LOGGER.log(Level.CONFIG, "Failed to submit telemetry: " + telemetry.getId() + " to: " + ENDPOINT, e);
+                    LOGGER.log(Level.CONFIG, new StringBuilder().append("Failed to submit telemetry: ").append(telemetry.getId()).append(" to: ").append(ENDPOINT).toString(), e);
                 }
             });
         }

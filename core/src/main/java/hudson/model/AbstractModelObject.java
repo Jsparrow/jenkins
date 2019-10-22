@@ -66,8 +66,9 @@ public abstract class AbstractModelObject implements SearchableModelObject {
      */
     protected final void sendError(String message, StaplerRequest req, StaplerResponse rsp, boolean pre) throws ServletException, IOException {
         req.setAttribute("message",message);
-        if(pre)
-            req.setAttribute("pre",true);
+        if(pre) {
+			req.setAttribute("pre",true);
+		}
         rsp.forward(this,"error",req);
     }
 
@@ -84,10 +85,14 @@ public abstract class AbstractModelObject implements SearchableModelObject {
     @Deprecated
     protected final void requirePOST() throws ServletException {
         StaplerRequest req = Stapler.getCurrentRequest();
-        if (req==null)  return; // invoked outside the context of servlet
+        if (req==null)
+		 {
+			return; // invoked outside the context of servlet
+		}
         String method = req.getMethod();
-        if(!method.equalsIgnoreCase("POST"))
-            throw new ServletException("Must be POST, Can't be "+method);
+        if(!"POST".equalsIgnoreCase(method)) {
+			throw new ServletException("Must be POST, Can't be "+method);
+		}
     }
 
     /**
@@ -97,15 +102,18 @@ public abstract class AbstractModelObject implements SearchableModelObject {
         return new SearchIndexBuilder().addAllAnnotations(this);
     }
 
-    public final SearchIndex getSearchIndex() {
+    @Override
+	public final SearchIndex getSearchIndex() {
         return makeSearchIndex().make();
     }
 
-    public Search getSearch() {
+    @Override
+	public Search getSearch() {
         for (SearchFactory sf : SearchFactory.all()) {
             Search s = sf.createFor(this);
-            if (s!=null)
-                return s;
+            if (s!=null) {
+				return s;
+			}
         }
         return new Search();
     }
@@ -113,7 +121,8 @@ public abstract class AbstractModelObject implements SearchableModelObject {
     /**
      * Default implementation that returns the display name.
      */
-    public String getSearchName() {
+    @Override
+	public String getSearchName() {
         return getDisplayName();
     }
 }

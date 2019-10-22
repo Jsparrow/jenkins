@@ -78,9 +78,39 @@ import org.kohsuke.stapler.interceptor.RequirePOST;
 public class OldDataMonitor extends AdministrativeMonitor {
     private static final Logger LOGGER = Logger.getLogger(OldDataMonitor.class.getName());
 
-    private ConcurrentMap<SaveableReference,VersionRange> data = new ConcurrentHashMap<>();
+	// Listeners to remove data here if resaved or deleted in regular Hudson usage
 
-    /**
+    @Extension
+    public static final SaveableListener changeListener = new SaveableListener() {
+        @Override
+        public void onChange(Saveable obj, XmlFile file) {
+            remove(obj, false);
+        }
+    };
+
+	@Extension
+    public static final ItemListener itemDeleteListener = new ItemListener() {
+        @Override
+        public void onDeleted(Item item) {
+            remove(item, true);
+        }
+    };
+
+	@Extension
+    public static final RunListener<Run> runDeleteListener = new RunListener<Run>() {
+        @Override
+        public void onDeleted(Run run) {
+            remove(run, true);
+        }
+    };
+
+	private ConcurrentMap<SaveableReference,VersionRange> data = new ConcurrentHashMap<>();
+
+	public OldDataMonitor() {
+        super("OldData");
+    }
+
+	/**
      * Gets instance of the monitor.
      * @param j Jenkins instance
      * @return Monitor instance
@@ -88,35 +118,32 @@ public class OldDataMonitor extends AdministrativeMonitor {
      *              It should never happen since the monitor is located in the core.
      */
     @Nonnull
-    static OldDataMonitor get(Jenkins j) throws IllegalStateException {
+    static OldDataMonitor get(Jenkins j) {
         return ExtensionList.lookupSingleton(OldDataMonitor.class);
     }
 
-    public OldDataMonitor() {
-        super("OldData");
-    }
-
-    @Override
+	@Override
     public String getDisplayName() {
         return Messages.OldDataMonitor_DisplayName();
     }
 
-    public boolean isActivated() {
+	@Override
+	public boolean isActivated() {
         return !data.isEmpty();
     }
 
-    public Map<Saveable,VersionRange> getData() {
+	public Map<Saveable,VersionRange> getData() {
         Map<Saveable,VersionRange> r = new HashMap<>();
-        for (Map.Entry<SaveableReference,VersionRange> entry : this.data.entrySet()) {
+        this.data.entrySet().forEach(entry -> {
             Saveable s = entry.getKey().get();
             if (s != null) {
                 r.put(s, entry.getValue());
             }
-        }
+        });
         return r;
     }
 
-    private static void remove(Saveable obj, boolean isDelete) {
+	private static void remove(Saveable obj, boolean isDelete) {
         Jenkins j = Jenkins.get();
         OldDataMonitor odm = get(j);
         SecurityContext oldContext = ACL.impersonate(ACL.SYSTEM);
@@ -132,33 +159,7 @@ public class OldDataMonitor extends AdministrativeMonitor {
         }
     }
 
-    // Listeners to remove data here if resaved or deleted in regular Hudson usage
-
-    @Extension
-    public static final SaveableListener changeListener = new SaveableListener() {
-        @Override
-        public void onChange(Saveable obj, XmlFile file) {
-            remove(obj, false);
-        }
-    };
-
-    @Extension
-    public static final ItemListener itemDeleteListener = new ItemListener() {
-        @Override
-        public void onDeleted(Item item) {
-            remove(item, true);
-        }
-    };
-
-    @Extension
-    public static final RunListener<Run> runDeleteListener = new RunListener<Run>() {
-        @Override
-        public void onDeleted(Run run) {
-            remove(run, true);
-        }
-    };
-
-    /**
+	/**
      * Inform monitor that some data in a deprecated format has been loaded,
      * and converted in-memory to a new structure.
      * @param obj Saveable object; calling save() on this object will persist
@@ -182,7 +183,7 @@ public class OldDataMonitor extends AdministrativeMonitor {
         }
     }
 
-    /**
+	/**
      * Inform monitor that some data in a deprecated format has been loaded, during
      * XStream unmarshalling when the Saveable containing this object is not available.
      * @param context XStream unmarshalling context
@@ -192,14 +193,7 @@ public class OldDataMonitor extends AdministrativeMonitor {
         RobustReflectionConverter.addErrorInContext(context, new ReportException(version));
     }
 
-    private static class ReportException extends Exception {
-        private String version;
-        private ReportException(String version) {
-            this.version = version;
-        }
-    }
-
-    /**
+	/**
      * Inform monitor that some unreadable data was found while loading.
      * @param obj Saveable object; calling save() on this object will discard the unreadable data.
      * @param errors Exception(s) thrown while loading, regarding the unreadable classes/fields.
@@ -211,17 +205,19 @@ public class OldDataMonitor extends AdministrativeMonitor {
             if (e instanceof ReportException) {
                 report(obj, ((ReportException)e).version);
             } else {
-                if (++i > 1) buf.append(", ");
+                if (++i > 1) {
+					buf.append(", ");
+				}
                 buf.append(e.getClass().getSimpleName()).append(": ").append(e.getMessage());
             }
         }
-        if (buf.length() == 0) return;
+        if (buf.length() == 0) {
+			return;
+		}
         Jenkins j = Jenkins.getInstanceOrNull();
         if (j == null) { // Need this path, at least for unit tests, but also in case of very broken startup
             // Startup failed, something is very broken, so report what we can.
-            for (Throwable t : errors) {
-                LOGGER.log(Level.WARNING, "could not read " + obj + " (and Jenkins did not start up)", t);
-            }
+			errors.forEach(t -> LOGGER.log(Level.WARNING, new StringBuilder().append("could not read ").append(obj).append(" (and Jenkins did not start up)").toString(), t));
             return;
         }
         OldDataMonitor odm = get(j);
@@ -236,13 +232,115 @@ public class OldDataMonitor extends AdministrativeMonitor {
         }
     }
 
+	/**
+     * Sorted list of unique max-versions in the data set.  For select list in jelly.
+     */
+    @Restricted(NoExternalUse.class)
+    public Iterator<VersionNumber> getVersionList() {
+        TreeSet<VersionNumber> set = new TreeSet<>();
+        data.values().stream().filter(vr -> vr.max != null).forEach(vr -> set.add(vr.max));
+        return set.iterator();
+    }
+
+	/**
+     * Depending on whether the user said "yes" or "no", send him to the right place.
+     */
+    @RequirePOST
+    public HttpResponse doAct(StaplerRequest req, StaplerResponse rsp) throws IOException {
+        if (req.hasParameter("no")) {
+            disable(true);
+            return HttpResponses.redirectViaContextPath("/manage");
+        } else {
+            return new HttpRedirect("manage");
+        }
+    }
+
+	/**
+     * Save all or some of the files to persist data in the new forms.
+     * Remove those items from the data map.
+     */
+    @RequirePOST
+    public HttpResponse doUpgrade(StaplerRequest req, StaplerResponse rsp) {
+        final String thruVerParam = req.getParameter("thruVer");
+        final VersionNumber thruVer = "all".equals(thruVerParam) ? null : new VersionNumber(thruVerParam);
+
+        saveAndRemoveEntries((Map.Entry<SaveableReference, VersionRange> entry) -> {
+		    VersionNumber version = entry.getValue().max;
+		    return version != null && (thruVer == null || !version.isNewerThan(thruVer));
+		});
+
+        return HttpResponses.forwardToPreviousPage();
+    }
+
+	/**
+     * Save all files containing only unreadable data (no data upgrades), which discards this data.
+     * Remove those items from the data map.
+     */
+    @RequirePOST
+    public HttpResponse doDiscard(StaplerRequest req, StaplerResponse rsp) {
+        saveAndRemoveEntries( (Map.Entry<SaveableReference, VersionRange> entry) -> entry.getValue().max == null);
+
+        return HttpResponses.forwardToPreviousPage();
+    }
+
+	private void saveAndRemoveEntries(Predicate<Map.Entry<SaveableReference, VersionRange>> matchingPredicate) {
+        /*
+         * Note that there a race condition here: we acquire the lock and get localCopy which includes some
+         * project (say); then we go through our loop and save that project; then someone POSTs a new
+         * config.xml for the project with some old data, causing remove to be called and the project to be
+         * added to data (in the new version); then we hit the end of this method and the project is removed
+         * from data again, even though it again has old data.
+         *
+         * In practice this condition is extremely unlikely, and not a major problem even if it
+         * does occur: just means the user will be prompted to discard less than they should have been (and
+         * would see the warning again after next restart).
+         */
+        List<SaveableReference> removed = new ArrayList<>();
+        for (Map.Entry<SaveableReference,VersionRange> entry : data.entrySet()) {
+            if (matchingPredicate.apply(entry)) {
+                Saveable s = entry.getKey().get();
+                if (s != null) {
+                    try {
+                        s.save();
+                    } catch (Exception x) {
+                        LOGGER.log(Level.WARNING, "failed to save " + s, x);
+                    }
+                }
+                removed.add(entry.getKey());
+            }
+        }
+
+        data.keySet().removeAll(removed);
+    }
+
+	public HttpResponse doIndex(StaplerResponse rsp) throws IOException {
+        return new HttpRedirect("manage");
+    }
+
+	private static SaveableReference referTo(Saveable s) {
+        if (s instanceof Run) {
+            Job parent = ((Run) s).getParent();
+            if (Jenkins.get().getItemByFullName(parent.getFullName()) == parent) {
+                return new RunSaveableReference((Run) s);
+            }
+        }
+        return new SimpleSaveableReference(s);
+    }
+
+    private static class ReportException extends Exception {
+        private String version;
+        private ReportException(String version) {
+            this.version = version;
+        }
+    }
+
     public static class VersionRange {
         private static VersionNumber currentVersion = Jenkins.getVersion();
 
         final VersionNumber min;
         final VersionNumber max;
         final boolean single;
-        final public String extra;
+        public final String extra;
 
         public VersionRange(VersionRange previous, String version, String extra) {
             if (previous == null) {
@@ -289,117 +387,10 @@ public class OldDataMonitor extends AdministrativeMonitor {
 
     }
 
-    /**
-     * Sorted list of unique max-versions in the data set.  For select list in jelly.
-     */
-    @Restricted(NoExternalUse.class)
-    public Iterator<VersionNumber> getVersionList() {
-        TreeSet<VersionNumber> set = new TreeSet<>();
-        for (VersionRange vr : data.values()) {
-            if (vr.max != null) {
-                set.add(vr.max);
-            }
-        }
-        return set.iterator();
-    }
-
-    /**
-     * Depending on whether the user said "yes" or "no", send him to the right place.
-     */
-    @RequirePOST
-    public HttpResponse doAct(StaplerRequest req, StaplerResponse rsp) throws IOException {
-        if (req.hasParameter("no")) {
-            disable(true);
-            return HttpResponses.redirectViaContextPath("/manage");
-        } else {
-            return new HttpRedirect("manage");
-        }
-    }
-
-    /**
-     * Save all or some of the files to persist data in the new forms.
-     * Remove those items from the data map.
-     */
-    @RequirePOST
-    public HttpResponse doUpgrade(StaplerRequest req, StaplerResponse rsp) {
-        final String thruVerParam = req.getParameter("thruVer");
-        final VersionNumber thruVer = thruVerParam.equals("all") ? null : new VersionNumber(thruVerParam);
-
-        saveAndRemoveEntries(new Predicate<Map.Entry<SaveableReference, VersionRange>>() {
-            @Override
-            public boolean apply(Map.Entry<SaveableReference, VersionRange> entry) {
-                VersionNumber version = entry.getValue().max;
-                return version != null && (thruVer == null || !version.isNewerThan(thruVer));
-            }
-        });
-
-        return HttpResponses.forwardToPreviousPage();
-    }
-
-    /**
-     * Save all files containing only unreadable data (no data upgrades), which discards this data.
-     * Remove those items from the data map.
-     */
-    @RequirePOST
-    public HttpResponse doDiscard(StaplerRequest req, StaplerResponse rsp) {
-        saveAndRemoveEntries( new Predicate<Map.Entry<SaveableReference,VersionRange>>() {
-            @Override
-            public boolean apply(Map.Entry<SaveableReference, VersionRange> entry) {
-                return entry.getValue().max == null;
-            }
-        });
-
-        return HttpResponses.forwardToPreviousPage();
-    }
-
-    private void saveAndRemoveEntries(Predicate<Map.Entry<SaveableReference, VersionRange>> matchingPredicate) {
-        /*
-         * Note that there a race condition here: we acquire the lock and get localCopy which includes some
-         * project (say); then we go through our loop and save that project; then someone POSTs a new
-         * config.xml for the project with some old data, causing remove to be called and the project to be
-         * added to data (in the new version); then we hit the end of this method and the project is removed
-         * from data again, even though it again has old data.
-         *
-         * In practice this condition is extremely unlikely, and not a major problem even if it
-         * does occur: just means the user will be prompted to discard less than they should have been (and
-         * would see the warning again after next restart).
-         */
-        List<SaveableReference> removed = new ArrayList<>();
-        for (Map.Entry<SaveableReference,VersionRange> entry : data.entrySet()) {
-            if (matchingPredicate.apply(entry)) {
-                Saveable s = entry.getKey().get();
-                if (s != null) {
-                    try {
-                        s.save();
-                    } catch (Exception x) {
-                        LOGGER.log(Level.WARNING, "failed to save " + s, x);
-                    }
-                }
-                removed.add(entry.getKey());
-            }
-        }
-
-        data.keySet().removeAll(removed);
-    }
-
-    public HttpResponse doIndex(StaplerResponse rsp) throws IOException {
-        return new HttpRedirect("manage");
-    }
-
     /** Reference to a saveable object that need not actually hold it in heap. */
     private interface SaveableReference {
         @CheckForNull Saveable get();
         // must also define equals, hashCode
-    }
-
-    private static SaveableReference referTo(Saveable s) {
-        if (s instanceof Run) {
-            Job parent = ((Run) s).getParent();
-            if (Jenkins.get().getItemByFullName(parent.getFullName()) == parent) {
-                return new RunSaveableReference((Run) s);
-            }
-        }
-        return new SimpleSaveableReference(s);
     }
 
     private static final class SimpleSaveableReference implements SaveableReference {
@@ -459,7 +450,8 @@ public class OldDataMonitor extends AdministrativeMonitor {
             return Messages.OldDataMonitor_Description();
         }
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.OldDataMonitor_DisplayName();
         }
     }

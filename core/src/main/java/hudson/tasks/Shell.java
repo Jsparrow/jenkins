@@ -59,85 +59,91 @@ import javax.annotation.CheckForNull;
  */
 public class Shell extends CommandInterpreter {
 
-    @DataBoundConstructor
+    private static final Logger LOGGER = Logger.getLogger(Shell.class.getName());
+	private Integer unstableReturn;
+
+
+
+	@DataBoundConstructor
     public Shell(String command) {
         super(LineEndingConversion.convertEOL(command, LineEndingConversion.EOLType.Unix));
     }
 
-    private Integer unstableReturn;
-
-
-
-    /**
+	/**
      * Older versions of bash have a bug where non-ASCII on the first line
      * makes the shell think the file is a binary file and not a script. Adding
      * a leading line feed works around this problem.
      */
     private static String addLineFeedForNonASCII(String s) {
-        if(!s.startsWith("#!")) {
-            if (s.indexOf('\n')!=0) {
-                return "\n" + s;
-            }
-        }
+        boolean condition = !s.startsWith("#!") && s.indexOf('\n')!=0;
+		if(condition) {
+		    return "\n" + s;
+		}
 
         return s;
     }
 
-    public String[] buildCommandLine(FilePath script) {
-        if(command.startsWith("#!")) {
-            // interpreter override
-            int end = command.indexOf('\n');
-            if(end<0)   end=command.length();
-            List<String> args = new ArrayList<>(Arrays.asList(Util.tokenize(command.substring(0, end).trim())));
-            args.add(script.getRemote());
-            args.set(0,args.get(0).substring(2));   // trim off "#!"
-            return args.toArray(new String[0]);
-        } else
-            return new String[] { getDescriptor().getShellOrDefault(script.getChannel()), "-xe", script.getRemote()};
+	@Override
+	public String[] buildCommandLine(FilePath script) {
+        if (!command.startsWith("#!")) {
+			return new String[] { getDescriptor().getShellOrDefault(script.getChannel()), "-xe", script.getRemote()};
+		}
+		// interpreter override
+		int end = command.indexOf('\n');
+		if(end<0) {
+			end=command.length();
+		}
+		List<String> args = new ArrayList<>(Arrays.asList(Util.tokenize(command.substring(0, end).trim())));
+		args.add(script.getRemote());
+		args.set(0,args.get(0).substring(2));   // trim off "#!"
+		return args.toArray(new String[0]);
     }
 
-    protected String getContents() {
+	@Override
+	protected String getContents() {
         return addLineFeedForNonASCII(LineEndingConversion.convertEOL(command,LineEndingConversion.EOLType.Unix));
     }
 
-    protected String getFileExtension() {
+	@Override
+	protected String getFileExtension() {
         return ".sh";
     }
 
-    @CheckForNull
+	@CheckForNull
     public final Integer getUnstableReturn() {
         return Integer.valueOf(0).equals(unstableReturn) ? null : unstableReturn;
     }
 
-    @DataBoundSetter
+	@DataBoundSetter
     public void setUnstableReturn(Integer unstableReturn) {
         this.unstableReturn = unstableReturn;
     }
 
-    @Override
+	@Override
     protected boolean isErrorlevelForUnstableBuild(int exitCode) {
         return this.unstableReturn != null && exitCode != 0 && this.unstableReturn.equals(exitCode);
     }
 
-    @Override
+	@Override
     public DescriptorImpl getDescriptor() {
         return (DescriptorImpl)super.getDescriptor();
     }
 
-    private Object readResolve() throws ObjectStreamException {
+	private Object readResolve() throws ObjectStreamException {
         Shell shell = new Shell(command);
         shell.setUnstableReturn(unstableReturn);
         return shell;
     }
 
-    @Extension @Symbol("shell")
+	@Extension @Symbol("shell")
     public static class DescriptorImpl extends BuildStepDescriptor<Builder> implements PersistentDescriptor {
         /**
          * Shell executable, or null to default.
          */
         private String shell;
 
-        public boolean isApplicable(Class<? extends AbstractProject> jobType) {
+        @Override
+		public boolean isApplicable(Class<? extends AbstractProject> jobType) {
             return true;
         }
 
@@ -158,8 +164,9 @@ public class Shell extends CommandInterpreter {
         }
 
         public String getShellOrDefault(VirtualChannel channel) {
-            if (shell != null)
-                return shell;
+            if (shell != null) {
+				return shell;
+			}
 
             String interpreter = null;
             try {
@@ -179,7 +186,8 @@ public class Shell extends CommandInterpreter {
             save();
         }
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.Shell_DisplayName();
         }
 
@@ -225,12 +233,11 @@ public class Shell extends CommandInterpreter {
 
             private static final long serialVersionUID = 1L;
 
-            public String call() throws IOException {
+            @Override
+			public String call() throws IOException {
                 return SystemUtils.IS_OS_WINDOWS ? "sh" : "/bin/sh";
             }
         }
 
     }
-
-    private static final Logger LOGGER = Logger.getLogger(Shell.class.getName());
 }

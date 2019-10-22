@@ -69,24 +69,28 @@ import org.kohsuke.accmod.restrictions.NoExternalUse;
  * @see SecureRequester
  */
 public class Api extends AbstractModelObject {
-    /**
+    private static final Logger LOGGER = Logger.getLogger(Api.class.getName());
+	private static final ModelBuilder MODEL_BUILDER = new ModelBuilder();
+	/**
      * Model object to be exposed as XML/JSON/etc.
      */
     public final Object bean;
 
-    public Api(Object bean) {
+	public Api(Object bean) {
         this.bean = bean;
     }
 
-    public String getDisplayName() {
+	@Override
+	public String getDisplayName() {
         return "API";
     }
 
-    public String getSearchUrl() {
+	@Override
+	public String getSearchUrl() {
         return "api";
     }
 
-    /**
+	/**
      * Exposes the bean as XML.
      */
     public void doXml(StaplerRequest req, StaplerResponse rsp,
@@ -122,11 +126,12 @@ public class Api extends AbstractModelObject {
                     XPath xExclude = dom.createXPath(exclude);
                     xExclude.setFunctionContext(functionContext);
                     List<org.dom4j.Node> list = (List<org.dom4j.Node>)xExclude.selectNodes(dom);
-                    for (org.dom4j.Node n : list) {
+                    list.forEach(n -> {
                         Element parent = n.getParent();
-                        if(parent!=null)
-                            parent.remove(n);
-                    }
+                        if(parent!=null) {
+							parent.remove(n);
+						}
+                    });
                 }
             }
             
@@ -199,11 +204,11 @@ public class Api extends AbstractModelObject {
         }
     }
 
-    private boolean isSimpleOutput(Object result) {
+	private boolean isSimpleOutput(Object result) {
         return result instanceof CharacterData || result instanceof String || result instanceof Number || result instanceof Boolean;
     }
 
-    /**
+	/**
      * Generate schema.
      */
     public void doSchema(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
@@ -214,7 +219,7 @@ public class Api extends AbstractModelObject {
         r.getOutputStream().close();
     }
 
-    /**
+	/**
      * Exposes the bean as JSON.
      */
     public void doJson(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
@@ -226,7 +231,7 @@ public class Api extends AbstractModelObject {
         }
     }
 
-    /**
+	/**
      * Exposes the bean as Python literal.
      */
     public void doPython(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
@@ -234,22 +239,14 @@ public class Api extends AbstractModelObject {
         rsp.serveExposedBean(req,bean, Flavor.PYTHON);
     }
 
-    private boolean permit(StaplerRequest req) {
-        for (SecureRequester r : ExtensionList.lookup(SecureRequester.class)) {
-            if (r.permit(req, bean)) {
-                return true;
-            }
-        }
-        return false;
+	private boolean permit(StaplerRequest req) {
+        return ExtensionList.lookup(SecureRequester.class).stream().anyMatch(r -> r.permit(req, bean));
     }
 
-    @Restricted(NoExternalUse.class)
+	@Restricted(NoExternalUse.class)
     protected void setHeaders(StaplerResponse rsp) {
         rsp.setHeader("X-Jenkins", Jenkins.VERSION);
         rsp.setHeader("X-Jenkins-Session", Jenkins.SESSION_HASH);
     }
-
-    private static final Logger LOGGER = Logger.getLogger(Api.class.getName());
-    private static final ModelBuilder MODEL_BUILDER = new ModelBuilder();
 
 }

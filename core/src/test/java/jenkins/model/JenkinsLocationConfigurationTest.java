@@ -43,12 +43,7 @@ public class JenkinsLocationConfigurationTest {
     @Before
     public void setUp() {
         config = mock(JenkinsLocationConfiguration.class, Mockito.CALLS_REAL_METHODS);
-        Answer<String> mockVoid = new Answer<String>() {
-            @Override
-            public String answer(InvocationOnMock invocation) throws Throwable {
-                return "stub";
-            }
-        };
+        Answer<String> mockVoid = (InvocationOnMock invocation) -> "stub";
         Mockito.doAnswer(mockVoid).when(config).save();      
         Mockito.doAnswer(mockVoid).when(config).save();
     }
@@ -66,7 +61,7 @@ public class JenkinsLocationConfigurationTest {
         assertEquals(email, config.getAdminAddress());
         
         // Quoted value
-        config.setAdminAddress("\""+email2+"\"");
+        config.setAdminAddress(new StringBuilder().append("\"").append(email2).append("\"").toString());
         assertEquals(email2, config.getAdminAddress());
     }
     

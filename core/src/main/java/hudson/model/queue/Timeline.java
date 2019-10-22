@@ -45,7 +45,9 @@ final class Timeline {
      */
     private int at(long t) {
         SortedMap<Long, int[]> head = data.subMap(t,Long.MAX_VALUE);
-        if (head.isEmpty()) return 0;
+        if (head.isEmpty()) {
+			return 0;
+		}
         return data.get(head.firstKey())[0];
     }
 
@@ -63,7 +65,10 @@ final class Timeline {
      * Splits the range set at the given timestamp (if it hasn't been split yet)
      */
     private void splitAt(long t) {
-        if (data.containsKey(t)) return; // already split at this timestamp
+        if (data.containsKey(t))
+		 {
+			return; // already split at this timestamp
+		}
 
         SortedMap<Long, int[]> head = data.headMap(t);
 
@@ -108,13 +113,18 @@ final class Timeline {
                 if (at(t)>n) {
                     // value too big. what's the next t that's worth trying?
                     Long nxt = next(t);
-                    if (nxt==null)  return null;
+                    if (nxt==null) {
+						return null;
+					}
                     start = nxt;
                     continue OUTER;
                 } else {
                     Long nxt = next(t);
-                    if (nxt==null) t = Long.MAX_VALUE;
-                    else           t = nxt;
+                    if (nxt==null) {
+						t = Long.MAX_VALUE;
+					} else {
+						t = nxt;
+					}
                 }
             }
             // q(t) looks good at the entire [start,start+duration)

@@ -26,13 +26,14 @@ public class HexStringConfidentialKey extends ConfidentialKey {
      */
     public HexStringConfidentialKey(String id, int length) {
         super(id);
-        if (length%2!=0)
-            throw new IllegalArgumentException("length must be even: "+length);
+        if (length%2!=0) {
+			throw new IllegalArgumentException("length must be even: "+length);
+		}
         this.length = length;
     }
 
     public HexStringConfidentialKey(Class owner, String shortName, int length) {
-        this(owner.getName()+'.'+shortName,length);
+        this(new StringBuilder().append(owner.getName()).append('.').append(shortName).toString(),length);
     }
 
     /**

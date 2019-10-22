@@ -53,6 +53,15 @@ import java.util.logging.Logger;
  */
 public abstract class ChangeLogAnnotator implements ExtensionPoint {
     /**
+     * All registered {@link ChangeLogAnnotator}s.
+     *
+     * @deprecated as of 1.286
+     *      Use {@link #all()} for read access, and {@link Extension} for registration.
+     */
+    @Deprecated
+    public static final CopyOnWriteList<ChangeLogAnnotator> annotators = ExtensionListView.createCopyOnWriteList(ChangeLogAnnotator.class);
+
+	/**
      * Called by Hudson to allow markups to be added to the changelog text.
      *
      * <p>
@@ -86,12 +95,12 @@ public abstract class ChangeLogAnnotator implements ExtensionPoint {
         }
     }
 
-    @Deprecated
+	@Deprecated
     public void annotate(AbstractBuild<?,?> build, Entry change, MarkupText text) {
         annotate((Run) build, change, text);
     }
 
-    /**
+	/**
      * Registers this annotator, so that Hudson starts using this object
      * for adding markup.
      *
@@ -103,23 +112,14 @@ public abstract class ChangeLogAnnotator implements ExtensionPoint {
         all().add(this);
     }
 
-    /**
+	/**
      * Unregisters this annotator, so that Hudson stops using this object.
      */
     public final boolean unregister() {
         return all().remove(this);
     }
 
-    /**
-     * All registered {@link ChangeLogAnnotator}s.
-     *
-     * @deprecated as of 1.286
-     *      Use {@link #all()} for read access, and {@link Extension} for registration.
-     */
-    @Deprecated
-    public static final CopyOnWriteList<ChangeLogAnnotator> annotators = ExtensionListView.createCopyOnWriteList(ChangeLogAnnotator.class);
-
-    /**
+	/**
      * Returns all the registered {@link ChangeLogAnnotator} descriptors.
      */
     public static ExtensionList<ChangeLogAnnotator> all() {

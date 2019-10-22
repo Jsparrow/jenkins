@@ -33,15 +33,18 @@ public class SearchItems {
 
     public static SearchItem create(final String searchName, final String url, final SearchIndex children) {
         return new SearchItem() {
-            public String getSearchName() {
+            @Override
+			public String getSearchName() {
                 return searchName;
             }
 
-            public String getSearchUrl() {
+            @Override
+			public String getSearchUrl() {
                 return url;
             }
 
-            public SearchIndex getSearchIndex() {
+            @Override
+			public SearchIndex getSearchIndex() {
                 return children;
             }
         };
@@ -49,15 +52,18 @@ public class SearchItems {
 
     public static SearchItem create(final String searchName, final String url, final SearchableModelObject searchable) {
         return new SearchItem() {
-            public String getSearchName() {
+            @Override
+			public String getSearchName() {
                 return searchName;
             }
 
-            public String getSearchUrl() {
+            @Override
+			public String getSearchUrl() {
                 return url;
             }
 
-            public SearchIndex getSearchIndex() {
+            @Override
+			public SearchIndex getSearchIndex() {
                 return searchable.getSearchIndex();
             }
         };

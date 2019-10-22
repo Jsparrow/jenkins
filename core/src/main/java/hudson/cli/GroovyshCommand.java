@@ -50,14 +50,14 @@ import org.kohsuke.args4j.Argument;
  */
 @Extension
 public class GroovyshCommand extends CLICommand {
-    @Override
+    @Argument(metaVar="ARGS") public List<String> args = new ArrayList<>();
+
+	@Override
     public String getShortDescription() {
         return Messages.GroovyshCommand_ShortDescription();
     }
 
-    @Argument(metaVar="ARGS") public List<String> args = new ArrayList<>();
-
-    @Override
+	@Override
     protected int run() {
         // this allows the caller to manipulate the JVM state, so require the admin privilege.
         Jenkins.getActiveInstance().checkPermission(Jenkins.RUN_SCRIPTS);
@@ -67,18 +67,18 @@ public class GroovyshCommand extends CLICommand {
         TerminalFactory.reset();
 
         StringBuilder commandLine = new StringBuilder();
-        for (String arg : args) {
+        args.forEach(arg -> {
             if (commandLine.length() > 0) {
                 commandLine.append(" ");
             }
             commandLine.append(arg);
-        }
+        });
 
         Groovysh shell = createShell(stdin, stdout, stderr);
         return shell.run(commandLine.toString());
     }
 
-    @SuppressWarnings({"unchecked","rawtypes"})
+	@SuppressWarnings({"unchecked","rawtypes"})
     protected Groovysh createShell(InputStream stdin, PrintStream stdout,
         PrintStream stderr) {
 

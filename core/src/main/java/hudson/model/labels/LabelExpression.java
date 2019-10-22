@@ -42,7 +42,17 @@ public abstract class LabelExpression extends Label {
         return getDisplayName();
     }
 
-    public static class Not extends LabelExpression {
+    /**
+     * Puts the label name into a parenthesis if the given operator will have a higher precedence.
+     */
+    static String paren(LabelOperatorPrecedence op, Label l) {
+        if (op.compareTo(l.precedence())<0) {
+			return new StringBuilder().append('(').append(l.getExpression()).append(')').toString();
+		}
+        return l.getExpression();
+    }
+
+	public static class Not extends LabelExpression {
         public final Label base;
 
         public Not(Label base) {
@@ -73,7 +83,7 @@ public abstract class LabelExpression extends Label {
         public final Label base;
 
         public Paren(Label base) {
-            super('('+base.getExpression()+')');
+            super(new StringBuilder().append('(').append(base.getExpression()).append(')').toString());
             this.base = base;
         }
 
@@ -93,17 +103,9 @@ public abstract class LabelExpression extends Label {
         }
     }
 
-    /**
-     * Puts the label name into a parenthesis if the given operator will have a higher precedence.
-     */
-    static String paren(LabelOperatorPrecedence op, Label l) {
-        if (op.compareTo(l.precedence())<0)
-            return '('+l.getExpression()+')';
-        return l.getExpression();
-    }
-
-    public static abstract class Binary extends LabelExpression {
-        public final Label lhs,rhs;
+    public abstract static class Binary extends LabelExpression {
+        public final Label lhs;
+		public final Label rhs;
 
         public Binary(Label lhs, Label rhs, LabelOperatorPrecedence op) {
             super(combine(lhs, rhs, op));
@@ -112,7 +114,7 @@ public abstract class LabelExpression extends Label {
         }
 
         private static String combine(Label lhs, Label rhs, LabelOperatorPrecedence op) {
-            return paren(op,lhs)+op.str+paren(op,rhs);
+            return new StringBuilder().append(paren(op,lhs)).append(op.str).append(paren(op,rhs)).toString();
         }
 
         /**

@@ -38,12 +38,7 @@ public abstract class JnlpAgentReceiver extends JnlpConnectionStateListener impl
     }
 
     public static boolean exists(String clientName) {
-        for (JnlpAgentReceiver receiver : all()) {
-            if (receiver.owns(clientName)) {
-                return true;
-            }
-        }
-        return false;
+        return all().stream().anyMatch(receiver -> receiver.owns(clientName));
     }
 
     protected abstract boolean owns(String clientName);

@@ -93,7 +93,57 @@ import java.util.Collection;
 @ExportedBean
 public class ListBoxModel extends ArrayList<ListBoxModel.Option> implements HttpResponse {
 
-    @ExportedBean(defaultVisibility=999)
+    public ListBoxModel(int initialCapacity) {
+        super(initialCapacity);
+    }
+
+	public ListBoxModel() {
+    }
+
+	public ListBoxModel(Collection<Option> c) {
+        super(c);
+    }
+
+	public ListBoxModel(Option... data) {
+        super(Arrays.asList(data));
+    }
+
+	public void add(String displayName, String value) {
+        add(new Option(displayName,value));
+    }
+
+	public void add(ModelObject usedForDisplayName, String value) {
+        add(usedForDisplayName.getDisplayName(), value);
+    }
+
+	/**
+     * A version of the {@link #add(String, String)} method where the display name and the value are the same. 
+     */
+    public ListBoxModel add(String nameAndValue) {
+        add(nameAndValue,nameAndValue);
+        return this;
+    }
+
+	public void writeTo(StaplerRequest req,StaplerResponse rsp) throws IOException, ServletException {
+        rsp.serveExposedBean(req,this,Flavor.JSON);
+    }
+
+	@Override
+	public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object node) throws IOException, ServletException {
+        writeTo(req,rsp);
+    }
+
+	/**
+     * @deprecated
+     *      Exposed for stapler. Not meant for programatic consumption.
+     */
+    @Exported
+    @Deprecated
+    public Option[] values() {
+        return toArray(new Option[size()]);
+    }
+
+	@ExportedBean(defaultVisibility=999)
     public static final class Option {
         /**
          * Text to be displayed to user.
@@ -127,57 +177,9 @@ public class ListBoxModel extends ArrayList<ListBoxModel.Option> implements Http
         }
 
         @Override public String toString() {
-            return name + "=" + value + (selected ? "[selected]" : "");
+            return new StringBuilder().append(name).append("=").append(value).append(selected ? "[selected]" : "")
+					.toString();
         }
 
-    }
-
-    public ListBoxModel(int initialCapacity) {
-        super(initialCapacity);
-    }
-
-    public ListBoxModel() {
-    }
-
-    public ListBoxModel(Collection<Option> c) {
-        super(c);
-    }
-
-    public ListBoxModel(Option... data) {
-        super(Arrays.asList(data));
-    }
-
-    public void add(String displayName, String value) {
-        add(new Option(displayName,value));
-    }
-
-    public void add(ModelObject usedForDisplayName, String value) {
-        add(usedForDisplayName.getDisplayName(), value);
-    }
-
-    /**
-     * A version of the {@link #add(String, String)} method where the display name and the value are the same. 
-     */
-    public ListBoxModel add(String nameAndValue) {
-        add(nameAndValue,nameAndValue);
-        return this;
-    }
-
-    public void writeTo(StaplerRequest req,StaplerResponse rsp) throws IOException, ServletException {
-        rsp.serveExposedBean(req,this,Flavor.JSON);
-    }
-
-    public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object node) throws IOException, ServletException {
-        writeTo(req,rsp);
-    }
-
-    /**
-     * @deprecated
-     *      Exposed for stapler. Not meant for programatic consumption.
-     */
-    @Exported
-    @Deprecated
-    public Option[] values() {
-        return toArray(new Option[size()]);
     }
 }

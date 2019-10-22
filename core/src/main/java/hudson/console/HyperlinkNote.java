@@ -45,18 +45,20 @@ import java.util.logging.Logger;
  * @see ModelHyperlinkNote
  */
 public class HyperlinkNote extends ConsoleNote {
-    /**
+    private static final Logger LOGGER = Logger.getLogger(HyperlinkNote.class.getName());
+	private static final long serialVersionUID = 3908468829358026949L;
+	/**
      * If this starts with '/', it's interpreted as a path within the context path.
      */
     private final String url;
-    private final int length;
+	private final int length;
 
-    public HyperlinkNote(String url, int length) {
+	public HyperlinkNote(String url, int length) {
         this.url = url;
         this.length = length;
     }
 
-    @Override
+	@Override
     public ConsoleAnnotator annotate(Object context, MarkupText text, int charPos) {
         String url = this.url;
         if (url.startsWith("/")) {
@@ -69,19 +71,19 @@ public class HyperlinkNote extends ConsoleNote {
                 url = Jenkins.get().getRootUrl()+url.substring(1);
             }
         }
-        text.addMarkup(charPos, charPos + length, "<a href='" + url + "'"+extraAttributes()+">", "</a>");
+        text.addMarkup(charPos, charPos + length, new StringBuilder().append("<a href='").append(url).append("'").append(extraAttributes()).append(">").toString(), "</a>");
         return null;
     }
 
-    protected String extraAttributes() {
+	protected String extraAttributes() {
         return "";
     }
 
-    public static String encodeTo(String url, String text) {
+	public static String encodeTo(String url, String text) {
         return encodeTo(url, text, HyperlinkNote::new);
     }
 
-    @Restricted(NoExternalUse.class)
+	@Restricted(NoExternalUse.class)
     static String encodeTo(String url, String text, BiFunction<String, Integer, ConsoleNote> constructor) {
         // If text contains newlines, then its stored length will not match its length when being
         // displayed, since the display length will only include text up to the first newline,
@@ -98,14 +100,11 @@ public class HyperlinkNote extends ConsoleNote {
             return text;
         }
     }
-
-    @Extension @Symbol("hyperlink")
+	@Extension @Symbol("hyperlink")
     public static class DescriptorImpl extends ConsoleAnnotationDescriptor {
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return "Hyperlinks";
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(HyperlinkNote.class.getName());
-    private static final long serialVersionUID = 3908468829358026949L;
 }

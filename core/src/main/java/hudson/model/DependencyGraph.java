@@ -69,29 +69,41 @@ import java.util.Stack;
  */
 public class DependencyGraph implements Comparator<AbstractProject> {
 
-    private Map<AbstractProject, List<DependencyGroup>> forward = new HashMap<>();
-    private Map<AbstractProject, List<DependencyGroup>> backward = new HashMap<>();
+    private static final Comparator<DependencyGroup> NAME_COMPARATOR = (DependencyGroup lhs, DependencyGroup rhs) -> {
+	    int cmp = lhs.getUpstreamProject().getName().compareTo(rhs.getUpstreamProject().getName());
+	    return cmp != 0 ? cmp : lhs.getDownstreamProject().getName().compareTo(rhs.getDownstreamProject().getName());
+	};
+	public static final DependencyGraph EMPTY = new DependencyGraph(false);
+	private Map<AbstractProject, List<DependencyGroup>> forward = new HashMap<>();
+	private Map<AbstractProject, List<DependencyGroup>> backward = new HashMap<>();
+	private transient Map<Class<?>, Object> computationalData;
+	private boolean built;
+	private Comparator<AbstractProject<?,?>> topologicalOrder;
+	private List<AbstractProject<?,?>> topologicallySorted;
 
-    private transient Map<Class<?>, Object> computationalData;
-
-    private boolean built;
-
-    private Comparator<AbstractProject<?,?>> topologicalOrder;
-    private List<AbstractProject<?,?>> topologicallySorted;
-
-    /**
+	/**
      * Builds the dependency graph.
      */
     public DependencyGraph() {
     }
-    
-    public void build() {
+
+	/**
+     * Special constructor for creating an empty graph
+     */
+    private DependencyGraph(boolean dummy) {
+        forward = backward = Collections.emptyMap();
+        topologicalDagSort();
+        built = true;
+    }
+
+	public void build() {
         // Set full privileges while computing to avoid missing any projects the current user cannot see.
         SecurityContext saveCtx = ACL.impersonate(ACL.SYSTEM);
         try {
             this.computationalData = new HashMap<>();
-            for( AbstractProject p : Jenkins.get().allItems(AbstractProject.class) )
-                p.buildDependencyGraph(this);
+            for( AbstractProject p : Jenkins.get().allItems(AbstractProject.class) ) {
+				p.buildDependencyGraph(this);
+			}
 
             forward = finalize(forward);
             backward = finalize(backward);
@@ -103,7 +115,7 @@ public class DependencyGraph implements Comparator<AbstractProject> {
         }
     }
 
-    /**
+	/**
      *
      *
      * See http://en.wikipedia.org/wiki/Tarjan's_strongly_connected_components_algorithm
@@ -136,26 +148,12 @@ public class DependencyGraph implements Comparator<AbstractProject> {
             }
         }
 
-        topologicalOrder = new Comparator<AbstractProject<?, ?>>() {
-            @Override
-            public int compare(AbstractProject<?,?> o1, AbstractProject<?,?> o2) {
-                return topoOrder.get(o1)-topoOrder.get(o2);
-            }
-        };
+        topologicalOrder = (AbstractProject<?,?> o1, AbstractProject<?,?> o2) -> topoOrder.get(o1) - topoOrder.get(o2);
 
         topologicallySorted = Collections.unmodifiableList(topologicallySorted);
     }
 
-    /**
-     * Special constructor for creating an empty graph
-     */
-    private DependencyGraph(boolean dummy) {
-        forward = backward = Collections.emptyMap();
-        topologicalDagSort();
-        built = true;
-    }
-
-    /**
+	/**
      * Adds data which is useful for the time when the dependency graph is built up.
      * All this data will be cleaned once the dependency graph creation has finished.
      */
@@ -163,7 +161,7 @@ public class DependencyGraph implements Comparator<AbstractProject> {
         this.computationalData.put(key, value);
     }
 
-    /**
+	/**
      * Gets temporary data which is needed for building up the dependency graph.
      */
     public <T> T getComputationalData(Class<T> key) {
@@ -172,7 +170,7 @@ public class DependencyGraph implements Comparator<AbstractProject> {
         return result;
     }
 
-    /**
+	/**
      * Gets all the immediate downstream projects (IOW forward edges) of the given project.
      *
      * @return
@@ -182,7 +180,7 @@ public class DependencyGraph implements Comparator<AbstractProject> {
         return get(forward,p,false);
     }
 
-    /**
+	/**
      * Gets all the immediate upstream projects (IOW backward edges) of the given project.
      *
      * @return
@@ -192,43 +190,43 @@ public class DependencyGraph implements Comparator<AbstractProject> {
         return get(backward,p,true);
     }
 
-    private List<AbstractProject> get(Map<AbstractProject, List<DependencyGroup>> map, AbstractProject src, boolean up) {
+	private List<AbstractProject> get(Map<AbstractProject, List<DependencyGroup>> map, AbstractProject src, boolean up) {
         List<DependencyGroup> v = map.get(src);
-        if(v==null) return Collections.emptyList();
+        if(v==null) {
+			return Collections.emptyList();
+		}
         List<AbstractProject> result = new ArrayList<>(v.size());
-        for (DependencyGroup d : v) result.add(up ? d.getUpstreamProject() : d.getDownstreamProject());
+        v.forEach(d -> result.add(up ? d.getUpstreamProject() : d.getDownstreamProject()));
         return result;
     }
 
-    /**
+	/**
      * @since 1.341
      */
     public List<Dependency> getDownstreamDependencies(AbstractProject p) {
         return get(forward,p);
     }
 
-    /**
+	/**
      * @since 1.341
      */
     public List<Dependency> getUpstreamDependencies(AbstractProject p) {
         return get(backward,p);
     }
 
-    private List<Dependency> get(Map<AbstractProject, List<DependencyGroup>> map, AbstractProject src) {
+	private List<Dependency> get(Map<AbstractProject, List<DependencyGroup>> map, AbstractProject src) {
         List<DependencyGroup> v = map.get(src);
         if(v==null) {
             return ImmutableList.of();
         } else {
             ImmutableList.Builder<Dependency> builder = ImmutableList.builder();
-            for (DependencyGroup dependencyGroup : v) {
-                builder.addAll(dependencyGroup.getGroup());
-            }
+            v.forEach(dependencyGroup -> builder.addAll(dependencyGroup.getGroup()));
             return builder.build();
         }
 
     }
 
-    /**
+	/**
      * @deprecated since 1.341; use {@link #addDependency(Dependency)}
      */
     @Deprecated
@@ -236,47 +234,45 @@ public class DependencyGraph implements Comparator<AbstractProject> {
         addDependency(new Dependency(upstream,downstream));
     }
 
-    /**
+	/**
      * Called during the dependency graph build phase to add a dependency edge.
      */
     public void addDependency(Dependency dep) {
-        if(built)
-            throw new IllegalStateException();
+        if(built) {
+			throw new IllegalStateException();
+		}
         add(forward,dep.getUpstreamProject(),dep);
         add(backward, dep.getDownstreamProject(), dep);
     }
 
-    /**
+	/**
      * @deprecated since 1.341
      */
     @Deprecated
     public void addDependency(AbstractProject upstream, Collection<? extends AbstractProject> downstream) {
-        for (AbstractProject p : downstream)
-            addDependency(upstream,p);
+        for (AbstractProject p : downstream) {
+			addDependency(upstream,p);
+		}
     }
 
-    /**
+	/**
      * @deprecated since 1.341
      */
     @Deprecated
     public void addDependency(Collection<? extends AbstractProject> upstream, AbstractProject downstream) {
-        for (AbstractProject p : upstream)
-            addDependency(p,downstream);
+        for (AbstractProject p : upstream) {
+			addDependency(p,downstream);
+		}
     }
 
-    /**
+	/**
      * Lists up {@link DependencyDeclarer} from the collection and let them builds dependencies.
      */
     public void addDependencyDeclarers(AbstractProject upstream, Collection<?> possibleDependecyDeclarers) {
-        for (Object o : possibleDependecyDeclarers) {
-            if (o instanceof DependencyDeclarer) {
-                DependencyDeclarer dd = (DependencyDeclarer) o;
-                dd.buildDependencyGraph(upstream,this);
-            }
-        }
+        possibleDependecyDeclarers.stream().filter(o -> o instanceof DependencyDeclarer).map(o -> (DependencyDeclarer) o).forEach(dd -> dd.buildDependencyGraph(upstream,this));
     }
 
-    /**
+	/**
      * Returns true if a project has a non-direct dependency to another project.
      * <p>
      * A non-direct dependency is a path of dependency "edge"s from the source to the destination,
@@ -291,30 +287,32 @@ public class DependencyGraph implements Comparator<AbstractProject> {
 
         while(!queue.isEmpty()) {
             AbstractProject p = queue.pop();
-            if(p==dst)
-                return true;
-            if(visited.add(p))
-                queue.addAll(getDownstream(p));
+            if(p==dst) {
+				return true;
+			}
+            if(visited.add(p)) {
+				queue.addAll(getDownstream(p));
+			}
         }
 
         return false;
     }
 
-    /**
+	/**
      * Gets all the direct and indirect upstream dependencies of the given project.
      */
     public Set<AbstractProject> getTransitiveUpstream(AbstractProject src) {
         return getTransitive(backward,src,true);
     }
 
-    /**
+	/**
      * Gets all the direct and indirect downstream dependencies of the given project.
      */
     public Set<AbstractProject> getTransitiveDownstream(AbstractProject src) {
         return getTransitive(forward,src,false);
     }
 
-    private Set<AbstractProject> getTransitive(Map<AbstractProject, List<DependencyGroup>> direction, AbstractProject src, boolean up) {
+	private Set<AbstractProject> getTransitive(Map<AbstractProject, List<DependencyGroup>> direction, AbstractProject src, boolean up) {
         Set<AbstractProject> visited = new HashSet<>();
         Stack<AbstractProject> queue = new Stack<>();
 
@@ -324,15 +322,16 @@ public class DependencyGraph implements Comparator<AbstractProject> {
             AbstractProject p = queue.pop();
 
             for (AbstractProject child : get(direction,p,up)) {
-                if(visited.add(child))
-                    queue.add(child);
+                if(visited.add(child)) {
+					queue.add(child);
+				}
             }
         }
 
         return visited;
     }
 
-    private void add(Map<AbstractProject, List<DependencyGroup>> map, AbstractProject key, Dependency dep) {
+	private void add(Map<AbstractProject, List<DependencyGroup>> map, AbstractProject key, Dependency dep) {
         List<DependencyGroup> set = map.computeIfAbsent(key, k -> new ArrayList<>());
         for (DependencyGroup d : set) {
             // Check for existing edge that connects the same two projects:
@@ -345,7 +344,7 @@ public class DependencyGraph implements Comparator<AbstractProject> {
         set.add(new DependencyGroup(dep));
     }
 
-    private Map<AbstractProject, List<DependencyGroup>> finalize(Map<AbstractProject, List<DependencyGroup>> m) {
+	private Map<AbstractProject, List<DependencyGroup>> finalize(Map<AbstractProject, List<DependencyGroup>> m) {
         for (Entry<AbstractProject, List<DependencyGroup>> e : m.entrySet()) {
             e.getValue().sort(NAME_COMPARATOR);
             e.setValue( Collections.unmodifiableList(e.getValue()) );
@@ -353,23 +352,15 @@ public class DependencyGraph implements Comparator<AbstractProject> {
         return Collections.unmodifiableMap(m);
     }
 
-    private static final Comparator<DependencyGroup> NAME_COMPARATOR = new Comparator<DependencyGroup>() {
-        public int compare(DependencyGroup lhs, DependencyGroup rhs) {
-            int cmp = lhs.getUpstreamProject().getName().compareTo(rhs.getUpstreamProject().getName());
-            return cmp != 0 ? cmp : lhs.getDownstreamProject().getName().compareTo(rhs.getDownstreamProject().getName());
-        }
-    };
-
-    public static final DependencyGraph EMPTY = new DependencyGraph(false);
-
-    /**
+	/**
      * Compare two Projects based on the topological order defined by this Dependency Graph
      */
-    public int compare(AbstractProject o1, AbstractProject o2) {
+    @Override
+	public int compare(AbstractProject o1, AbstractProject o2) {
         return topologicalOrder.compare(o1,o2);
     }
 
-    /**
+	/**
      * Returns all the projects in the topological order of the dependency.
      *
      * Intuitively speaking, the first one in the list is the source of the dependency graph,
@@ -381,12 +372,13 @@ public class DependencyGraph implements Comparator<AbstractProject> {
         return topologicallySorted;
     }
 
-    /**
+	/**
      * Represents an edge in the dependency graph.
      * @since 1.341
      */
     public static class Dependency {
-        private AbstractProject upstream, downstream;
+        private AbstractProject upstream;
+		private AbstractProject downstream;
 
         public Dependency(AbstractProject upstream, AbstractProject downstream) {
             this.upstream = upstream;
@@ -428,8 +420,12 @@ public class DependencyGraph implements Comparator<AbstractProject> {
 
         @Override
         public boolean equals(Object obj) {
-            if (obj == null) return false;
-            if (getClass() != obj.getClass()) return false;
+            if (obj == null) {
+				return false;
+			}
+            if (getClass() != obj.getClass()) {
+				return false;
+			}
 
             final Dependency that = (Dependency) obj;
             return this.upstream == that.upstream || this.downstream == that.downstream;
@@ -444,7 +440,8 @@ public class DependencyGraph implements Comparator<AbstractProject> {
         }
 
         @Override public String toString() {
-            return super.toString() + "[" + upstream + "->" + downstream + "]";
+            return new StringBuilder().append(super.toString()).append("[").append(upstream).append("->").append(downstream).append("]")
+					.toString();
         }
     }
 
@@ -453,28 +450,28 @@ public class DependencyGraph implements Comparator<AbstractProject> {
      */
     private static class DependencyGroup {
         private Set<Dependency> group = new LinkedHashSet<>();
+		private AbstractProject upstream;
+		private AbstractProject downstream;
 
-        DependencyGroup(Dependency first) {
+		DependencyGroup(Dependency first) {
             this.upstream = first.getUpstreamProject();
             this.downstream= first.getDownstreamProject();
             group.add(first);
         }
 
-        private void add(Dependency next) {
+		private void add(Dependency next) {
             group.add(next);
         }
 
-        public Set<Dependency> getGroup() {
+		public Set<Dependency> getGroup() {
             return group;
         }
 
-        private AbstractProject upstream, downstream;
-
-        public AbstractProject getUpstreamProject() {
+		public AbstractProject getUpstreamProject() {
             return upstream;
         }
 
-        public AbstractProject getDownstreamProject() {
+		public AbstractProject getDownstreamProject() {
             return downstream;
         }
     }

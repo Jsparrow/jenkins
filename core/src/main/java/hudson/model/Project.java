@@ -64,35 +64,34 @@ import jenkins.triggers.SCMTriggerItem;
 public abstract class Project<P extends Project<P,B>,B extends Build<P,B>>
     extends AbstractProject<P,B> implements SCMTriggerItem, Saveable, ProjectWithMaven, BuildableItemWithBuildWrappers {
 
-    /**
+    private static final AtomicReferenceFieldUpdater<Project,DescribableList> buildersSetter
+            = AtomicReferenceFieldUpdater.newUpdater(Project.class,DescribableList.class,"builders");
+	private static final AtomicReferenceFieldUpdater<Project,DescribableList> publishersSetter
+            = AtomicReferenceFieldUpdater.newUpdater(Project.class,DescribableList.class,"publishers");
+	private static final AtomicReferenceFieldUpdater<Project,DescribableList> buildWrappersSetter
+            = AtomicReferenceFieldUpdater.newUpdater(Project.class,DescribableList.class,"buildWrappers");
+	private static final Logger LOGGER = Logger.getLogger(Project.class.getName());
+	/**
      * List of active {@link Builder}s configured for this project.
      */
     private volatile DescribableList<Builder,Descriptor<Builder>> builders;
-    private static final AtomicReferenceFieldUpdater<Project,DescribableList> buildersSetter
-            = AtomicReferenceFieldUpdater.newUpdater(Project.class,DescribableList.class,"builders");
-
-    /**
+	/**
      * List of active {@link Publisher}s configured for this project.
      */
     private volatile DescribableList<Publisher,Descriptor<Publisher>> publishers;
-    private static final AtomicReferenceFieldUpdater<Project,DescribableList> publishersSetter
-            = AtomicReferenceFieldUpdater.newUpdater(Project.class,DescribableList.class,"publishers");
-
-    /**
+	/**
      * List of active {@link BuildWrapper}s configured for this project.
      */
     private volatile DescribableList<BuildWrapper,Descriptor<BuildWrapper>> buildWrappers;
-    private static final AtomicReferenceFieldUpdater<Project,DescribableList> buildWrappersSetter
-            = AtomicReferenceFieldUpdater.newUpdater(Project.class,DescribableList.class,"buildWrappers");
 
-    /**
+	/**
      * Creates a new project.
      */
     public Project(ItemGroup parent,String name) {
         super(parent,name);
     }
 
-    @Override
+	@Override
     public void onLoad(ItemGroup<? extends Item> parent, String name) throws IOException {
         super.onLoad(parent, name);
         getBuildersList().setOwner(this);
@@ -100,27 +99,28 @@ public abstract class Project<P extends Project<P,B>,B extends Build<P,B>>
         getBuildWrappersList().setOwner(this);
     }
 
-    public AbstractProject<?, ?> asProject() {
+	@Override
+	public AbstractProject<?, ?> asProject() {
         return this;
     }
 
-    @Override public Item asItem() {
+	@Override public Item asItem() {
         return this;
     }
 
-    @Override public SCMTrigger getSCMTrigger() {
+	@Override public SCMTrigger getSCMTrigger() {
         return getTrigger(SCMTrigger.class);
     }
 
-    @Override public Collection<? extends SCM> getSCMs() {
+	@Override public Collection<? extends SCM> getSCMs() {
         return SCMTriggerItem.SCMTriggerItems.resolveMultiScmIfConfigured(getScm());
     }
 
-    public List<Builder> getBuilders() {
+	public List<Builder> getBuilders() {
         return getBuildersList().toList();
     }
 
-    /**
+	/**
      * @deprecated as of 1.463
      *      We will be soon removing the restriction that only one instance of publisher is allowed per type.
      *      Use {@link #getPublishersList()} instead.
@@ -130,32 +130,34 @@ public abstract class Project<P extends Project<P,B>,B extends Build<P,B>>
         return getPublishersList().toMap();
     }
 
-    public DescribableList<Builder,Descriptor<Builder>> getBuildersList() {
+	public DescribableList<Builder,Descriptor<Builder>> getBuildersList() {
         if (builders == null) {
             buildersSetter.compareAndSet(this,null,new DescribableList<Builder,Descriptor<Builder>>(this));
         }
         return builders;
     }
-    
-    public DescribableList<Publisher,Descriptor<Publisher>> getPublishersList() {
+
+	@Override
+	public DescribableList<Publisher,Descriptor<Publisher>> getPublishersList() {
         if (publishers == null) {
             publishersSetter.compareAndSet(this,null,new DescribableList<Publisher,Descriptor<Publisher>>(this));
         }
         return publishers;
     }
 
-    public Map<Descriptor<BuildWrapper>,BuildWrapper> getBuildWrappers() {
+	public Map<Descriptor<BuildWrapper>,BuildWrapper> getBuildWrappers() {
         return getBuildWrappersList().toMap();
     }
 
-    public DescribableList<BuildWrapper, Descriptor<BuildWrapper>> getBuildWrappersList() {
+	@Override
+	public DescribableList<BuildWrapper, Descriptor<BuildWrapper>> getBuildWrappersList() {
         if (buildWrappers == null) {
             buildWrappersSetter.compareAndSet(this,null,new DescribableList<BuildWrapper,Descriptor<BuildWrapper>>(this));
         }
         return buildWrappers;
     }
 
-    @Override
+	@Override
     protected Set<ResourceActivity> getResourceActivities() {
         final Set<ResourceActivity> activities = new HashSet<>();
 
@@ -167,7 +169,7 @@ public abstract class Project<P extends Project<P,B>,B extends Build<P,B>>
         return activities;
     }
 
-    /**
+	/**
      * Adds a new {@link BuildStep} to this {@link Project} and saves the configuration.
      *
      * @deprecated as of 1.290
@@ -178,7 +180,7 @@ public abstract class Project<P extends Project<P,B>,B extends Build<P,B>>
         getPublishersList().add(buildStep);
     }
 
-    /**
+	/**
      * Removes a publisher from this project, if it's active.
      *
      * @deprecated as of 1.290
@@ -189,73 +191,72 @@ public abstract class Project<P extends Project<P,B>,B extends Build<P,B>>
         getPublishersList().remove(descriptor);
     }
 
-    public Publisher getPublisher(Descriptor<Publisher> descriptor) {
-        for (Publisher p : getPublishersList()) {
-            if(p.getDescriptor()==descriptor)
-                return p;
-        }
-        return null;
+	public Publisher getPublisher(Descriptor<Publisher> descriptor) {
+        return getPublishersList().stream().filter(p -> p.getDescriptor()==descriptor).findFirst().orElse(null);
     }
 
-    @Override protected void buildDependencyGraph(DependencyGraph graph) {
+	@Override protected void buildDependencyGraph(DependencyGraph graph) {
         super.buildDependencyGraph(graph);
         getPublishersList().buildDependencyGraph(this,graph);
         getBuildersList().buildDependencyGraph(this,graph);
         getBuildWrappersList().buildDependencyGraph(this,graph);
     }
 
-    @Override
+	@Override
     public boolean isFingerprintConfigured() {
         return getPublishersList().get(Fingerprinter.class)!=null;
     }
 
-    public MavenInstallation inferMavenInstallation() {
+	@Override
+	public MavenInstallation inferMavenInstallation() {
         Maven m = getBuildersList().get(Maven.class);
-        if (m!=null)    return m.getMaven();
+        if (m!=null) {
+			return m.getMaven();
+		}
         return null;
     }
 
-//
-//
-// actions
-//
-//
-    @Override
-    protected void submit( StaplerRequest req, StaplerResponse rsp ) throws IOException, ServletException, FormException {
-        super.submit(req,rsp);
+	//
+	//
+	// actions
+	//
+	//
+	    @Override
+	    protected void submit( StaplerRequest req, StaplerResponse rsp ) throws IOException, ServletException, FormException {
+	        super.submit(req,rsp);
+	
+	        JSONObject json = req.getSubmittedForm();
+	
+	        getBuildWrappersList().rebuild(req,json, BuildWrappers.getFor(this));
+	        getBuildersList().rebuildHetero(req,json, Builder.all(), "builder");
+	        getPublishersList().rebuildHetero(req, json, Publisher.all(), "publisher");
+	    }
 
-        JSONObject json = req.getSubmittedForm();
-
-        getBuildWrappersList().rebuild(req,json, BuildWrappers.getFor(this));
-        getBuildersList().rebuildHetero(req,json, Builder.all(), "builder");
-        getPublishersList().rebuildHetero(req, json, Publisher.all(), "publisher");
-    }
-
-    @Override
+	@Override
     protected List<Action> createTransientActions() {
         List<Action> r = super.createTransientActions();
 
-        for (BuildStep step : getBuildersList()) {
+        getBuildersList().forEach(step -> {
             try {
                 r.addAll(step.getProjectActions(this));
             } catch (Exception e) {
                 LOGGER.log(Level.SEVERE, "Error loading build step.", e);
             }
-        }
-        for (BuildStep step : getPublishersList()) {
+        });
+        getPublishersList().forEach(step -> {
             try {
                 r.addAll(step.getProjectActions(this));
             } catch (Exception e) {
                 LOGGER.log(Level.SEVERE, "Error loading publisher.", e);
             }
-        }
-        for (BuildWrapper step : getBuildWrappers().values()) {
+        });
+        getBuildWrappers().values().forEach(step -> {
             try {
                 r.addAll(step.getProjectActions(this));
             } catch (Exception e) {
                 LOGGER.log(Level.SEVERE, "Error loading build wrapper.", e);
             }
-        }
+        });
         for (Trigger trigger : triggers()) {
             try {
                 r.addAll(trigger.getProjectActions());
@@ -266,6 +267,4 @@ public abstract class Project<P extends Project<P,B>,B extends Build<P,B>>
 
         return r;
     }
-
-    private static final Logger LOGGER = Logger.getLogger(Project.class.getName());
 }

@@ -39,7 +39,9 @@ import java.util.regex.Pattern;
  * @author Kohsuke Kawaguchi
  */
 public class DotNet {
-    /**
+    private static final Pattern VERSION_PATTERN = Pattern.compile("v(\\d+)\\.(\\d+).*");
+
+	/**
      * Returns true if the .NET framework of the given version (or greater) is installed.
      */
     public static boolean isInstalled(int major, int minor) {
@@ -49,22 +51,19 @@ public class DotNet {
             // or "v2.0.50727", so the regexp is written to accommodate this.
             RegistryKey key = RegistryKey.LOCAL_MACHINE.openReadonly("SOFTWARE\\Microsoft\\.NETFramework");
             try {
-                for( String keyName : key.getSubKeys() ) {
-                    if (matches(keyName, major, minor))
-                        return true;
-                }
-                return false;
+                return key.getSubKeys().stream().anyMatch(keyName -> matches(keyName, major, minor));
             } finally {
                 key.dispose();
             }
         } catch (JnaException e) {
-            if(e.getErrorCode()==2) // thrown when openReadonly fails because the key doesn't exist.
-                return false;
+            if(e.getErrorCode()==2) {
+				return false;
+			}
             throw e;
         }
     }
 
-    /**
+	/**
      * Returns true if the .NET framework of the given version (or grater) is installed
      * on a remote machine. 
      */
@@ -79,34 +78,38 @@ public class DotNet {
 
             for( int i=0; ; i++ ) {
                 String keyName = registry.winreg_EnumKey(key,i)[0];
-                if(matches(keyName,major,minor))
-                    return true;
+                if(matches(keyName,major,minor)) {
+					return true;
+				}
             }
         } catch (JIException e) {
             if(e.getErrorCode()==2)
-                return false;       // not found
+			 {
+				return false;       // not found
+			}
             throw e;
         } finally {
-            if(hklm!=null)
-                registry.winreg_CloseKey(hklm);
-            if(key!=null)
-                registry.winreg_CloseKey(key);
+            if(hklm!=null) {
+				registry.winreg_CloseKey(hklm);
+			}
+            if(key!=null) {
+				registry.winreg_CloseKey(key);
+			}
             registry.closeConnection();
         }
     }
 
-    private static boolean matches(String keyName, int major, int minor) {
+	private static boolean matches(String keyName, int major, int minor) {
         Matcher m = VERSION_PATTERN.matcher(keyName);
         if(m.matches()) {
             int mj = Integer.parseInt(m.group(1));
             if(mj>=major) {
                 int mn = Integer.parseInt(m.group(2));
-                if(mn>=minor)
-                    return true;
+                if(mn>=minor) {
+					return true;
+				}
             }
         }
         return false;
     }
-
-    private static final Pattern VERSION_PATTERN = Pattern.compile("v(\\d+)\\.(\\d+).*");
 }

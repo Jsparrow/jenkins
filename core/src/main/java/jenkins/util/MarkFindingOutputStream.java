@@ -13,18 +13,21 @@ import java.nio.charset.StandardCharsets;
  * @since 1.458
  */
 public abstract class MarkFindingOutputStream extends OutputStream {
-    private final OutputStream base;
-
-    public MarkFindingOutputStream(OutputStream base) {
-        this.base = base;
-    }
-
-    /**
+    // having a new line in the end makes it work better with line-buffering transformation
+    public static final String MARK = "[Jenkins:SYNC-MARK]\n";
+	private static final byte[] MBYTES = toUTF8(MARK);
+	private final OutputStream base;
+	/**
      * Position in {@link #MARK} if we are currently suspecting a match.
      */
     private int match = 0;
 
-    public synchronized void write(int b) throws IOException {
+	public MarkFindingOutputStream(OutputStream base) {
+        this.base = base;
+    }
+
+	@Override
+	public synchronized void write(int b) throws IOException {
         if (MBYTES[match] == b) {// another byte matched. Good. Keep going...
             match++;
             if (match == MBYTES.length) {
@@ -46,7 +49,8 @@ public abstract class MarkFindingOutputStream extends OutputStream {
         }
     }
 
-    public void write(byte[] b, int off, int len) throws IOException {
+	@Override
+	public void write(byte[] b, int off, int len) throws IOException {
         final int start = off; 
         final int end = off + len;
         for (int i=off; i<end; ) {
@@ -81,34 +85,34 @@ public abstract class MarkFindingOutputStream extends OutputStream {
         }
 
         // if we are partially matching, can't send that portion yet.
-        if (len-match>0)
-            base.write(b, off, len-match);
+        if (len-match>0) {
+			base.write(b, off, len-match);
+		}
     }
 
-    public void flush() throws IOException {
+	@Override
+	public void flush() throws IOException {
         flushPartialMatch();
         base.flush();
     }
 
-    public void close() throws IOException {
+	@Override
+	public void close() throws IOException {
         flushPartialMatch();
         base.close();
     }
 
-    private void flushPartialMatch() throws IOException {
-        if (match>0) {
-            base.write(MBYTES,0,match);
-            match = 0;
-        }
+	private void flushPartialMatch() throws IOException {
+        if (match <= 0) {
+			return;
+		}
+		base.write(MBYTES,0,match);
+		match = 0;
     }
 
-    protected  abstract void onMarkFound();
+	protected  abstract void onMarkFound();
 
-    // having a new line in the end makes it work better with line-buffering transformation
-    public static final String MARK = "[Jenkins:SYNC-MARK]\n";
-    private static final byte[] MBYTES = toUTF8(MARK);
-    
-    private static byte[] toUTF8(String s) {
+	private static byte[] toUTF8(String s) {
         return s.getBytes(StandardCharsets.UTF_8);
     }
 }

@@ -68,11 +68,10 @@ public class AutoCompletionCandidates implements HttpResponse {
         return values;
     }
 
-    public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object o) throws IOException, ServletException {
+    @Override
+	public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object o) throws IOException, ServletException {
         Search.Result r = new Search.Result();
-        for (String value : values) {
-            r.suggestions.add(new hudson.search.Search.Item(value));
-        }
+        values.forEach(value -> r.suggestions.add(new hudson.search.Search.Item(value)));
         rsp.serveExposedBean(req,r, Flavor.JSON);
     }
 
@@ -91,8 +90,9 @@ public class AutoCompletionCandidates implements HttpResponse {
      * @since 1.489
      */
     public static <T extends Item> AutoCompletionCandidates ofJobNames(final Class<T> type, final String value, @CheckForNull Item self, ItemGroup container) {
-        if (self==container)
-            container = self.getParent();
+        if (self==container) {
+			container = self.getParent();
+		}
         return ofJobNames(type, value, container);
     }
 
@@ -126,31 +126,32 @@ public class AutoCompletionCandidates implements HttpResponse {
                 //the whole application.
                 boolean caseInsensitive = UserSearchProperty.isCaseInsensitive();
 
-                if ((startsWithImpl(itemName, value, caseInsensitive) || startsWithImpl(value, itemName, caseInsensitive))
+                // and read permission required
+				if (!((startsWithImpl(itemName, value, caseInsensitive) || startsWithImpl(value, itemName, caseInsensitive))
                     // 'foobar' is a valid candidate if the current value is 'foo'.
                     // Also, we need to visit 'foo' if the current value is 'foo/bar'
                  && (value.length()> itemName.length() || !itemName.substring(value.length()).contains("/"))
                     // but 'foobar/zot' isn't if the current value is 'foo'
                     // we'll first show 'foobar' and then wait for the user to type '/' to show the rest
-                 && i.hasPermission(Item.READ)
-                    // and read permission required
-                ) {
-                    if (type.isInstance(i) && startsWithImpl(itemName, value, caseInsensitive))
-                        candidates.add(itemName);
-
-                    // recurse
-                    String oldPrefix = prefix;
-                    prefix = itemName;
-                    super.onItem(i);
-                    prefix = oldPrefix;
-                }
+                 && i.hasPermission(Item.READ))) {
+					return;
+				}
+				if (type.isInstance(i) && startsWithImpl(itemName, value, caseInsensitive)) {
+					candidates.add(itemName);
+				}
+				// recurse
+				String oldPrefix = prefix;
+				prefix = itemName;
+				super.onItem(i);
+				prefix = oldPrefix;
             }
 
             private String contextualNameOf(Item i) {
-                if (prefix.endsWith("/") || prefix.length()==0)
-                    return prefix+i.getName();
-                else
-                    return prefix+'/'+i.getName();
+                if (prefix.endsWith("/") || prefix.isEmpty()) {
+					return prefix+i.getName();
+				} else {
+					return new StringBuilder().append(prefix).append('/').append(i.getName()).toString();
+				}
             }
         }
 
@@ -158,8 +159,9 @@ public class AutoCompletionCandidates implements HttpResponse {
             new Visitor("").onItemGroup(Jenkins.get());
         } else {
             new Visitor("").onItemGroup(container);
-            if (value.startsWith("/"))
-                new Visitor("/").onItemGroup(Jenkins.get());
+            if (value.startsWith("/")) {
+				new Visitor("/").onItemGroup(Jenkins.get());
+			}
 
             for ( String p="../"; value.startsWith(p); p+="../") {
                 container = ((Item)container).getParent();

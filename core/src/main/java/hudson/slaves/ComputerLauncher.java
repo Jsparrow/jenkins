@@ -53,6 +53,16 @@ import org.apache.tools.ant.util.DeweyDecimal;
  */
 public abstract class ComputerLauncher extends AbstractDescribableImpl<ComputerLauncher> implements ExtensionPoint {
     /**
+     * All registered {@link ComputerLauncher} implementations.
+     *
+     * @deprecated as of 1.281
+     *      Use {@link Extension} for registration, and use
+     *      {@link jenkins.model.Jenkins#getDescriptorList(Class)} for read access.
+     */
+    @Deprecated
+    public static final DescriptorList<ComputerLauncher> LIST = new DescriptorList<>(ComputerLauncher.class);
+
+	/**
      * Returns true if this {@link ComputerLauncher} supports
      * programatic launch of the agent in the target {@link Computer}.
      */
@@ -60,7 +70,7 @@ public abstract class ComputerLauncher extends AbstractDescribableImpl<ComputerL
         return true;
     }
 
-    /**
+	/**
      * Launches the agent for the given {@link Computer}.
      *
      * <p>
@@ -89,7 +99,7 @@ public abstract class ComputerLauncher extends AbstractDescribableImpl<ComputerL
         launch(computer,cast(listener));
     }
 
-    /**
+	/**
      * @deprecated as of 1.304
      *  Use {@link #launch(SlaveComputer, TaskListener)}
      */
@@ -98,7 +108,7 @@ public abstract class ComputerLauncher extends AbstractDescribableImpl<ComputerL
         throw new UnsupportedOperationException(getClass()+" must implement the launch method");
     }
 
-    /**
+	/**
      * Allows the {@link ComputerLauncher} to tidy-up after a disconnect.
      *
      * <p>
@@ -114,7 +124,7 @@ public abstract class ComputerLauncher extends AbstractDescribableImpl<ComputerL
         afterDisconnect(computer,cast(listener));
     }
 
-    /**
+	/**
      * @deprecated as of 1.304
      *  Use {@link #afterDisconnect(SlaveComputer, TaskListener)}
      */
@@ -122,7 +132,7 @@ public abstract class ComputerLauncher extends AbstractDescribableImpl<ComputerL
     public void afterDisconnect(SlaveComputer computer, StreamTaskListener listener) {
     }
 
-    /**
+	/**
      * Allows the {@link ComputerLauncher} to prepare for a disconnect.
      *
      * <p>
@@ -141,7 +151,7 @@ public abstract class ComputerLauncher extends AbstractDescribableImpl<ComputerL
         beforeDisconnect(computer,cast(listener));
     }
 
-    /**
+	/**
      * @deprecated as of 1.304
      *  Use {@link #beforeDisconnect(SlaveComputer, TaskListener)} 
      */
@@ -149,23 +159,14 @@ public abstract class ComputerLauncher extends AbstractDescribableImpl<ComputerL
     public void beforeDisconnect(SlaveComputer computer, StreamTaskListener listener) {
     }
 
-    private StreamTaskListener cast(TaskListener listener) {
-        if (listener instanceof StreamTaskListener)
-            return (StreamTaskListener) listener;
+	private StreamTaskListener cast(TaskListener listener) {
+        if (listener instanceof StreamTaskListener) {
+			return (StreamTaskListener) listener;
+		}
         return new StreamTaskListener(listener.getLogger());
     }
 
-    /**
-     * All registered {@link ComputerLauncher} implementations.
-     *
-     * @deprecated as of 1.281
-     *      Use {@link Extension} for registration, and use
-     *      {@link jenkins.model.Jenkins#getDescriptorList(Class)} for read access.
-     */
-    @Deprecated
-    public static final DescriptorList<ComputerLauncher> LIST = new DescriptorList<>(ComputerLauncher.class);
-
-    /**
+	/**
      * Given the output of "java -version" in <code>r</code>, determine if this
      * version of Java is supported, or throw {@link IOException}.
      *

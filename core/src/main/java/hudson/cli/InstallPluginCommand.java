@@ -56,11 +56,6 @@ import org.apache.commons.io.FileUtils;
 @Extension
 public class InstallPluginCommand extends CLICommand {
 
-    @Override
-    public String getShortDescription() {
-        return Messages.InstallPluginCommand_ShortDescription();
-    }
-
     @Argument(metaVar="SOURCE",required=true,usage=
             "If this is an URL, Jenkins downloads the URL and installs that as a plugin. " +
             "If it is the string ‘=’, the file will be read from standard input of the command. " +
@@ -70,17 +65,22 @@ public class InstallPluginCommand extends CLICommand {
             "will be searched in order for the first one publishing a version that is at least the specified version.")
     public List<String> sources = new ArrayList<>();
 
-    @Deprecated
+	@Deprecated
     @Option(name = "-name", usage = "No longer used.")
     public String name;
 
-    @Option(name="-restart",usage="Restart Jenkins upon successful installation.")
+	@Option(name="-restart",usage="Restart Jenkins upon successful installation.")
     public boolean restart;
 
-    @Option(name="-deploy",usage="Deploy plugins right away without postponing them until the reboot.")
+	@Option(name="-deploy",usage="Deploy plugins right away without postponing them until the reboot.")
     public boolean dynamicLoad;
 
-    @Override
+	@Override
+    public String getShortDescription() {
+        return Messages.InstallPluginCommand_ShortDescription();
+    }
+
+	@Override
     protected int run() throws Exception {
         Jenkins h = Jenkins.get();
         h.checkPermission(PluginManager.UPLOAD_PLUGINS);
@@ -91,7 +91,7 @@ public class InstallPluginCommand extends CLICommand {
         }
 
         for (String source : sources) {
-            if (source.equals("=")) {
+            if ("=".equals(source)) {
                 stdout.println(Messages.InstallPluginCommand_InstallingPluginFromStdin());
                 File f = getTmpFile();
                 FileUtils.copyInputStreamToFile(stdin, f);
@@ -149,13 +149,14 @@ public class InstallPluginCommand extends CLICommand {
                     stdout.println(Messages.InstallPluginCommand_NoUpdateCenterDefined());
                 } else {
                     Set<String> candidates = new HashSet<>();
-                    for (UpdateSite s : h.getUpdateCenter().getSites()) {
+                    h.getUpdateCenter().getSites().forEach(s -> {
                         Data dt = s.getData();
-                        if (dt==null)
-                            stdout.println(Messages.InstallPluginCommand_NoUpdateDataRetrieved(s.getUrl()));
-                        else
-                            candidates.addAll(dt.plugins.keySet());
-                    }
+                        if (dt==null) {
+							stdout.println(Messages.InstallPluginCommand_NoUpdateDataRetrieved(s.getUrl()));
+						} else {
+							candidates.addAll(dt.plugins.keySet());
+						}
+                    });
                     stdout.println(Messages.InstallPluginCommand_DidYouMean(source,EditDistance.findNearest(source,candidates)));
                 }
             }
@@ -163,16 +164,17 @@ public class InstallPluginCommand extends CLICommand {
             throw new AbortException("Error occurred, see previous output.");
         }
 
-        if (restart)
-            h.safeRestart();
+        if (restart) {
+			h.safeRestart();
+		}
         return 0; // all success
     }
 
-    private static File getTmpFile() throws Exception {
+	private static File getTmpFile() throws Exception {
         return File.createTempFile("download", ".jpi.tmp", Jenkins.get().getPluginManager().rootDir);
     }
 
-    private static File moveToFinalLocation(File tmpFile) throws Exception {
+	private static File moveToFinalLocation(File tmpFile) throws Exception {
         String pluginName;
         try (JarFile jf = new JarFile(tmpFile)) {
             Manifest mf = jf.getManifest();

@@ -45,10 +45,6 @@ import net.sf.json.JSONObject;
  * @since 1.123
  */
 public class ClockMonitor extends NodeMonitor {
-    public ClockDifference getDifferenceFor(Computer c) {
-        return DESCRIPTOR.get(c);
-    }
-
     /**
      * @deprecated as of 2.0
      *      Don't use this field, use injection.
@@ -56,7 +52,11 @@ public class ClockMonitor extends NodeMonitor {
     @Restricted(NoExternalUse.class)
     public static /*almost final*/ AbstractNodeMonitorDescriptor<ClockDifference> DESCRIPTOR;
 
-    @Extension @Symbol("clock")
+	public ClockDifference getDifferenceFor(Computer c) {
+        return DESCRIPTOR.get(c);
+    }
+
+	@Extension @Symbol("clock")
     public static class DescriptorImpl extends AbstractAsyncNodeMonitorDescriptor<ClockDifference> {
         public DescriptorImpl() {
             DESCRIPTOR = this;
@@ -65,11 +65,14 @@ public class ClockMonitor extends NodeMonitor {
         @Override
         protected Callable<ClockDifference,IOException> createCallable(Computer c) {
             Node n = c.getNode();
-            if(n==null) return null;
+            if(n==null) {
+				return null;
+			}
             return n.getClockDifferenceCallable();
         }
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.ClockMonitor_DisplayName();
         }
 

@@ -35,15 +35,22 @@ import org.kohsuke.accmod.restrictions.NoExternalUse;
  * @author Kohsuke Kawaguchi
  */
 public class InitReactorRunner {
-    public void run(Reactor reactor) throws InterruptedException, ReactorException, IOException {
+    private static final int TWICE_CPU_NUM = SystemProperties.getInteger(
+            InitReactorRunner.class.getName()+".concurrency",
+            Runtime.getRuntime().availableProcessors() * 2);
+
+	private static final Logger LOGGER = Logger.getLogger(InitReactorRunner.class.getName());
+
+	public void run(Reactor reactor) throws InterruptedException, ReactorException, IOException {
          reactor.addAll(InitMilestone.ordering().discoverTasks(reactor));
 
         ExecutorService es;
-        if (Jenkins.PARALLEL_LOAD)
-            es = new ThreadPoolExecutor(
+        if (Jenkins.PARALLEL_LOAD) {
+			es = new ThreadPoolExecutor(
                 TWICE_CPU_NUM, TWICE_CPU_NUM, 5L, TimeUnit.SECONDS, new LinkedBlockingQueue<>(), new DaemonThreadFactory());
-        else
-            es = Executors.newSingleThreadExecutor(new NamingThreadFactory(new DaemonThreadFactory(), "InitReactorRunner"));
+		} else {
+			es = Executors.newSingleThreadExecutor(new NamingThreadFactory(new DaemonThreadFactory(), "InitReactorRunner"));
+		}
         try {
             reactor.execute(es,buildReactorListener());
         } finally {
@@ -52,7 +59,7 @@ public class InitReactorRunner {
 
     }
 
-    /**
+	/**
      * Aggregates all the listeners into one and returns it.
      *
      * <p>
@@ -63,19 +70,23 @@ public class InitReactorRunner {
         List<ReactorListener> r = Lists.newArrayList(ServiceLoader.load(InitReactorListener.class, Thread.currentThread().getContextClassLoader()));
         r.add(new ReactorListener() {
             final Level level = Level.parse( Configuration.getStringConfigParameter("initLogLevel", "FINE") );
-            public void onTaskStarted(Task t) {
+            @Override
+			public void onTaskStarted(Task t) {
                 LOGGER.log(level, "Started {0}", getDisplayName(t));
             }
 
-            public void onTaskCompleted(Task t) {
+            @Override
+			public void onTaskCompleted(Task t) {
                 LOGGER.log(level, "Completed {0}", getDisplayName(t));
             }
 
-            public void onTaskFailed(Task t, Throwable err, boolean fatal) {
+            @Override
+			public void onTaskFailed(Task t, Throwable err, boolean fatal) {
                 LOGGER.log(SEVERE, "Failed " + getDisplayName(t), err);
             }
 
-            public void onAttained(Milestone milestone) {
+            @Override
+			public void onAttained(Milestone milestone) {
                 Level lv = level;
                 String s = "Attained "+milestone.toString();
                 if (milestone instanceof InitMilestone) {
@@ -89,7 +100,7 @@ public class InitReactorRunner {
         return new ReactorListener.Aggregator(r);
     }
 
-    /** Like {@link Task#getDisplayName} but more robust. */
+	/** Like {@link Task#getDisplayName} but more robust. */
     @Restricted(NoExternalUse.class)
     public static String getDisplayName(Task t) {
         try {
@@ -100,15 +111,9 @@ public class InitReactorRunner {
         }
     }
 
-    /**
+	/**
      * Called when the init milestone is attained.
      */
     protected void onInitMilestoneAttained(InitMilestone milestone) {
     }
-
-    private static final int TWICE_CPU_NUM = SystemProperties.getInteger(
-            InitReactorRunner.class.getName()+".concurrency",
-            Runtime.getRuntime().availableProcessors() * 2);
-
-    private static final Logger LOGGER = Logger.getLogger(InitReactorRunner.class.getName());
 }

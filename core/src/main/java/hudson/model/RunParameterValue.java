@@ -121,12 +121,12 @@ public class RunParameterValue extends ParameterValue {
     
     @Override
     public String toString() {
-    	return "(RunParameterValue) " + getName() + "='" + getRunId() + "'";
+    	return new StringBuilder().append("(RunParameterValue) ").append(getName()).append("='").append(getRunId()).append("'").toString();
     }
 
     @Override public String getShortDescription() {
         Run run = getRun();
-        return name + "=" + ((null == run) ? getJobName() + " #" + getNumber() : run.getFullDisplayName());
+        return new StringBuilder().append(name).append("=").append((null == run) ? getJobName() + " #" + getNumber() : run.getFullDisplayName()).toString();
     }
 
 }

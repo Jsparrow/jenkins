@@ -51,13 +51,20 @@ abstract class TaskMethodFinder<T extends Annotation> extends TaskBuilder {
     protected abstract Milestone beforeOf(T i);
     protected abstract boolean fatalOf(T i);
 
-    public Collection<Task> discoverTasks(Reactor session) throws IOException {
+    @Override
+	public Collection<Task> discoverTasks(Reactor session) throws IOException {
         List<Task> result = new ArrayList<>();
         for (Method e : Index.list(type, cl, Method.class)) {
-            if (filter(e)) continue;   // already reported once
+            if (filter(e))
+			 {
+				continue;   // already reported once
+			}
 
             T i = e.getAnnotation(type);
-            if (i==null)        continue; // stale index
+            if (i==null)
+			 {
+				continue; // stale index
+			}
 
             result.add(new TaskImpl(i, e));
         }
@@ -77,16 +84,18 @@ abstract class TaskMethodFinder<T extends Annotation> extends TaskBuilder {
     protected String getDisplayNameOf(Method e, T i) {
         Class<?> c = e.getDeclaringClass();
         String key = displayNameOf(i);
-        if (key.length()==0)  return c.getSimpleName()+"."+e.getName();
+        if (key.isEmpty()) {
+			return new StringBuilder().append(c.getSimpleName()).append(".").append(e.getName()).toString();
+		}
         try {
             ResourceBundleHolder rb = ResourceBundleHolder.get(
                     c.getClassLoader().loadClass(c.getPackage().getName() + ".Messages"));
             return rb.format(key);
         } catch (ClassNotFoundException x) {
-            LOGGER.log(WARNING, "Failed to load "+x.getMessage()+" for "+e.toString(),x);
+            LOGGER.log(WARNING, new StringBuilder().append("Failed to load ").append(x.getMessage()).append(" for ").append(e.toString()).toString(),x);
             return key;
         } catch (MissingResourceException x) {
-            LOGGER.log(WARNING, "Could not find key '" + key + "' in " + c.getPackage().getName() + ".Messages", x);
+            LOGGER.log(WARNING, new StringBuilder().append("Could not find key '").append(key).append("' in ").append(c.getPackage().getName()).append(".Messages").toString(), x);
             return key;
         }
     }
@@ -98,8 +107,9 @@ abstract class TaskMethodFinder<T extends Annotation> extends TaskBuilder {
         try {
             Class<?>[] pt = e.getParameterTypes();
             Object[] args = new Object[pt.length];
-            for (int i=0; i<args.length; i++)
-                args[i] = lookUp(pt[i]);
+            for (int i=0; i<args.length; i++) {
+				args[i] = lookUp(pt[i]);
+			}
 
             e.invoke(
                 Modifier.isStatic(e.getModifiers()) ? null : lookUp(e.getDeclaringClass()),
@@ -117,11 +127,13 @@ abstract class TaskMethodFinder<T extends Annotation> extends TaskBuilder {
     private Object lookUp(Class<?> type) {
         Jenkins j = Jenkins.get();
         assert j != null : "This method is only invoked after the Jenkins singleton instance has been set";
-        if (type==Jenkins.class || type==Hudson.class)
-            return j;
+        if (type==Jenkins.class || type==Hudson.class) {
+			return j;
+		}
         Injector i = j.getInjector();
-        if (i!=null)
-            return i.getInstance(type);
+        if (i!=null) {
+			return i.getInstance(type);
+		}
         throw new IllegalArgumentException("Unable to inject "+type);
     }
 
@@ -155,27 +167,33 @@ abstract class TaskMethodFinder<T extends Annotation> extends TaskBuilder {
             return e;
         }
 
-        public Collection<Milestone> requires() {
+        @Override
+		public Collection<Milestone> requires() {
             return requires;
         }
 
-        public Collection<Milestone> attains() {
+        @Override
+		public Collection<Milestone> attains() {
             return attains;
         }
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return getDisplayNameOf(e, i);
         }
 
-        public boolean failureIsFatal() {
+        @Override
+		public boolean failureIsFatal() {
             return fatalOf(i);
         }
 
-        public void run(Reactor session) {
+        @Override
+		public void run(Reactor session) {
             invoke(e);
         }
 
-        public String toString() {
+        @Override
+		public String toString() {
             return e.toString();
         }
 

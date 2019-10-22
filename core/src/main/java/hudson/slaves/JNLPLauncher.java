@@ -49,6 +49,12 @@ import org.kohsuke.stapler.DataBoundSetter;
 */
 public class JNLPLauncher extends ComputerLauncher {
     /**
+     * @deprecated as of 1.XXX
+     *      Use {@link Jenkins#getDescriptor(Class)}
+     */
+    public static /*almost final*/ Descriptor<ComputerLauncher> DESCRIPTOR;
+
+	/**
      * If the agent needs to tunnel the connection to the master,
      * specify the "host:port" here. This can include the special
      * syntax "host:" and ":port" to indicate the default host/port
@@ -62,17 +68,17 @@ public class JNLPLauncher extends ComputerLauncher {
     @CheckForNull
     public final String tunnel;
 
-    /**
+	/**
      * Additional JVM arguments. Can be null.
      * @since 1.297
      */
     @CheckForNull
     public final String vmargs;
 
-    @Nonnull
+	@Nonnull
     private RemotingWorkDirSettings workDirSettings = RemotingWorkDirSettings.getEnabledDefaults();
 
-    /**
+	/**
      * Constructor.
      * @param tunnel Tunnel settings
      * @param vmargs JVM arguments
@@ -88,14 +94,14 @@ public class JNLPLauncher extends ComputerLauncher {
             setWorkDirSettings(workDirSettings);
         }
     }
-    
-    @DataBoundConstructor
+
+	@DataBoundConstructor
     public JNLPLauncher(@CheckForNull String tunnel, @CheckForNull String vmargs) {
         this.tunnel = Util.fixEmptyAndTrim(tunnel);
         this.vmargs = Util.fixEmptyAndTrim(vmargs);
     }
 
-    /**
+	/**
      * @deprecated This Launcher does not enable the work directory.
      *             It is recommended to use {@link #JNLPLauncher(boolean)}
      */
@@ -103,8 +109,8 @@ public class JNLPLauncher extends ComputerLauncher {
     public JNLPLauncher() {
         this(false);
     }
-    
-    /**
+
+	/**
      * Constructor with default options.
      * 
      * @param enableWorkDir If {@code true}, the work directory will be enabled with default settings.
@@ -114,8 +120,8 @@ public class JNLPLauncher extends ComputerLauncher {
                 ? RemotingWorkDirSettings.getEnabledDefaults() 
                 : RemotingWorkDirSettings.getDisabledDefaults());
     }
-    
-    protected Object readResolve() {
+
+	protected Object readResolve() {
         if (workDirSettings == null) {
             // For the migrated code agents are always disabled
             workDirSettings = RemotingWorkDirSettings.getDisabledDefaults();
@@ -123,7 +129,7 @@ public class JNLPLauncher extends ComputerLauncher {
         return this;
     }
 
-    /**
+	/**
      * Returns work directory settings.
      * 
      * @since 2.72
@@ -133,28 +139,22 @@ public class JNLPLauncher extends ComputerLauncher {
         return workDirSettings;
     }
 
-    @DataBoundSetter
+	@DataBoundSetter
     public final void setWorkDirSettings(@Nonnull RemotingWorkDirSettings workDirSettings) {
         this.workDirSettings = workDirSettings;
     }
-    
-    @Override
+
+	@Override
     public boolean isLaunchSupported() {
         return false;
     }
 
-    @Override
+	@Override
     public void launch(SlaveComputer computer, TaskListener listener) {
         // do nothing as we cannot self start
     }
 
-    /**
-     * @deprecated as of 1.XXX
-     *      Use {@link Jenkins#getDescriptor(Class)}
-     */
-    public static /*almost final*/ Descriptor<ComputerLauncher> DESCRIPTOR;
-
-    /**
+	/**
      * Gets work directory options as a String.
      * 
      * In public API {@code getWorkDirSettings().toCommandLineArgs(computer)} should be used instead
@@ -169,14 +169,31 @@ public class JNLPLauncher extends ComputerLauncher {
         }
         return workDirSettings.toCommandLineString((SlaveComputer)computer);
     }
-    
-    @Extension @Symbol("jnlp")
+
+	/**
+     * Returns true if Java Web Start button should be displayed.
+     * Java Web Start is only supported when the Jenkins server is
+     * running with Java 8.  Earlier Java versions are not supported by Jenkins.
+     * Later Java versions do not support Java Web Start.
+     *
+     * This flag is checked in {@code config.jelly} before displaying the
+     * Java Web Start button.
+     * @return {@code true} if Java Web Start button should be displayed.
+     * @since FIXME
+     */
+    @Restricted(NoExternalUse.class) // Jelly use
+    public boolean isJavaWebStartSupported() {
+        return JavaUtils.isRunningWithJava8OrBelow();
+    }
+
+	@Extension @Symbol("jnlp")
     public static class DescriptorImpl extends Descriptor<ComputerLauncher> {
         public DescriptorImpl() {
             DESCRIPTOR = this;
         }
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.JNLPLauncher_displayName();
         }
         
@@ -220,21 +237,5 @@ public class JNLPLauncher extends ComputerLauncher {
         public boolean filterType(@Nonnull Class<?> contextClass, @Nonnull Descriptor descriptor) {
             return descriptor.clazz != JNLPLauncher.class || Jenkins.get().getTcpSlaveAgentListener() != null;
         }
-    }
-
-    /**
-     * Returns true if Java Web Start button should be displayed.
-     * Java Web Start is only supported when the Jenkins server is
-     * running with Java 8.  Earlier Java versions are not supported by Jenkins.
-     * Later Java versions do not support Java Web Start.
-     *
-     * This flag is checked in {@code config.jelly} before displaying the
-     * Java Web Start button.
-     * @return {@code true} if Java Web Start button should be displayed.
-     * @since FIXME
-     */
-    @Restricted(NoExternalUse.class) // Jelly use
-    public boolean isJavaWebStartSupported() {
-        return JavaUtils.isRunningWithJava8OrBelow();
     }
 }

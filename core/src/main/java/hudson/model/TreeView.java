@@ -82,7 +82,8 @@ public class TreeView extends View implements ViewGroup {
     public Indenter createFixedIndenter(String d) {
         final int depth = Integer.parseInt(d);
         return new Indenter() {
-            protected int getNestLevel(Job job) { return depth; }
+            @Override
+			protected int getNestLevel(Job job) { return depth; }
         };
     }
 
@@ -93,7 +94,8 @@ public class TreeView extends View implements ViewGroup {
      * This method returns a separate copy each time to avoid
      * concurrent modification issue.
      */
-    public synchronized List<TopLevelItem> getItems() {
+    @Override
+	public synchronized List<TopLevelItem> getItems() {
         return Jenkins.get().getItems();
 //        List<TopLevelItem> items = new ArrayList<TopLevelItem>(jobNames.size());
 //        for (String name : jobNames) {
@@ -104,43 +106,50 @@ public class TreeView extends View implements ViewGroup {
 //        return items;
     }
 
-    public boolean contains(TopLevelItem item) {
+    @Override
+	public boolean contains(TopLevelItem item) {
         return true;
 //        return jobNames.contains(item.getName());
     }
 
-    @POST
+    @Override
+	@POST
     public TopLevelItem doCreateItem(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
         ItemGroup<? extends TopLevelItem> ig = getOwner().getItemGroup();
-        if (ig instanceof ModifiableItemGroup) {
-            TopLevelItem item = ((ModifiableItemGroup<? extends TopLevelItem>)ig).doCreateItem(req, rsp);
-            if(item!=null) {
-                jobNames.add(item.getName());
-                owner.save();
-            }
-            return item;
-        }
-        return null;
+        if (!(ig instanceof ModifiableItemGroup)) {
+			return null;
+		}
+		TopLevelItem item = ((ModifiableItemGroup<? extends TopLevelItem>)ig).doCreateItem(req, rsp);
+		if(item!=null) {
+		    jobNames.add(item.getName());
+		    owner.save();
+		}
+		return item;
     }
 
     // TODO listen for changes that might affect jobNames
 
-    protected void submit(StaplerRequest req) throws IOException, ServletException, FormException {
+    @Override
+	protected void submit(StaplerRequest req) throws IOException, ServletException, FormException {
     }
 
-    public boolean canDelete(View view) {
+    @Override
+	public boolean canDelete(View view) {
         return true;
     }
 
-    public void deleteView(View view) throws IOException {
+    @Override
+	public void deleteView(View view) throws IOException {
         views.remove(view);
     }
 
-    public Collection<View> getViews() {
+    @Override
+	public Collection<View> getViews() {
         return Collections.unmodifiableList(views);
     }
 
-    public View getView(String name) {
+    @Override
+	public View getView(String name) {
         //Top level views returned first if match
         for (View v : views) {
             if (v.getViewName().equals(name)) {
@@ -158,7 +167,8 @@ public class TreeView extends View implements ViewGroup {
         return null;
     }
 
-    public void onViewRenamed(View view, String oldName, String newName) {
+    @Override
+	public void onViewRenamed(View view, String oldName, String newName) {
         // noop
     }
 
@@ -172,28 +182,33 @@ public class TreeView extends View implements ViewGroup {
     // this feature is not public yet
     @Extension
     public static ViewDescriptor register() {
-        if(SystemProperties.getBoolean("hudson.TreeView"))
-            return new DescriptorImpl();
-        else
-            return null;
+        if(SystemProperties.getBoolean("hudson.TreeView")) {
+			return new DescriptorImpl();
+		} else {
+			return null;
+		}
     }
 
-    public static final class DescriptorImpl extends ViewDescriptor {
-        public String getDisplayName() {
-            return "Tree View";
-        }
-    }
-
-    public ViewsTabBar getViewsTabBar() {
+    @Override
+	public ViewsTabBar getViewsTabBar() {
         return Jenkins.get().getViewsTabBar();
     }
 
-    public ItemGroup<? extends TopLevelItem> getItemGroup() {
+	@Override
+	public ItemGroup<? extends TopLevelItem> getItemGroup() {
         return getOwner().getItemGroup();
     }
 
-    public List<Action> getViewActions() {
+	@Override
+	public List<Action> getViewActions() {
         return owner.getViewActions();
+    }
+
+	public static final class DescriptorImpl extends ViewDescriptor {
+        @Override
+		public String getDisplayName() {
+            return "Tree View";
+        }
     }
 
 }

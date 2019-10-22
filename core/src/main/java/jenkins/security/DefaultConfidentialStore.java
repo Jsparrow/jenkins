@@ -31,14 +31,16 @@ import org.apache.commons.io.IOUtils;
  */
 // @MetaInfServices --- not annotated because this is the fallback implementation
 public class DefaultConfidentialStore extends ConfidentialStore {
-    private final SecureRandom sr = new SecureRandom();
+    private static final byte[] MAGIC = "::::MAGIC::::".getBytes();
 
-    /**
+	private final SecureRandom sr = new SecureRandom();
+
+	/**
      * Directory that stores individual keys.
      */
     private final File rootDir;
 
-    /**
+	/**
      * The master key.
      *
      * The sole purpose of the master key is to encrypt individual keys on the disk.
@@ -47,11 +49,11 @@ public class DefaultConfidentialStore extends ConfidentialStore {
      */
     private final SecretKey masterKey;
 
-    public DefaultConfidentialStore() throws IOException, InterruptedException {
+	public DefaultConfidentialStore() throws IOException, InterruptedException {
         this(new File(Jenkins.get().getRootDir(),"secrets"));
     }
 
-    public DefaultConfidentialStore(File rootDir) throws IOException, InterruptedException {
+	public DefaultConfidentialStore(File rootDir) throws IOException, InterruptedException {
         this.rootDir = rootDir;
         if (rootDir.mkdirs()) {
             // protect this directory. but don't change the permission of the existing directory
@@ -68,7 +70,7 @@ public class DefaultConfidentialStore extends ConfidentialStore {
         this.masterKey = Util.toAes128Key(masterSecret.readTrim());
     }
 
-    /**
+	/**
      * Persists the payload of {@link ConfidentialKey} to the disk.
      */
     @Override
@@ -88,7 +90,7 @@ public class DefaultConfidentialStore extends ConfidentialStore {
         }
     }
 
-    /**
+	/**
      * Reverse operation of {@link #store(ConfidentialKey, byte[])}
      *
      * @return
@@ -98,7 +100,9 @@ public class DefaultConfidentialStore extends ConfidentialStore {
     protected byte[] load(ConfidentialKey key) throws IOException {
         try {
             File f = getFileFor(key);
-            if (!f.exists())    return null;
+            if (!f.exists()) {
+				return null;
+			}
 
             Cipher sym = Secret.getCipher("AES");
             sym.init(Cipher.DECRYPT_MODE, masterKey);
@@ -120,31 +124,35 @@ public class DefaultConfidentialStore extends ConfidentialStore {
         }
     }
 
-    /**
+	/**
      * Verifies that the given byte[] has the MAGIC trailer, to verify the integrity of the decryption process.
      */
     private byte[] verifyMagic(byte[] payload) {
         int payloadLen = payload.length-MAGIC.length;
-        if (payloadLen<0)   return null;    // obviously broken
+        if (payloadLen<0)
+		 {
+			return null;    // obviously broken
+		}
 
         for (int i=0; i<MAGIC.length; i++) {
             if (payload[payloadLen+i]!=MAGIC[i])
-                return null;    // broken
+			 {
+				return null;    // broken
+			}
         }
         byte[] truncated = new byte[payloadLen];
         System.arraycopy(payload,0,truncated,0,truncated.length);
         return truncated;
     }
 
-    private File getFileFor(ConfidentialKey key) {
+	private File getFileFor(ConfidentialKey key) {
         return new File(rootDir, key.getId());
     }
 
-    public byte[] randomBytes(int size) {
+	@Override
+	public byte[] randomBytes(int size) {
         byte[] random = new byte[size];
         sr.nextBytes(random);
         return random;
     }
-
-    private static final byte[] MAGIC = "::::MAGIC::::".getBytes();
 }

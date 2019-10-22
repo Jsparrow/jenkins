@@ -47,7 +47,24 @@ import org.kohsuke.stapler.StaplerResponse;
  */
 public abstract class FormFillFailure extends IOException implements HttpResponse {
 
-    /**
+    private final FormValidation.Kind kind;
+	private boolean selectionCleared;
+
+	/**
+     * Instances should be created via one of the factory methods above.
+     *
+     * @param kind the kind
+     */
+    private FormFillFailure(FormValidation.Kind kind) {
+        this.kind = kind;
+    }
+
+	private FormFillFailure(FormValidation.Kind kind, String message) {
+        super(message);
+        this.kind = kind;
+    }
+
+	/**
      * Sends out a string error message that indicates an error.
      *
      * @param message Human readable message to be sent.
@@ -56,11 +73,11 @@ public abstract class FormFillFailure extends IOException implements HttpRespons
         return errorWithMarkup(Util.escape(message));
     }
 
-    public static FormFillFailure warning(@Nonnull String message) {
+	public static FormFillFailure warning(@Nonnull String message) {
         return warningWithMarkup(Util.escape(message));
     }
 
-    /**
+	/**
      * Sends out a string error message that indicates an error,
      * by formatting it with {@link String#format(String, Object[])}
      */
@@ -68,11 +85,11 @@ public abstract class FormFillFailure extends IOException implements HttpRespons
         return error(String.format(format, args));
     }
 
-    public static FormFillFailure warning(String format, Object... args) {
+	public static FormFillFailure warning(String format, Object... args) {
         return warning(String.format(format, args));
     }
 
-    /**
+	/**
      * Sends out a string error message, with optional "show details" link that expands to the full stack trace.
      *
      * <p>
@@ -84,33 +101,29 @@ public abstract class FormFillFailure extends IOException implements HttpRespons
         return _error(FormValidation.Kind.ERROR, e, message);
     }
 
-    public static FormFillFailure warning(Throwable e, String message) {
+	public static FormFillFailure warning(Throwable e, String message) {
         return _error(FormValidation.Kind.WARNING, e, message);
     }
 
-    private static FormFillFailure _error(FormValidation.Kind kind, Throwable e, String message) {
+	private static FormFillFailure _error(FormValidation.Kind kind, Throwable e, String message) {
         if (e == null) {
             return _errorWithMarkup(Util.escape(message), kind);
         }
 
-        return _errorWithMarkup(Util.escape(message) +
-                " <a href='#' class='showDetails'>"
-                + Messages.FormValidation_Error_Details()
-                + "</a><pre style='display:none'>"
-                + Util.escape(Functions.printThrowable(e)) +
-                "</pre>", kind
+        return _errorWithMarkup(new StringBuilder().append(Util.escape(message)).append(" <a href='#' class='showDetails'>").append(Messages.FormValidation_Error_Details()).append("</a><pre style='display:none'>").append(Util.escape(Functions.printThrowable(e))).append("</pre>")
+				.toString(), kind
         );
     }
 
-    public static FormFillFailure error(Throwable e, String format, Object... args) {
+	public static FormFillFailure error(Throwable e, String format, Object... args) {
         return error(e, String.format(format, args));
     }
 
-    public static FormFillFailure warning(Throwable e, String format, Object... args) {
+	public static FormFillFailure warning(Throwable e, String format, Object... args) {
         return warning(e, String.format(format, args));
     }
 
-    /**
+	/**
      * Sends out an HTML fragment that indicates an error.
      *
      * <p>
@@ -124,64 +137,49 @@ public abstract class FormFillFailure extends IOException implements HttpRespons
         return _errorWithMarkup(message, FormValidation.Kind.ERROR);
     }
 
-    public static FormFillFailure warningWithMarkup(String message) {
+	public static FormFillFailure warningWithMarkup(String message) {
         return _errorWithMarkup(message, FormValidation.Kind.WARNING);
     }
 
-    private static FormFillFailure _errorWithMarkup(@Nonnull final String message, final FormValidation.Kind kind) {
+	private static FormFillFailure _errorWithMarkup(@Nonnull final String message, final FormValidation.Kind kind) {
         return new FormFillFailure(kind, message) {
-            public String renderHtml() {
+            @Override
+			public String renderHtml() {
                 StaplerRequest req = Stapler.getCurrentRequest();
                 if (req == null) { // being called from some other context
                     return message;
                 }
                 // 1x16 spacer needed for IE since it doesn't support min-height
-                return "<div class=" + getKind().name().toLowerCase(Locale.ENGLISH) + "><img src='" +
-                        req.getContextPath() + Jenkins.RESOURCE_PATH + "/images/none.gif' height=16 width=1>" +
-                        message + "</div>";
+                return new StringBuilder().append("<div class=").append(getKind().name().toLowerCase(Locale.ENGLISH)).append("><img src='").append(req.getContextPath()).append(Jenkins.RESOURCE_PATH)
+						.append("/images/none.gif' height=16 width=1>").append(message).append("</div>").toString();
             }
 
             @Override
             public String toString() {
-                return kind + ": " + message;
+                return new StringBuilder().append(kind).append(": ").append(message).toString();
             }
         };
     }
 
-    /**
+	/**
      * Sends out an arbitrary HTML fragment as the output.
      */
     public static FormFillFailure respond(FormValidation.Kind kind, final String html) {
         return new FormFillFailure(kind) {
-            public String renderHtml() {
+            @Override
+			public String renderHtml() {
                 return html;
             }
 
             @Override
             public String toString() {
-                return getKind() + ": " + html;
+                return new StringBuilder().append(getKind()).append(": ").append(html).toString();
             }
         };
     }
 
-    private final FormValidation.Kind kind;
-    private boolean selectionCleared;
-
-    /**
-     * Instances should be created via one of the factory methods above.
-     *
-     * @param kind the kind
-     */
-    private FormFillFailure(FormValidation.Kind kind) {
-        this.kind = kind;
-    }
-
-    private FormFillFailure(FormValidation.Kind kind, String message) {
-        super(message);
-        this.kind = kind;
-    }
-
-    public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object node)
+	@Override
+	public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object node)
             throws IOException, ServletException {
         rsp.setContentType("text/html;charset=UTF-8");
         rsp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
@@ -189,15 +187,15 @@ public abstract class FormFillFailure extends IOException implements HttpRespons
         rsp.getWriter().print(renderHtml());
     }
 
-    public FormValidation.Kind getKind() {
+	public FormValidation.Kind getKind() {
         return kind;
     }
 
-    public boolean isSelectionCleared() {
+	public boolean isSelectionCleared() {
         return selectionCleared;
     }
 
-    /**
+	/**
      * Flags this failure as requiring that the select options should be cleared out.
      *
      * @return {@code this} for method chaining.
@@ -207,6 +205,6 @@ public abstract class FormFillFailure extends IOException implements HttpRespons
         return this;
     }
 
-    public abstract String renderHtml();
+	public abstract String renderHtml();
 
 }

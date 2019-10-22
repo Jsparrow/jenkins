@@ -117,11 +117,11 @@ public abstract class ToolInstaller implements Describable<ToolInstaller>, Exten
         }
         String home = Util.fixEmptyAndTrim(tool.getHome());
         if (home == null) {
-            home = sanitize(tool.getDescriptor().getId()) + File.separatorChar + sanitize(tool.getName());
+            home = new StringBuilder().append(sanitize(tool.getDescriptor().getId())).append(File.separatorChar).append(sanitize(tool.getName())).toString();
         }
         FilePath root = node.getRootPath();
         if (root == null) {
-            throw new IllegalArgumentException("Node " + node.getDisplayName() + " seems to be offline");
+            throw new IllegalArgumentException(new StringBuilder().append("Node ").append(node.getDisplayName()).append(" seems to be offline").toString());
         }
         return root.child("tools").child(home);
     }
@@ -130,7 +130,8 @@ public abstract class ToolInstaller implements Describable<ToolInstaller>, Exten
         return s != null ? s.replaceAll("[^A-Za-z0-9_.-]+", "_") : null;
     }
 
-    public ToolInstallerDescriptor<?> getDescriptor() {
+    @Override
+	public ToolInstallerDescriptor<?> getDescriptor() {
         return (ToolInstallerDescriptor) Jenkins.get().getDescriptorOrDie(getClass());
     }
 

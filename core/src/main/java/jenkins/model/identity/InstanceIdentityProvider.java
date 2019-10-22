@@ -162,14 +162,14 @@ public abstract class InstanceIdentityProvider<PUB extends PublicKey, PRIV exten
                     }
                 } catch (RuntimeException e) {
                     LOGGER.log(Level.WARNING,
-                            "Instance identity provider " + provider + " propagated a runtime exception", e);
+                            new StringBuilder().append("Instance identity provider ").append(provider).append(" propagated a runtime exception").toString(), e);
                 } catch (Error e) {
                     LOGGER.log(Level.INFO,
                             "Encountered an error while consulting instance identity provider " + provider, e);
                     throw e;
                 } catch (Throwable e) {
                     LOGGER.log(Level.SEVERE,
-                            "Instance identity provider " + provider + " propagated an uncaught exception", e);
+                            new StringBuilder().append("Instance identity provider ").append(provider).append(" propagated an uncaught exception").toString(), e);
                 }
             }
             return null;
@@ -208,7 +208,7 @@ public abstract class InstanceIdentityProvider<PUB extends PublicKey, PRIV exten
                 return provider == null ? null : provider.getKeyPair();
             } catch (RuntimeException e) {
                 LOGGER.log(Level.WARNING,
-                        "Instance identity provider " + provider + " propagated a runtime exception", e);
+                        new StringBuilder().append("Instance identity provider ").append(provider).append(" propagated a runtime exception").toString(), e);
                 return null;
             } catch (Error e) {
                 LOGGER.log(Level.INFO,
@@ -216,7 +216,7 @@ public abstract class InstanceIdentityProvider<PUB extends PublicKey, PRIV exten
                 throw e;
             } catch (Throwable e) {
                 LOGGER.log(Level.SEVERE,
-                        "Instance identity provider " + provider + " propagated an uncaught exception", e);
+                        new StringBuilder().append("Instance identity provider ").append(provider).append(" propagated an uncaught exception").toString(), e);
                 return null;
             }
         }
@@ -233,7 +233,7 @@ public abstract class InstanceIdentityProvider<PUB extends PublicKey, PRIV exten
                 return provider == null ? null : provider.getPublicKey();
             } catch (RuntimeException e) {
                 LOGGER.log(Level.WARNING,
-                        "Instance identity provider " + provider + " propagated a runtime exception", e);
+                        new StringBuilder().append("Instance identity provider ").append(provider).append(" propagated a runtime exception").toString(), e);
                 return null;
             } catch (Error e) {
                 LOGGER.log(Level.INFO,
@@ -241,7 +241,7 @@ public abstract class InstanceIdentityProvider<PUB extends PublicKey, PRIV exten
                 throw e;
             } catch (Throwable e) {
                 LOGGER.log(Level.SEVERE,
-                        "Instance identity provider " + provider + " propagated an uncaught exception", e);
+                        new StringBuilder().append("Instance identity provider ").append(provider).append(" propagated an uncaught exception").toString(), e);
                 return null;
             }
         }
@@ -258,7 +258,7 @@ public abstract class InstanceIdentityProvider<PUB extends PublicKey, PRIV exten
                 return provider == null ? null : provider.getPrivateKey();
             } catch (RuntimeException e) {
                 LOGGER.log(Level.WARNING,
-                        "Instance identity provider " + provider + " propagated a runtime exception", e);
+                        new StringBuilder().append("Instance identity provider ").append(provider).append(" propagated a runtime exception").toString(), e);
                 return null;
             } catch (Error e) {
                 LOGGER.log(Level.INFO,
@@ -266,7 +266,7 @@ public abstract class InstanceIdentityProvider<PUB extends PublicKey, PRIV exten
                 throw e;
             } catch (Throwable e) {
                 LOGGER.log(Level.SEVERE,
-                        "Instance identity provider " + provider + " propagated an uncaught exception", e);
+                        new StringBuilder().append("Instance identity provider ").append(provider).append(" propagated an uncaught exception").toString(), e);
                 return null;
             }
         }
@@ -284,7 +284,7 @@ public abstract class InstanceIdentityProvider<PUB extends PublicKey, PRIV exten
                 return provider == null ? null : provider.getCertificate();
             } catch (RuntimeException e) {
                 LOGGER.log(Level.WARNING,
-                        "Instance identity provider " + provider + " propagated a runtime exception", e);
+                        new StringBuilder().append("Instance identity provider ").append(provider).append(" propagated a runtime exception").toString(), e);
                 return null;
             } catch (Error e) {
                 LOGGER.log(Level.INFO,
@@ -292,7 +292,7 @@ public abstract class InstanceIdentityProvider<PUB extends PublicKey, PRIV exten
                 throw e;
             } catch (Throwable e) {
                 LOGGER.log(Level.SEVERE,
-                        "Instance identity provider " + provider + " propagated an uncaught exception", e);
+                        new StringBuilder().append("Instance identity provider ").append(provider).append(" propagated an uncaught exception").toString(), e);
                 return null;
             }
         }

@@ -17,9 +17,16 @@ import java.util.logging.Logger;
  */
 @Extension
 public class NioChannelSelector {
-    private NioChannelHub hub;
+    /**
+     * Escape hatch to disable use of NIO.
+     */
+    public static boolean DISABLED = SystemProperties.getBoolean(NioChannelSelector.class.getName()+".disabled");
 
-    public NioChannelSelector() {
+	private static final Logger LOGGER = Logger.getLogger(NioChannelSelector.class.getName());
+
+	private NioChannelHub hub;
+
+	public NioChannelSelector() {
         try {
             if (!DISABLED) {
                 this.hub = new NioChannelHub(Computer.threadPoolForRemoting);
@@ -32,22 +39,16 @@ public class NioChannelSelector {
         }
     }
 
-    public NioChannelHub getHub() {
+	public NioChannelHub getHub() {
         return hub;
     }
 
-    @Terminator
+	@Terminator
     public void cleanUp() throws IOException {
-        if (hub!=null) {
-            hub.close();
-            hub = null;
-        }
+        if (hub == null) {
+			return;
+		}
+		hub.close();
+		hub = null;
     }
-
-    /**
-     * Escape hatch to disable use of NIO.
-     */
-    public static boolean DISABLED = SystemProperties.getBoolean(NioChannelSelector.class.getName()+".disabled");
-
-    private static final Logger LOGGER = Logger.getLogger(NioChannelSelector.class.getName());
 }

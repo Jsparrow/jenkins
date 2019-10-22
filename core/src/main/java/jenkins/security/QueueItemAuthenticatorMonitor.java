@@ -52,7 +52,11 @@ import java.util.logging.Logger;
 @Extension
 @Restricted(NoExternalUse.class)
 public class QueueItemAuthenticatorMonitor extends AdministrativeMonitor {
-    @Override
+    private static boolean anyBuildLaunchedAsSystemWithAuthenticatorPresent = false;
+
+	private static final Logger LOGGER = Logger.getLogger(QueueItemAuthenticatorMonitor.class.getName());
+
+	@Override
     public boolean isActivated() {
         AuthorizationStrategy authorizationStrategy = Jenkins.get().getAuthorizationStrategy();
         if (authorizationStrategy instanceof AuthorizationStrategy.Unsecured) {
@@ -67,7 +71,7 @@ public class QueueItemAuthenticatorMonitor extends AdministrativeMonitor {
         return !isQueueItemAuthenticatorPresent() || !isQueueItemAuthenticatorConfigured() || isAnyBuildLaunchedAsSystemWithAuthenticatorPresent();
     }
 
-    @RequirePOST
+	@RequirePOST
     public HttpResponse doAct(@QueryParameter String redirect, @QueryParameter String dismiss, @QueryParameter String reset) throws IOException {
         if (redirect != null) {
             return HttpResponses.redirectTo("https://jenkins.io/redirect/queue-item-security");
@@ -81,27 +85,27 @@ public class QueueItemAuthenticatorMonitor extends AdministrativeMonitor {
         return HttpResponses.forwardToPreviousPage();
     }
 
-    public static boolean isQueueItemAuthenticatorPresent() {
+	public static boolean isQueueItemAuthenticatorPresent() {
         // there is no QueueItemAuthenticatorDescriptor; perhaps you need to install authorize-project?
         return !QueueItemAuthenticatorDescriptor.all().isEmpty();
     }
 
-    public static boolean isQueueItemAuthenticatorConfigured() {
+	public static boolean isQueueItemAuthenticatorConfigured() {
         // there is no configured QueueItemAuthenticator; perhaps you need to configure it?
         return !QueueItemAuthenticatorConfiguration.get().getAuthenticators().isEmpty();
     }
 
-    public boolean isAnyBuildLaunchedAsSystemWithAuthenticatorPresent() {
+	public boolean isAnyBuildLaunchedAsSystemWithAuthenticatorPresent() {
         // you configured a QueueItemAuthenticator, but builds are still running as SYSTEM
         return anyBuildLaunchedAsSystemWithAuthenticatorPresent;
     }
 
-    @Override
+	@Override
     public String getDisplayName() {
         return Messages.QueueItemAuthenticatorMonitor_DisplayName();
     }
 
-    @Restricted(NoExternalUse.class)
+	@Restricted(NoExternalUse.class)
     @Extension
     public static class QueueListenerImpl extends QueueListener {
         @Override
@@ -140,8 +144,4 @@ public class QueueItemAuthenticatorMonitor extends AdministrativeMonitor {
             }
         }
     }
-
-    private static boolean anyBuildLaunchedAsSystemWithAuthenticatorPresent = false;
-
-    private static final Logger LOGGER = Logger.getLogger(QueueItemAuthenticatorMonitor.class.getName());
 }

@@ -33,7 +33,9 @@ public class ByteArrayOutputStream2 extends ByteArrayOutputStream {
             }
 
             int sz = is.read(buf,count,buf.length-count);
-            if(sz<0)     return;
+            if(sz<0) {
+				return;
+			}
             count += sz;
         }
     }

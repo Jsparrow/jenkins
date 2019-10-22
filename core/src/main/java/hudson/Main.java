@@ -56,7 +56,22 @@ import java.nio.charset.Charset;
  */
 public class Main {
 
-    /** @see #remotePost */
+    /**
+     * Set to true if we are running unit tests.
+     */
+    public static boolean isUnitTest = false;
+
+	/**
+     * Set to true if we are running inside "mvn hpi:run" or "mvn hudson-dev:run"
+     */
+    public static boolean isDevelopmentMode = SystemProperties.getBoolean(Main.class.getName()+".development");
+
+	/**
+     * Time out for socket connection to Hudson.
+     */
+    public static final int TIMEOUT = SystemProperties.getInteger(Main.class.getName()+".timeout",15000);
+
+	/** @see #remotePost */
     public static void main(String[] args) {
         try {
             System.exit(run(args));
@@ -66,28 +81,29 @@ public class Main {
         }
     }
 
-    /** @see #remotePost */
+	/** @see #remotePost */
     public static int run(String[] args) throws Exception {
         String home = getHudsonHome();
         if (home==null) {
             System.err.println("JENKINS_HOME is not set.");
             return -1;
         }
-        if (args.length < 2) {
-            System.err.println("Usage: <job-name> <command> <args..>");
-            return -1;
-        }
-
-        return remotePost(args);
+        if (args.length >= 2) {
+			return remotePost(args);
+		}
+		System.err.println("Usage: <job-name> <command> <args..>");
+		return -1;
     }
 
-    private static String getHudsonHome() {
+	private static String getHudsonHome() {
         String home = EnvVars.masterEnvVars.get("JENKINS_HOME");
-        if (home!=null) return home;
+        if (home!=null) {
+			return home;
+		}
         return EnvVars.masterEnvVars.get("HUDSON_HOME");
     }
 
-    /**
+	/**
      * Run command and send result to {@code ExternalJob} in the {@code external-monitor-job} plugin.
      * Obsoleted by {@code SetExternalBuildResultCommand} but kept here for compatibility.
      */
@@ -95,41 +111,54 @@ public class Main {
         String projectName = args[0];
 
         String home = getHudsonHome();
-        if(!home.endsWith("/"))     home = home + '/';  // make sure it ends with '/'
+        if(!home.endsWith("/"))
+		 {
+			home = home + '/';  // make sure it ends with '/'
+		}
 
         // check for authentication info
         String auth = new URL(home).getUserInfo();
-        if(auth != null) auth = "Basic " + new Base64Encoder().encode(auth.getBytes(StandardCharsets.UTF_8));
+        if(auth != null) {
+			auth = "Basic " + new Base64Encoder().encode(auth.getBytes(StandardCharsets.UTF_8));
+		}
 
         {// check if the home is set correctly
             HttpURLConnection con = open(new URL(home));
-            if (auth != null) con.setRequestProperty("Authorization", auth);
+            if (auth != null) {
+				con.setRequestProperty("Authorization", auth);
+			}
             con.connect();
             if(con.getResponseCode()!=200
             || con.getHeaderField("X-Hudson")==null) {
-                System.err.println(home+" is not Hudson ("+con.getResponseMessage()+")");
+                System.err.println(new StringBuilder().append(home).append(" is not Hudson (").append(con.getResponseMessage()).append(")").toString());
                 return -1;
             }
         }
 
-        URL jobURL = new URL(home + "job/" + Util.encode(projectName).replace("/", "/job/") + "/");
+        URL jobURL = new URL(new StringBuilder().append(home).append("job/").append(Util.encode(projectName).replace("/", "/job/")).append("/").toString());
 
         {// check if the job name is correct
             HttpURLConnection con = open(new URL(jobURL, "acceptBuildResult"));
-            if (auth != null) con.setRequestProperty("Authorization", auth);
+            if (auth != null) {
+				con.setRequestProperty("Authorization", auth);
+			}
             con.connect();
             if(con.getResponseCode()!=200) {
-                System.err.println(jobURL + " is not a valid external job (" + con.getResponseCode() + " " + con.getResponseMessage() + ")");
+                System.err.println(new StringBuilder().append(jobURL).append(" is not a valid external job (").append(con.getResponseCode()).append(" ").append(con.getResponseMessage()).append(")")
+						.toString());
                 return -1;
             }
         }
 
         // get a crumb to pass the csrf check
-        String crumbField = null, crumbValue = null;
+        String crumbField = null;
+		String crumbValue = null;
         try {
             HttpURLConnection con = open(new URL(home +
                     "crumbIssuer/api/xml?xpath=concat(//crumbRequestField,\":\",//crumb)'"));
-            if (auth != null) con.setRequestProperty("Authorization", auth);
+            if (auth != null) {
+				con.setRequestProperty("Authorization", auth);
+			}
             String line = IOUtils.readFirstLine(con.getInputStream(),"UTF-8");
             String[] components = line.split(":");
             if (components.length == 2) {
@@ -147,7 +176,7 @@ public class Main {
             try (OutputStream os = Files.newOutputStream(tmpFile.toPath());
                  Writer w = new OutputStreamWriter(os, StandardCharsets.UTF_8)) {
                 w.write("<?xml version='1.1' encoding='UTF-8'?>");
-                w.write("<run><log encoding='hexBinary' content-encoding='"+Charset.defaultCharset().name()+"'>");
+                w.write(new StringBuilder().append("<run><log encoding='hexBinary' content-encoding='").append(Charset.defaultCharset().name()).append("'>").toString());
                 w.flush();
 
                 // run the command
@@ -159,7 +188,8 @@ public class Main {
 
                 ret = proc.join();
 
-                w.write("</log><result>"+ret+"</result><duration>"+(System.currentTimeMillis()-start)+"</duration></run>");
+                w.write(new StringBuilder().append("</log><result>").append(ret).append("</result><duration>").append(System.currentTimeMillis()-start).append("</duration></run>")
+						.toString());
             } catch (InvalidPathException e) {
                 throw new IOException(e);
             }
@@ -169,7 +199,9 @@ public class Main {
                 try {
                     // start a remote connection
                     HttpURLConnection con = open(location);
-                    if (auth != null) con.setRequestProperty("Authorization", auth);
+                    if (auth != null) {
+						con.setRequestProperty("Authorization", auth);
+					}
                     if (crumbField != null && crumbValue != null) {
                         con.setRequestProperty(crumbField, crumbValue);
                     }
@@ -204,7 +236,7 @@ public class Main {
         }
     }
 
-    /**
+	/**
      * Connects to the given HTTP URL and configure time out, to avoid infinite hang.
      */
     private static HttpURLConnection open(URL url) throws IOException {
@@ -213,19 +245,4 @@ public class Main {
         c.setConnectTimeout(TIMEOUT);
         return c;
     }
-
-    /**
-     * Set to true if we are running unit tests.
-     */
-    public static boolean isUnitTest = false;
-
-    /**
-     * Set to true if we are running inside "mvn hpi:run" or "mvn hudson-dev:run"
-     */
-    public static boolean isDevelopmentMode = SystemProperties.getBoolean(Main.class.getName()+".development");
-
-    /**
-     * Time out for socket connection to Hudson.
-     */
-    public static final int TIMEOUT = SystemProperties.getInteger(Main.class.getName()+".timeout",15000);
 }

@@ -64,7 +64,8 @@ public class BooleanParameterDefinition extends SimpleParameterDefinition {
         return value;
     }
 
-    public ParameterValue createValue(String value) {
+    @Override
+	public ParameterValue createValue(String value) {
         return new BooleanParameterValue(getName(),Boolean.parseBoolean(value),getDescription());
     }
 

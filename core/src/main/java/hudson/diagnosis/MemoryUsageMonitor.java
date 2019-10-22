@@ -49,7 +49,27 @@ import org.kohsuke.stapler.QueryParameter;
  */
 @Extension @Symbol("memoryUsage")
 public final class MemoryUsageMonitor extends PeriodicWork {
-    /**
+    public final MemoryGroup heap;
+	public final MemoryGroup nonHeap;
+
+	public MemoryUsageMonitor() {
+        List<MemoryPoolMXBean> pools = ManagementFactory.getMemoryPoolMXBeans();
+        heap = new MemoryGroup(pools, MemoryType.HEAP);
+        nonHeap = new MemoryGroup(pools, MemoryType.NON_HEAP);
+    }
+
+	@Override
+	public long getRecurrencePeriod() {
+        return TimeUnit.SECONDS.toMillis(10);
+    }
+
+	@Override
+	protected void doRun() {
+        heap.update();
+        nonHeap.update();
+    }
+
+	/**
      * A memory group is conceptually a set of memory pools. 
      */
     public final class MemoryGroup {
@@ -66,10 +86,7 @@ public final class MemoryUsageMonitor extends PeriodicWork {
         public final MultiStageTimeSeries max = new MultiStageTimeSeries(Messages._MemoryUsageMonitor_TOTAL(), ColorPalette.BLUE, 0,0);
 
         private MemoryGroup(List<MemoryPoolMXBean> pools, MemoryType type) {
-            for (MemoryPoolMXBean pool : pools) {
-                if (pool.getType() == type)
-                    this.pools.add(pool);
-            }
+            pools.stream().filter(pool -> pool.getType() == type).forEach(pool -> this.pools.add(pool));
         }
 
         private void update() {
@@ -78,7 +95,10 @@ public final class MemoryUsageMonitor extends PeriodicWork {
 //            long cur = 0;
             for (MemoryPoolMXBean pool : pools) {
                 MemoryUsage usage = pool.getCollectionUsage();
-                if(usage==null) continue;   // not available
+                if(usage==null)
+				 {
+					continue;   // not available
+				}
                 used += usage.getUsed();
                 max  += usage.getMax();
 
@@ -104,23 +124,5 @@ public final class MemoryUsageMonitor extends PeriodicWork {
         public TrendChart doGraph(@QueryParameter String type) throws IOException {
             return MultiStageTimeSeries.createTrendChart(TimeScale.parse(type),used,max);
         }
-    }
-
-    public final MemoryGroup heap;
-    public final MemoryGroup nonHeap;
-
-    public MemoryUsageMonitor() {
-        List<MemoryPoolMXBean> pools = ManagementFactory.getMemoryPoolMXBeans();
-        heap = new MemoryGroup(pools, MemoryType.HEAP);
-        nonHeap = new MemoryGroup(pools, MemoryType.NON_HEAP);
-    }
-
-    public long getRecurrencePeriod() {
-        return TimeUnit.SECONDS.toMillis(10);
-    }
-
-    protected void doRun() {
-        heap.update();
-        nonHeap.update();
     }
 }

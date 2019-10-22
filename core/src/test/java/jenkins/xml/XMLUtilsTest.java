@@ -49,22 +49,8 @@ public class XMLUtilsTest {
     @Issue("SECURITY-167")
     @Test()
     public void testSafeTransformDoesNotProcessForeignResources() throws Exception {
-        final String xml = "<?xml version='1.0' encoding='UTF-8'?>\n" +
-                "<!DOCTYPE project[\n" +
-                "  <!ENTITY foo SYSTEM \"file:///\">\n" +
-                "]>\n" +
-                "<project>\n" +
-                "  <actions/>\n" +
-                "  <description>&foo;</description>\n" +
-                "  <keepDependencies>false</keepDependencies>\n" +
-                "  <properties/>\n" +
-                "  <scm class=\"hudson.scm.NullSCM\"/>\n" +
-                "  <canRoam>true</canRoam>\n" +
-                "  <triggers/>\n" +
-                "  <builders/>\n" +
-                "  <publishers/>\n" +
-                "  <buildWrappers/>\n" +
-                "</project>";
+        final String xml = new StringBuilder().append("<?xml version='1.0' encoding='UTF-8'?>\n").append("<!DOCTYPE project[\n").append("  <!ENTITY foo SYSTEM \"file:///\">\n").append("]>\n").append("<project>\n").append("  <actions/>\n").append("  <description>&foo;</description>\n").append("  <keepDependencies>false</keepDependencies>\n")
+				.append("  <properties/>\n").append("  <scm class=\"hudson.scm.NullSCM\"/>\n").append("  <canRoam>true</canRoam>\n").append("  <triggers/>\n").append("  <builders/>\n").append("  <publishers/>\n").append("  <buildWrappers/>\n").append("</project>").toString();
 
 
         StringWriter stringWriter = new StringWriter();
@@ -82,19 +68,8 @@ public class XMLUtilsTest {
     @Issue("SECURITY-167")
     @Test()
     public void testUpdateByXmlIDoesNotFail() throws Exception {
-        final String xml = "<?xml version='1.0' encoding='UTF-8'?>\n" +
-                "<project>\n" +
-                "  <actions/>\n" +
-                "  <description>&amp;</description>\n" +
-                "  <keepDependencies>false</keepDependencies>\n" +
-                "  <properties/>\n" +
-                "  <scm class=\"hudson.scm.NullSCM\"/>\n" +
-                "  <canRoam>true</canRoam>\n" +
-                "  <triggers/>\n" +
-                "  <builders/>\n" +
-                "  <publishers/>\n" +
-                "  <buildWrappers/>\n" +
-                "</project>";
+        final String xml = new StringBuilder().append("<?xml version='1.0' encoding='UTF-8'?>\n").append("<project>\n").append("  <actions/>\n").append("  <description>&amp;</description>\n").append("  <keepDependencies>false</keepDependencies>\n").append("  <properties/>\n").append("  <scm class=\"hudson.scm.NullSCM\"/>\n").append("  <canRoam>true</canRoam>\n")
+				.append("  <triggers/>\n").append("  <builders/>\n").append("  <publishers/>\n").append("  <buildWrappers/>\n").append("</project>").toString();
 
         StringWriter stringWriter = new StringWriter();
 
@@ -119,11 +94,7 @@ public class XMLUtilsTest {
     @Test
     public void testParse_with_XXE() throws IOException, XPathExpressionException {
         try {
-            final String xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-                    "<!DOCTYPE foo [\n" +
-                    "   <!ELEMENT foo ANY >\n" +
-                    "   <!ENTITY xxe SYSTEM \"http://abc.com/temp/test.jsp\" >]> " +
-                    "<foo>&xxe;</foo>";
+            final String xml = new StringBuilder().append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n").append("<!DOCTYPE foo [\n").append("   <!ELEMENT foo ANY >\n").append("   <!ENTITY xxe SYSTEM \"http://abc.com/temp/test.jsp\" >]> ").append("<foo>&xxe;</foo>").toString();
 
             StringReader stringReader = new StringReader(xml);
             XMLUtils.parse(stringReader);

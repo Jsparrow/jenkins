@@ -37,14 +37,15 @@ import hudson.Extension;
  */
 @Extension
 public class MonitorMarkedNodeOffline extends AdministrativeMonitor {
-    @Override
+    public boolean active = false;
+
+	@Override
     public String getDisplayName() {
         return Messages.MonitorMarkedNodeOffline_DisplayName();
     }
 
-    public boolean active = false;
-
-    public boolean isActivated() {
+	@Override
+	public boolean isActivated() {
         return active;
     }
 }

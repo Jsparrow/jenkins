@@ -57,54 +57,41 @@ import java.util.TreeMap;
 @SuppressWarnings({"unchecked"})
 public final class PackedMap<K,V> extends AbstractMap<K,V> {
     private Object[] kvpairs;
-
-    /**
-     *
-     * @param src
-     *      Map to copy contents from. Iteration order is preserved.
-     */
-    public static <K,V> PackedMap<K,V> of(Map<? extends K,? extends V> src) {
-        return new PackedMap<>(src);
-    }
-
-    private PackedMap(Map<? extends K,? extends V> src) {
-        kvpairs = new Object[src.size()*2];
-        int i=0;
-        for (Entry<? extends K, ? extends V> e : src.entrySet()) {
-            kvpairs[i++] = e.getKey();
-            kvpairs[i++] = e.getValue();
-        }
-    }
-
-    private final Set<Entry<K,V>> entrySet = new AbstractSet<Entry<K, V>>() {
+	private final Set<Entry<K,V>> entrySet = new AbstractSet<Entry<K, V>>() {
         @Override
         public Iterator<Entry<K, V>> iterator() {
             return new Iterator<Entry<K, V>>() {
                 int index=0;
-                public boolean hasNext() {
+                @Override
+				public boolean hasNext() {
                     return index<kvpairs.length;
                 }
 
-                @SuppressWarnings({"unchecked"})
+                @Override
+				@SuppressWarnings({"unchecked"})
                 public Entry<K, V> next() {
                     final K k = (K)kvpairs[index++];
                     final V v = (V)kvpairs[index++];
                     return new Entry<K, V>() {
-                        public K getKey() {
+                        @Override
+						public K getKey() {
                             return k;
                         }
 
-                        public V getValue() {
+                        @Override
+						public V getValue() {
                             return v;
                         }
 
-                        public V setValue(V value) {
+                        @Override
+						public V setValue(V value) {
                             throw new UnsupportedOperationException();
                         }
                     };
                 }
 
-                public void remove() {
+                @Override
+				public void remove() {
                     throw new UnsupportedOperationException();
                 }
             };
@@ -116,28 +103,50 @@ public final class PackedMap<K,V> extends AbstractMap<K,V> {
         }
     };
 
-    @Override
+	private PackedMap(Map<? extends K,? extends V> src) {
+        kvpairs = new Object[src.size()*2];
+        int i=0;
+        for (Entry<? extends K, ? extends V> e : src.entrySet()) {
+            kvpairs[i++] = e.getKey();
+            kvpairs[i++] = e.getValue();
+        }
+    }
+
+	/**
+     *
+     * @param src
+     *      Map to copy contents from. Iteration order is preserved.
+     */
+    public static <K,V> PackedMap<K,V> of(Map<? extends K,? extends V> src) {
+        return new PackedMap<>(src);
+    }
+
+	@Override
     public Set<Entry<K, V>> entrySet() {
         return entrySet;
     }
 
-    @Override
+	@Override
     public boolean containsKey(Object key) {
-        for (int i=0; i<kvpairs.length; i+=2)
-            if (key.equals(kvpairs[i]))
-                return true;
+        for (int i=0; i<kvpairs.length; i+=2) {
+			if (key.equals(kvpairs[i])) {
+				return true;
+			}
+		}
         return false;
     }
 
-    @Override
+	@Override
     public V get(Object key) {
-        for (int i=0; i<kvpairs.length; i+=2)
-            if (key.equals(kvpairs[i]))
-                return (V)kvpairs[i+1];
+        for (int i=0; i<kvpairs.length; i+=2) {
+			if (key.equals(kvpairs[i])) {
+				return (V)kvpairs[i+1];
+			}
+		}
         return null;
     }
 
-    @Override
+	@Override
     public Collection<V> values() {
         return new AbstractList<V>() {
             @Override

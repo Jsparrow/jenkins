@@ -16,12 +16,14 @@ import java.io.IOException;
  */
 public enum BuildStepMonitor {
     NONE {
-        public boolean perform(BuildStep bs, AbstractBuild build, Launcher launcher, BuildListener listener) throws IOException, InterruptedException {
+        @Override
+		public boolean perform(BuildStep bs, AbstractBuild build, Launcher launcher, BuildListener listener) throws IOException, InterruptedException {
             return bs.perform(build,launcher,listener);
         }
     },
     STEP {
-        public boolean perform(BuildStep bs, AbstractBuild build, Launcher launcher, BuildListener listener) throws InterruptedException, IOException {
+        @Override
+		public boolean perform(BuildStep bs, AbstractBuild build, Launcher launcher, BuildListener listener) throws InterruptedException, IOException {
             CheckPoint cp = new CheckPoint(bs.getClass().getName(),bs.getClass());
             if (bs instanceof Describable) {
                 cp.block(listener, ((Describable) bs).getDescriptor().getDisplayName());
@@ -36,7 +38,8 @@ public enum BuildStepMonitor {
         }
     },
     BUILD {
-        public boolean perform(BuildStep bs, AbstractBuild build, Launcher launcher, BuildListener listener) throws IOException, InterruptedException {
+        @Override
+		public boolean perform(BuildStep bs, AbstractBuild build, Launcher launcher, BuildListener listener) throws IOException, InterruptedException {
             if (bs instanceof Describable) {
                 CheckPoint.COMPLETED.block(listener, ((Describable) bs).getDescriptor().getDisplayName());
             } else {

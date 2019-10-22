@@ -58,7 +58,7 @@ public abstract class RSAConfidentialKey extends ConfidentialKey {
     }
 
     public RSAConfidentialKey(Class owner, String shortName) {
-        this(owner.getName() + '.' + shortName);
+        this(new StringBuilder().append(owner.getName()).append('.').append(shortName).toString());
     }
 
     /**

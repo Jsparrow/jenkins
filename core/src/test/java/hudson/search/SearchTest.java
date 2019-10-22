@@ -68,25 +68,31 @@ public class SearchTest {
         final String searchName = "sameDisplayName";
 
         SearchItem searchItemHit = new SearchItem() {
-            public SearchIndex getSearchIndex() {
+            @Override
+			public SearchIndex getSearchIndex() {
                     return null;
             }
-            public String getSearchName() {
+            @Override
+			public String getSearchName() {
                 return searchName;
             }
-            public String getSearchUrl() {
-                return "/job/"+Util.rawEncode(query) + "/";
+            @Override
+			public String getSearchUrl() {
+                return new StringBuilder().append("/job/").append(Util.rawEncode(query)).append("/").toString();
             }
         };
 
         SearchItem searchItemNoHit = new SearchItem() {
-            public SearchIndex getSearchIndex() {
+            @Override
+			public SearchIndex getSearchIndex() {
                     return null;
             }
-            public String getSearchName() {
+            @Override
+			public String getSearchName() {
                 return searchName;
             }
-            public String getSearchUrl() {
+            @Override
+			public String getSearchUrl() {
                 return "/job/someotherJob/";
             }
         };

@@ -22,7 +22,7 @@ public class MarkFindingOutputStreamTest {
 
     @Test
     public void findTwice() throws IOException {
-        write("foo"+mark+"bar"+mark);
+        write(new StringBuilder().append("foo").append(mark).append("bar").append(mark).toString());
         assertCount(2);
         assertOutput("foobar");
     }
@@ -34,7 +34,7 @@ public class MarkFindingOutputStreamTest {
 
         write("foo"); // this needs to write what was held off during the first write
         assertCount(0);
-        assertOutput("bar"+markHead+"foo");
+        assertOutput(new StringBuilder().append("bar").append(markHead).append("foo").toString());
     }
 
     /**
@@ -79,8 +79,9 @@ public class MarkFindingOutputStreamTest {
     }
 
     private void writeOneByOne(String s) throws IOException {
-        for (int i=0; i< s.length(); i++)
-            m.write(s.charAt(i));
+        for (int i=0; i< s.length(); i++) {
+			m.write(s.charAt(i));
+		}
     }
 
     class MarkCountingOutputStream extends MarkFindingOutputStream {

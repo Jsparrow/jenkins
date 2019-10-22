@@ -69,7 +69,7 @@ public class CreateNodeCommand extends CLICommand {
         }
 
         if (jenkins.getNode(newNode.getNodeName()) != null) {
-            throw new IllegalStateException("Node '" + newNode.getNodeName() + "' already exists");
+            throw new IllegalStateException(new StringBuilder().append("Node '").append(newNode.getNodeName()).append("' already exists").toString());
         }
 
         jenkins.addNode(newNode);

@@ -79,7 +79,8 @@ public final class ComputerSet extends AbstractModelObject implements Describabl
      * This is the owner that persists {@link #monitors}.
      */
     private static final Saveable MONITORS_OWNER = new Saveable() {
-        public void save() throws IOException {
+        @Override
+		public void save() throws IOException {
             getConfigFile().write(monitors);
             SaveableListener.fireOnChange(this, getConfigFile());
         }
@@ -88,12 +89,49 @@ public final class ComputerSet extends AbstractModelObject implements Describabl
     private static final DescribableList<NodeMonitor,Descriptor<NodeMonitor>> monitors
             = new DescribableList<>(MONITORS_OWNER);
 
-    @Exported
+	private static final Logger LOGGER = Logger.getLogger(ComputerSet.class.getName());
+
+	static {
+        try {
+            DescribableList<NodeMonitor,Descriptor<NodeMonitor>> r
+                    = new DescribableList<>(Saveable.NOOP);
+
+            // load persisted monitors
+            XmlFile xf = getConfigFile();
+            if(xf.exists()) {
+                DescribableList<NodeMonitor,Descriptor<NodeMonitor>> persisted =
+                        (DescribableList<NodeMonitor,Descriptor<NodeMonitor>>) xf.read();
+                List<NodeMonitor> sanitized = new ArrayList<>();
+                persisted.forEach(nm -> {
+                    try {
+                        nm.getDescriptor();
+                        sanitized.add(nm);
+                    } catch (Throwable e) {
+                        // the descriptor didn't load? see JENKINS-15869
+                    }
+                });
+                r.replaceBy(sanitized);
+            }
+
+            // if we have any new monitors, let's add them
+			NodeMonitor.all().stream().filter(d -> r.get(d)==null).map(d -> createDefaultInstance(d,false)).forEach(i -> {
+				if(i!=null) {
+					r.add(i);
+				}
+			});
+            monitors.replaceBy(r.toList());
+        } catch (Throwable x) {
+            LOGGER.log(Level.WARNING, "Failed to instantiate NodeMonitors", x);
+        }
+    }
+
+	@Override
+	@Exported
     public String getDisplayName() {
         return Messages.ComputerSet_DisplayName();
     }
 
-    /**
+	/**
      * @deprecated as of 1.301
      *      Use {@link #getMonitors()}.
      */
@@ -102,12 +140,13 @@ public final class ComputerSet extends AbstractModelObject implements Describabl
         return monitors.toList();
     }
 
-    @Exported(name="computer",inline=true)
+	@Exported(name="computer",inline=true)
     public Computer[] get_all() {
         return Jenkins.get().getComputers();
     }
 
-    public ContextMenu doChildrenContextMenu(StaplerRequest request, StaplerResponse response) throws Exception {
+	@Override
+	public ContextMenu doChildrenContextMenu(StaplerRequest request, StaplerResponse response) throws Exception {
         ContextMenu m = new ContextMenu();
         for (Computer c : get_all()) {
             m.add(c);
@@ -115,47 +154,46 @@ public final class ComputerSet extends AbstractModelObject implements Describabl
         return m;
     }
 
-    /**
+	/**
      * Exposing {@link NodeMonitor#all()} for Jelly binding.
      */
     public DescriptorExtensionList<NodeMonitor,Descriptor<NodeMonitor>> getNodeMonitorDescriptors() {
         return NodeMonitor.all();
     }
 
-    public static DescribableList<NodeMonitor,Descriptor<NodeMonitor>> getMonitors() {
+	public static DescribableList<NodeMonitor,Descriptor<NodeMonitor>> getMonitors() {
         return monitors;
     }
 
-    /**
+	/**
      * Returns a subset pf {@link #getMonitors()} that are {@linkplain NodeMonitor#isIgnored() not ignored}.
      */
     public static Map<Descriptor<NodeMonitor>,NodeMonitor> getNonIgnoredMonitors() {
         Map<Descriptor<NodeMonitor>,NodeMonitor> r = new HashMap<>();
-        for (NodeMonitor m : monitors) {
-            if(!m.isIgnored())
-                r.put(m.getDescriptor(),m);
-        }
+        monitors.stream().filter(m -> !m.isIgnored()).forEach(m -> r.put(m.getDescriptor(), m));
         return r;
     }
 
-    /**
+	/**
      * Gets all the agent names.
      */
     public List<String> get_slaveNames() {
         return new AbstractList<String>() {
             final List<Node> nodes = Jenkins.get().getNodes();
 
-            public String get(int index) {
+            @Override
+			public String get(int index) {
                 return nodes.get(index).getNodeName();
             }
 
-            public int size() {
+            @Override
+			public int size() {
                 return nodes.size();
             }
         };
     }
 
-    /**
+	/**
      * Number of total {@link Executor}s that belong to this label that are functioning.
      * <p>
      * This excludes executors that belong to offline nodes.
@@ -164,56 +202,62 @@ public final class ComputerSet extends AbstractModelObject implements Describabl
     public int getTotalExecutors() {
         int r=0;
         for (Computer c : get_all()) {
-            if(c.isOnline())
-                r += c.countExecutors();
+            if(c.isOnline()) {
+				r += c.countExecutors();
+			}
         }
         return r;
     }
 
-    /**
+	/**
      * Number of busy {@link Executor}s that are carrying out some work right now.
      */
     @Exported
     public int getBusyExecutors() {
         int r=0;
         for (Computer c : get_all()) {
-            if(c.isOnline())
-                r += c.countBusy();
+            if(c.isOnline()) {
+				r += c.countBusy();
+			}
         }
         return r;
     }
 
-    /**
+	/**
      * {@code getTotalExecutors()-getBusyExecutors()}, plus executors that are being brought online.
      */
     public int getIdleExecutors() {
         int r=0;
-        for (Computer c : get_all())
-            if((c.isOnline() || c.isConnecting()) && c.isAcceptingTasks())
-                r += c.countIdle();
+        for (Computer c : get_all()) {
+			if((c.isOnline() || c.isConnecting()) && c.isAcceptingTasks()) {
+				r += c.countIdle();
+			}
+		}
         return r;
     }
 
-    public String getSearchUrl() {
+	@Override
+	public String getSearchUrl() {
         return "/computers/";
     }
 
-    public Computer getDynamic(String token, StaplerRequest req, StaplerResponse rsp) {
+	public Computer getDynamic(String token, StaplerRequest req, StaplerResponse rsp) {
         return Jenkins.get().getComputer(token);
     }
 
-    @RequirePOST
+	@RequirePOST
     public void do_launchAll(StaplerRequest req, StaplerResponse rsp) throws IOException {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
 
         for(Computer c : get_all()) {
-            if(c.isLaunchSupported())
-                c.connect(true);
+            if(c.isLaunchSupported()) {
+				c.connect(true);
+			}
         }
         rsp.sendRedirect(".");
     }
 
-    /**
+	/**
      * Triggers the schedule update now.
      *
      * TODO: ajax on the client side to wait until the update completion might be nice.
@@ -222,17 +266,17 @@ public final class ComputerSet extends AbstractModelObject implements Describabl
     public void doUpdateNow( StaplerRequest req, StaplerResponse rsp ) throws IOException, ServletException {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
         
-        for (NodeMonitor nodeMonitor : NodeMonitor.getAll()) {
+        NodeMonitor.getAll().forEach(nodeMonitor -> {
             Thread t = nodeMonitor.triggerUpdate();
             String columnCaption = nodeMonitor.getColumnCaption();
             if (columnCaption != null) {
                 t.setName(columnCaption);
             }
-        }
+        });
         rsp.forwardToPreviousPage(req);
     }
 
-    /**
+	/**
      * First check point in creating a new agent.
      */
     @RequirePOST
@@ -242,7 +286,7 @@ public final class ComputerSet extends AbstractModelObject implements Describabl
         final Jenkins app = Jenkins.get();
         app.checkPermission(Computer.CREATE);
 
-        if(mode!=null && mode.equals("copy")) {
+        if(mode!=null && "copy".equals(mode)) {
             name = checkName(name);
 
             Node src = app.getNode(from);
@@ -276,13 +320,13 @@ public final class ComputerSet extends AbstractModelObject implements Describabl
 
             NodeDescriptor d = NodeDescriptor.all().findByName(mode);
             if (d == null) {
-                throw new Failure("No node type ‘" + mode + "’ is known");
+                throw new Failure(new StringBuilder().append("No node type ‘").append(mode).append("’ is known").toString());
             }
             d.handleNewNodePage(this,name,req,rsp);
         }
     }
 
-    /**
+	/**
      * Really creates a new agent.
      */
     @POST
@@ -305,32 +349,35 @@ public final class ComputerSet extends AbstractModelObject implements Describabl
         rsp.sendRedirect2(".");
     }
 
-    /**
+	/**
      * Makes sure that the given name is good as an agent name.
      * @return trimmed name if valid; throws ParseException if not
      */
-    public String checkName(String name) throws Failure {
-        if(name==null)
-            throw new Failure("Query parameter 'name' is required");
+    public String checkName(String name) {
+        if(name==null) {
+			throw new Failure("Query parameter 'name' is required");
+		}
 
         name = name.trim();
         Jenkins.checkGoodName(name);
 
-        if(Jenkins.get().getNode(name)!=null)
-            throw new Failure(Messages.ComputerSet_SlaveAlreadyExists(name));
+        if(Jenkins.get().getNode(name)!=null) {
+			throw new Failure(Messages.ComputerSet_SlaveAlreadyExists(name));
+		}
 
         // looks good
         return name;
     }
 
-    /**
+	/**
      * Makes sure that the given name is good as an agent name.
      */
     public FormValidation doCheckName(@QueryParameter String value) throws IOException, ServletException {
         Jenkins.get().checkPermission(Computer.CREATE);
 
-        if(Util.fixEmpty(value)==null)
-            return FormValidation.ok();
+        if(Util.fixEmpty(value)==null) {
+			return FormValidation.ok();
+		}
         
         try {
             checkName(value);
@@ -339,8 +386,8 @@ public final class ComputerSet extends AbstractModelObject implements Describabl
             return FormValidation.error(e.getMessage());
         }
     }
-    
-    /**
+
+	/**
      * Accepts submission from the configuration page.
      */
     @POST
@@ -351,17 +398,14 @@ public final class ComputerSet extends AbstractModelObject implements Describabl
             monitors.rebuild(req,req.getSubmittedForm(),getNodeMonitorDescriptors());
 
             // add in the rest of instances are ignored instances
-            for (Descriptor<NodeMonitor> d : NodeMonitor.all())
-                if(monitors.get(d)==null) {
-                    NodeMonitor i = createDefaultInstance(d, true);
-                    if(i!=null)
-                        monitors.add(i);
-                }
+			NodeMonitor.all().stream().filter(d -> monitors.get(d)==null).map(d -> createDefaultInstance(d, true)).forEach(i -> {
+				if(i!=null) {
+					monitors.add(i);
+				}
+			});
 
             // recompute the data
-            for (NodeMonitor nm : monitors) {
-                nm.triggerUpdate();
-            }
+			monitors.forEach(NodeMonitor::triggerUpdate);
 
             return FormApply.success(".");
         } finally {
@@ -369,54 +413,39 @@ public final class ComputerSet extends AbstractModelObject implements Describabl
         }
     }
 
-    /**
+	/**
      * {@link NodeMonitor}s are persisted in this file.
      */
     private static XmlFile getConfigFile() {
         return new XmlFile(new File(Jenkins.get().getRootDir(),"nodeMonitors.xml"));
     }
 
-    public Api getApi() {
+	public Api getApi() {
         return new Api(this);
     }
 
-    public Descriptor<ComputerSet> getDescriptor() {
+	@Override
+	public Descriptor<ComputerSet> getDescriptor() {
         return Jenkins.get().getDescriptorOrDie(ComputerSet.class);
     }
 
-    @Extension
-    public static class DescriptorImpl extends Descriptor<ComputerSet> {
-        /**
-         * Auto-completion for the "copy from" field in the new job page.
-         */
-        public AutoCompletionCandidates doAutoCompleteCopyNewItemFrom(@QueryParameter final String value) {
-            final AutoCompletionCandidates r = new AutoCompletionCandidates();
-
-            for (Node n : Jenkins.get().getNodes()) {
-                if (n.getNodeName().startsWith(value))
-                    r.add(n.getNodeName());
-            }
-
-            return r;
-        }
-    }
-
-    /**
+	/**
      * Just to force the execution of the static initializer.
      */
     public static void initialize() {}
 
-    @Initializer(after= JOB_LOADED)
+	@Initializer(after= JOB_LOADED)
     public static void init() {
         // start monitoring nodes, although there's no hurry.
         Timer.get().schedule(new SafeTimerTask() {
-            public void doRun() {
+            @Override
+			public void doRun() {
                 ComputerSet.initialize();
             }
         }, 10, TimeUnit.SECONDS);
     }
 
-    /**
+	/**
      * @return The list of strings of computer names (excluding master)
      * @since 2.14
      */
@@ -431,44 +460,7 @@ public final class ComputerSet extends AbstractModelObject implements Describabl
         return names;
     }
 
-    private static final Logger LOGGER = Logger.getLogger(ComputerSet.class.getName());
-
-    static {
-        try {
-            DescribableList<NodeMonitor,Descriptor<NodeMonitor>> r
-                    = new DescribableList<>(Saveable.NOOP);
-
-            // load persisted monitors
-            XmlFile xf = getConfigFile();
-            if(xf.exists()) {
-                DescribableList<NodeMonitor,Descriptor<NodeMonitor>> persisted =
-                        (DescribableList<NodeMonitor,Descriptor<NodeMonitor>>) xf.read();
-                List<NodeMonitor> sanitized = new ArrayList<>();
-                for (NodeMonitor nm : persisted) {
-                    try {
-                        nm.getDescriptor();
-                        sanitized.add(nm);
-                    } catch (Throwable e) {
-                        // the descriptor didn't load? see JENKINS-15869
-                    }
-                }
-                r.replaceBy(sanitized);
-            }
-
-            // if we have any new monitors, let's add them
-            for (Descriptor<NodeMonitor> d : NodeMonitor.all())
-                if(r.get(d)==null) {
-                    NodeMonitor i = createDefaultInstance(d,false);
-                    if(i!=null)
-                        r.add(i);
-                }
-            monitors.replaceBy(r.toList());
-        } catch (Throwable x) {
-            LOGGER.log(Level.WARNING, "Failed to instantiate NodeMonitors", x);
-        }
-    }
-
-    private static NodeMonitor createDefaultInstance(Descriptor<NodeMonitor> d, boolean ignored) {
+	private static NodeMonitor createDefaultInstance(Descriptor<NodeMonitor> d, boolean ignored) {
         try {
             NodeMonitor nm = d.clazz.newInstance();
             nm.setIgnored(ignored);
@@ -477,5 +469,19 @@ public final class ComputerSet extends AbstractModelObject implements Describabl
             LOGGER.log(Level.SEVERE, "Failed to instantiate "+d.clazz,e);
         }
         return null;
+    }
+
+    @Extension
+    public static class DescriptorImpl extends Descriptor<ComputerSet> {
+        /**
+         * Auto-completion for the "copy from" field in the new job page.
+         */
+        public AutoCompletionCandidates doAutoCompleteCopyNewItemFrom(@QueryParameter final String value) {
+            final AutoCompletionCandidates r = new AutoCompletionCandidates();
+
+            Jenkins.get().getNodes().stream().filter(n -> n.getNodeName().startsWith(value)).forEach(n -> r.add(n.getNodeName()));
+
+            return r;
+        }
     }
 }

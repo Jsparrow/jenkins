@@ -69,45 +69,51 @@ import static hudson.util.jna.SHELLEXECUTEINFO.*;
  */
 public class WindowsInstallerLink extends ManagementLink {
 
-    /**
+    private static final Logger LOGGER = Logger.getLogger(WindowsInstallerLink.class.getName());
+
+	/**
      * Location of the jenkins.war.
      * In general case, we can't determine this value, yet having this is a requirement for the installer.
      */
     private final File hudsonWar;
 
-    /**
+	/**
      * If the installation is completed, this value holds the installation directory.
      */
     private volatile File installationDir;
 
-    private WindowsInstallerLink(File jenkinsWar) {
+	private WindowsInstallerLink(File jenkinsWar) {
         this.hudsonWar = jenkinsWar;
     }
 
-    public String getIconFileName() {
+	@Override
+	public String getIconFileName() {
         return "installer.gif";
     }
 
-    public String getUrlName() {
+	@Override
+	public String getUrlName() {
         return "install";
     }
 
-    public String getDisplayName() {
+	@Override
+	public String getDisplayName() {
         return Messages.WindowsInstallerLink_DisplayName();
     }
 
-    public String getDescription() {
+	@Override
+	public String getDescription() {
         return Messages.WindowsInstallerLink_Description();
     }
 
-    /**
+	/**
      * Is the installation successful?
      */
     public boolean isInstalled() {
         return installationDir!=null;
     }
 
-    /**
+	/**
      * Performs installation.
      */
     @RequirePOST
@@ -136,8 +142,9 @@ public class WindowsInstallerLink extends ManagementLink {
             copy(req, rsp, dir, getClass().getResource("/windows-service/jenkins.exe"),         "jenkins.exe");
             copy(req, rsp, dir, getClass().getResource("/windows-service/jenkins.exe.config"),  "jenkins.exe.config");
             copy(req, rsp, dir, getClass().getResource("/windows-service/jenkins.xml"),         "jenkins.xml");
-            if(!hudsonWar.getCanonicalFile().equals(new File(dir,"jenkins.war").getCanonicalFile()))
-                copy(req, rsp, dir, hudsonWar.toURI().toURL(), "jenkins.war");
+            if(!hudsonWar.getCanonicalFile().equals(new File(dir,"jenkins.war").getCanonicalFile())) {
+				copy(req, rsp, dir, hudsonWar.toURI().toURL(), "jenkins.war");
+			}
 
             // install as a service
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -159,7 +166,7 @@ public class WindowsInstallerLink extends ManagementLink {
         }
     }
 
-    /**
+	/**
      * Copies a single resource into the target folder, by the given name, and handle errors gracefully.
      */
     private void copy(StaplerRequest req, StaplerResponse rsp, File dir, URL src, String name) throws ServletException, IOException {
@@ -167,12 +174,12 @@ public class WindowsInstallerLink extends ManagementLink {
             FileUtils.copyURLToFile(src,new File(dir, name));
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, "Failed to copy "+name,e);
-            sendError("Failed to copy "+name+": "+e.getMessage(),req,rsp);
+            sendError(new StringBuilder().append("Failed to copy ").append(name).append(": ").append(e.getMessage()).toString(),req,rsp);
             throw new AbortException();
         }
     }
 
-    @RequirePOST
+	@RequirePOST
     public void doRestart(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
 
@@ -189,14 +196,16 @@ public class WindowsInstallerLink extends ManagementLink {
 
         // initiate an orderly shutdown after we finished serving this request
         new Thread("terminator") {
-            @SuppressFBWarnings(value = "DM_EXIT", justification = "Exit is really intended.")
+            @Override
+			@SuppressFBWarnings(value = "DM_EXIT", justification = "Exit is really intended.")
             public void run() {
                 try {
                     Thread.sleep(1000);
 
                     // let the service start after we close our sockets, to avoid conflicts
                     Runtime.getRuntime().addShutdownHook(new Thread("service starter") {
-                        public void run() {
+                        @Override
+						public void run() {
                             try {
                                 if(!oldRoot.equals(installationDir)) {
                                     LOGGER.info("Moving data");
@@ -239,47 +248,49 @@ public class WindowsInstallerLink extends ManagementLink {
         }.start();
     }
 
-    /**
+	/**
      * Displays the error in a page.
      */
     protected final void sendError(Exception e, StaplerRequest req, StaplerResponse rsp) throws ServletException, IOException {
         sendError(e.getMessage(),req,rsp);
     }
 
-    protected final void sendError(String message, StaplerRequest req, StaplerResponse rsp) throws ServletException, IOException {
+	protected final void sendError(String message, StaplerRequest req, StaplerResponse rsp) throws ServletException, IOException {
         req.setAttribute("message",message);
         req.setAttribute("pre",true);
         rsp.forward(Jenkins.get(),"error",req);
     }
 
-    /**
+	/**
      * Decide if {@link WindowsInstallerLink} should show up in UI, and if so, register it.
      */
     @Extension
     public static WindowsInstallerLink registerIfApplicable() {
         if(!Functions.isWindows())
-            return null; // this is a Windows only feature
+		 {
+			return null; // this is a Windows only feature
+		}
 
         if(Lifecycle.get() instanceof WindowsServiceLifecycle)
-            return null; // already installed as Windows service
+		 {
+			return null; // already installed as Windows service
+		}
 
         // this system property is set by the launcher when we run "java -jar jenkins.war"
         // and this is how we know where is jenkins.war.
         String war = SystemProperties.getString("executable-war");
-        if(war!=null && new File(war).exists()) {
-            WindowsInstallerLink link = new WindowsInstallerLink(new File(war));
-
-            // TODO possibly now unused (JNLP installation mode is long gone):
-            if(SystemProperties.getString(WindowsInstallerLink.class.getName()+".prominent")!=null)
-                Jenkins.get().getActions().add(link);
-
-            return link;
-        }
-
-        return null;
+        if (!(war!=null && new File(war).exists())) {
+			return null;
+		}
+		WindowsInstallerLink link = new WindowsInstallerLink(new File(war));
+		// TODO possibly now unused (JNLP installation mode is long gone):
+		if(SystemProperties.getString(WindowsInstallerLink.class.getName()+".prominent")!=null) {
+			Jenkins.get().getActions().add(link);
+		}
+		return link;
     }
 
-    /**
+	/**
      * Invokes jenkins.exe with a SCM management command.
      *
      * <p>
@@ -303,8 +314,9 @@ public class WindowsInstallerLink extends ManagementLink {
         sei.lpParameters = "/redirect redirect.log "+command;
         sei.lpDirectory = pwd.getAbsolutePath();
         sei.nShow = SW_HIDE;
-        if (!Shell32.INSTANCE.ShellExecuteEx(sei))
-            throw new IOException("Failed to shellExecute: "+ Native.getLastError());
+        if (!Shell32.INSTANCE.ShellExecuteEx(sei)) {
+			throw new IOException("Failed to shellExecute: "+ Native.getLastError());
+		}
 
         try {
             return Kernel32Utils.waitForExitProcess(sei.hProcess);
@@ -316,6 +328,4 @@ public class WindowsInstallerLink extends ManagementLink {
             }
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(WindowsInstallerLink.class.getName());
 }

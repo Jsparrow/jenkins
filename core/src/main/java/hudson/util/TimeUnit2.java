@@ -83,7 +83,8 @@ public enum TimeUnit2 {
         @Override public long toDays(long d)    { return d/(C6/C0); }
         @Override public long convert(long d, TimeUnit2 u) { return u.toNanos(d); }
         @Override public long convert(long d, TimeUnit u) { return u.toNanos(d); }
-        int excessNanos(long d, long m) { return (int)(d - (m*C2)); }
+        @Override
+		int excessNanos(long d, long m) { return (int)(d - (m*C2)); }
     },
     MICROSECONDS {
         @Override public long toNanos(long d)   { return x(d, C1/C0, MAX/(C1/C0)); }
@@ -95,7 +96,8 @@ public enum TimeUnit2 {
         @Override public long toDays(long d)    { return d/(C6/C1); }
         @Override public long convert(long d, TimeUnit2 u) { return u.toMicros(d); }
         @Override public long convert(long d, TimeUnit u) { return u.toMicros(d); }
-        int excessNanos(long d, long m) { return (int)((d*C1) - (m*C2)); }
+        @Override
+		int excessNanos(long d, long m) { return (int)((d*C1) - (m*C2)); }
     },
     MILLISECONDS {
         @Override public long toNanos(long d)   { return x(d, C2/C0, MAX/(C2/C0)); }
@@ -107,7 +109,8 @@ public enum TimeUnit2 {
         @Override public long toDays(long d)    { return d/(C6/C2); }
         @Override public long convert(long d, TimeUnit2 u) { return u.toMillis(d); }
         @Override public long convert(long d, TimeUnit u) { return u.toMillis(d); }
-        int excessNanos(long d, long m) { return 0; }
+        @Override
+		int excessNanos(long d, long m) { return 0; }
     },
     SECONDS {
         @Override public long toNanos(long d)   { return x(d, C3/C0, MAX/(C3/C0)); }
@@ -119,7 +122,8 @@ public enum TimeUnit2 {
         @Override public long toDays(long d)    { return d/(C6/C3); }
         @Override public long convert(long d, TimeUnit2 u) { return u.toSeconds(d); }
         @Override public long convert(long d, TimeUnit u) { return u.toSeconds(d); }
-        int excessNanos(long d, long m) { return 0; }
+        @Override
+		int excessNanos(long d, long m) { return 0; }
     },
     MINUTES {
         @Override public long toNanos(long d)   { return x(d, C4/C0, MAX/(C4/C0)); }
@@ -131,7 +135,8 @@ public enum TimeUnit2 {
         @Override public long toDays(long d)    { return d/(C6/C4); }
         @Override public long convert(long d, TimeUnit2 u) { return u.toMinutes(d); }
         @Override public long convert(long d, TimeUnit u) { return SECONDS.toMinutes(u.toSeconds(d)); }
-        int excessNanos(long d, long m) { return 0; }
+        @Override
+		int excessNanos(long d, long m) { return 0; }
     },
     HOURS {
         @Override public long toNanos(long d)   { return x(d, C5/C0, MAX/(C5/C0)); }
@@ -143,7 +148,8 @@ public enum TimeUnit2 {
         @Override public long toDays(long d)    { return d/(C6/C5); }
         @Override public long convert(long d, TimeUnit2 u) { return u.toHours(d); }
         @Override public long convert(long d, TimeUnit u) { return SECONDS.toHours(u.toSeconds(d)); }
-        int excessNanos(long d, long m) { return 0; }
+        @Override
+		int excessNanos(long d, long m) { return 0; }
     },
     DAYS {
         @Override public long toNanos(long d)   { return x(d, C6/C0, MAX/(C6/C0)); }
@@ -155,7 +161,8 @@ public enum TimeUnit2 {
         @Override public long toDays(long d)    { return d; }
         @Override public long convert(long d, TimeUnit2 u) { return u.toDays(d); }
         @Override public long convert(long d, TimeUnit u) { return SECONDS.toDays(u.toSeconds(d)); }
-        int excessNanos(long d, long m) { return 0; }
+        @Override
+		int excessNanos(long d, long m) { return 0; }
     };
 
     // Handy constants for conversion methods
@@ -174,8 +181,12 @@ public enum TimeUnit2 {
      * This has a short name to make above code more readable.
      */
     static long x(long d, long m, long over) {
-        if (d >  over) return Long.MAX_VALUE;
-        if (d < -over) return Long.MIN_VALUE;
+        if (d >  over) {
+			return Long.MAX_VALUE;
+		}
+        if (d < -over) {
+			return Long.MIN_VALUE;
+		}
         return d * m;
     }
 
@@ -345,11 +356,12 @@ public enum TimeUnit2 {
      */
     public void timedWait(Object obj, long timeout)
     throws InterruptedException {
-        if (timeout > 0) {
-            long ms = toMillis(timeout);
-            int ns = excessNanos(timeout, ms);
-            obj.wait(ms, ns);
-        }
+        if (timeout <= 0) {
+			return;
+		}
+		long ms = toMillis(timeout);
+		int ns = excessNanos(timeout, ms);
+		obj.wait(ms, ns);
     }
 
     /**
@@ -364,11 +376,12 @@ public enum TimeUnit2 {
      */
     public void timedJoin(Thread thread, long timeout)
     throws InterruptedException {
-        if (timeout > 0) {
-            long ms = toMillis(timeout);
-            int ns = excessNanos(timeout, ms);
-            thread.join(ms, ns);
-        }
+        if (timeout <= 0) {
+			return;
+		}
+		long ms = toMillis(timeout);
+		int ns = excessNanos(timeout, ms);
+		thread.join(ms, ns);
     }
 
     /**
@@ -381,11 +394,12 @@ public enum TimeUnit2 {
      * @see Thread#sleep
      */
     public void sleep(long timeout) throws InterruptedException {
-        if (timeout > 0) {
-            long ms = toMillis(timeout);
-            int ns = excessNanos(timeout, ms);
-            Thread.sleep(ms, ns);
-        }
+        if (timeout <= 0) {
+			return;
+		}
+		long ms = toMillis(timeout);
+		int ns = excessNanos(timeout, ms);
+		Thread.sleep(ms, ns);
     }
 
 }

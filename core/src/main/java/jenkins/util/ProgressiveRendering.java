@@ -111,35 +111,31 @@ public abstract class ProgressiveRendering {
         boundId = ancestor.getNextToken(0);
         LOG.log(Level.FINE, "starting rendering {0} at {1}", new Object[] {uri, boundId});
         final ExecutorService executorService = executorService();
-        executorService.submit(new Runnable() {
-            @Override public void run() {
-                lastNewsTime = start = System.currentTimeMillis();
-                setCurrentRequest(request);
-                SecurityContext orig = SecurityContextHolder.getContext();
-                try {
-                    SecurityContextHolder.setContext(securityContext);
-                    compute();
-                    if (status != CANCELED && status != ERROR) {
-                        status = 1;
-                    }
-                } catch (Exception x) {
-                    LOG.log(Level.WARNING, "failed to compute " + uri, x);
-                    status = ERROR;
-                } finally {
-                    SecurityContextHolder.setContext(orig);
-                    setCurrentRequest(null);
-                    LOG.log(Level.FINE, "{0} finished in {1}msec with status {2}", new Object[] {uri, System.currentTimeMillis() - start, status});
-                }
-                if (executorService instanceof ScheduledExecutorService) {
-                    ((ScheduledExecutorService) executorService).schedule(new Runnable() {
-                        @Override public void run() {
-                            LOG.log(Level.FINE, "some time has elapsed since {0} finished, so releasing", boundId);
-                            release();
-                        }
-                    }, timeout() /* add some grace period for browser/network overhead */ * 2, TimeUnit.MILLISECONDS);
-                }
-            }
-        });
+        executorService.submit(() -> {
+		    lastNewsTime = start = System.currentTimeMillis();
+		    setCurrentRequest(request);
+		    SecurityContext orig = SecurityContextHolder.getContext();
+		    try {
+		        SecurityContextHolder.setContext(securityContext);
+		        compute();
+		        if (status != CANCELED && status != ERROR) {
+		            status = 1;
+		        }
+		    } catch (Exception x) {
+		        LOG.log(Level.WARNING, "failed to compute " + uri, x);
+		        status = ERROR;
+		    } finally {
+		        SecurityContextHolder.setContext(orig);
+		        setCurrentRequest(null);
+		        LOG.log(Level.FINE, "{0} finished in {1}msec with status {2}", new Object[] {uri, System.currentTimeMillis() - start, status});
+		    }
+		    if (executorService instanceof ScheduledExecutorService) {
+		        ((ScheduledExecutorService) executorService).schedule(() -> {
+				    LOG.log(Level.FINE, "some time has elapsed since {0} finished, so releasing", boundId);
+				    release();
+				}, timeout() /* add some grace period for browser/network overhead */ * 2, TimeUnit.MILLISECONDS);
+		    }
+		});
     }
 
     /** {@link BoundObjectTable#releaseMe} just cannot work the way we need it to. */
@@ -179,16 +175,14 @@ public abstract class ProgressiveRendering {
         List/*<AncestorImpl>*/ ancestors = currentRequest.ancestors;
         LOG.log(Level.FINER, "mocking ancestors {0} using {1}", new Object[] {ancestors, getters});
         TokenList tokens = currentRequest.tokens;
-        return new RequestImpl(Stapler.getCurrent(), (HttpServletRequest) Proxy.newProxyInstance(ProgressiveRendering.class.getClassLoader(), new Class<?>[] {HttpServletRequest.class}, new InvocationHandler() {
-            @Override public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-                String m = method.getName();
-                if (getters.containsKey(m)) {
-                    return getters.get(m);
-                } else { // TODO implement other methods as needed
-                    throw new UnsupportedOperationException(m);
-                }
-            }
-        }), ancestors, tokens);
+        return new RequestImpl(Stapler.getCurrent(), (HttpServletRequest) Proxy.newProxyInstance(ProgressiveRendering.class.getClassLoader(), new Class<?>[] {HttpServletRequest.class}, (Object proxy, Method method1, Object[] args) -> {
+		    String m = method1.getName();
+		    if (getters.containsKey(m)) {
+		        return getters.get(m);
+		    } else { // TODO implement other methods as needed
+		        throw new UnsupportedOperationException(m);
+		    }
+		}), ancestors, tokens);
     }
 
     @java.lang.SuppressWarnings("unchecked")
@@ -256,13 +250,12 @@ public abstract class ProgressiveRendering {
         }
         long now = System.currentTimeMillis();
         long elapsed = now - lastNewsTime;
-        if (elapsed > timeout()) {
-            status = CANCELED;
-            LOG.log(Level.FINE, "{0} canceled due to {1}msec inactivity after {2}msec", new Object[] {uri, elapsed, now - start});
-            return true;
-        } else {
-            return false;
-        }
+        if (elapsed <= timeout()) {
+			return false;
+		}
+		status = CANCELED;
+		LOG.log(Level.FINE, "{0} canceled due to {1}msec inactivity after {2}msec", new Object[] {uri, elapsed, now - start});
+		return true;
     }
 
     /**

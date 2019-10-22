@@ -18,7 +18,15 @@ import java.util.GregorianCalendar;
 @RunWith(Parameterized.class)
 @For({CronTab.class, Hash.class})
 public class CronTabEventualityTest {
-    @Parameterized.Parameters
+    private String name;
+	private Hash hash;
+
+	public CronTabEventualityTest(String name, Hash hash) {
+        this.name = name;
+        this.hash = hash;
+    }
+
+	@Parameterized.Parameters
     public static Collection<Object[]> parameters() {
         Collection<Object[]> parameters = new ArrayList<>();
         parameters.add(new Object[]{"zero", Hash.zero()});
@@ -26,22 +34,14 @@ public class CronTabEventualityTest {
         parameters.add(new Object[]{"seed2", Hash.from("seed2")});
         return parameters;
     }
-    
-    private Calendar createLimit(Calendar start, int field, int amount){
+
+	private Calendar createLimit(Calendar start, int field, int amount){
         Calendar limit = (Calendar)start.clone();
         limit.add(field, amount);
         return limit;
     }
 
-    private String name;
-    private Hash hash;
-
-    public CronTabEventualityTest(String name, Hash hash) {
-        this.name = name;
-        this.hash = hash;
-    }
-
-    @Test
+	@Test
     @Issue("JENKINS-12388")
     public void testYearlyWillBeEventuallyTriggeredWithinOneYear() throws ANTLRException {
         Calendar start = new GregorianCalendar(2012, 0, 11, 22, 33); // Jan 11th 2012 22:33
@@ -49,7 +49,7 @@ public class CronTabEventualityTest {
         checkEventuality(start, "@yearly", limit);
     }
 
-    @Test
+	@Test
     @Issue("JENKINS-12388")
     public void testAnnuallyWillBeEventuallyTriggeredWithinOneYear() throws ANTLRException {
         Calendar start = new GregorianCalendar(2012, 0, 11, 22, 33); // Jan 11th 2012 22:33
@@ -57,49 +57,49 @@ public class CronTabEventualityTest {
         checkEventuality(start, "@annually", limit);
     }
 
-    @Test
+	@Test
     public void testMonthlyWillBeEventuallyTriggeredWithinOneMonth() throws ANTLRException {
         Calendar start = new GregorianCalendar(2012, 0, 11, 22, 33); // Jan 11th 2012 22:33
         Calendar limit = createLimit(start, Calendar.MONTH, 1);
         checkEventuality(start, "@monthly", limit);
     }
 
-    @Test
+	@Test
     public void testWeeklyWillBeEventuallyTriggeredWithinOneWeek() throws ANTLRException {
         Calendar start = new GregorianCalendar(2012, 0, 11, 22, 33); // Jan 11th 2012 22:33
         Calendar limit = createLimit(start, Calendar.WEEK_OF_YEAR, 1);
         checkEventuality(start, "@weekly", limit);
     }
 
-    @Test
+	@Test
     public void testDailyWillBeEventuallyTriggeredWithinOneDay() throws ANTLRException {
         Calendar start = new GregorianCalendar(2012, 0, 11, 22, 33); // Jan 11th 2012 22:33
         Calendar limit = createLimit(start, Calendar.DAY_OF_MONTH, 1);
         checkEventuality(start, "@daily", limit);
     }
 
-    @Test
+	@Test
     public void testMidnightWillBeEventuallyTriggeredWithinOneDay() throws ANTLRException {
         Calendar start = new GregorianCalendar(2012, 0, 11, 22, 33); // Jan 11th 2012 22:33
         Calendar limit = createLimit(start, Calendar.DAY_OF_MONTH, 1);
         checkEventuality(start, "@midnight", limit);
     }
 
-    @Test
+	@Test
     public void testHourlyWillBeEventuallyTriggeredWithinOneHour() throws ANTLRException {
         Calendar start = new GregorianCalendar(2012, 0, 11, 22, 33); // Jan 11th 2012 22:33
         Calendar limit = createLimit(start, Calendar.HOUR, 1);
         checkEventuality(start, "@hourly", limit);
     }
 
-    @Test
+	@Test
     public void testFirstDayOfMonthWillBeEventuallyTriggeredWithinOneMonth() throws ANTLRException {
         Calendar start = new GregorianCalendar(2012, 0, 11, 22, 33); // Jan 11th 2012 22:33
         Calendar limit = createLimit(start, Calendar.MONTH, 1);
         checkEventuality(start, "H H 1 * *", limit);
     }
 
-    @Test
+	@Test
     public void testFirstSundayOfMonthWillBeEventuallyTriggeredWithinOneMonthAndOneWeek() throws ANTLRException {
         Calendar start = new GregorianCalendar(2012, 0, 11, 22, 33); // Jan 11th 2012 22:33
         Calendar limit = createLimit(start, Calendar.DAY_OF_MONTH, 31+7);
@@ -109,15 +109,15 @@ public class CronTabEventualityTest {
         checkEventuality(start, "H H 1-7 * 0", limit);
     }
 
-    private void checkEventuality(Calendar start, String crontabFormat, Calendar limit) throws ANTLRException {
+	private void checkEventuality(Calendar start, String crontabFormat, Calendar limit) throws ANTLRException {
         CronTab cron = new CronTab(crontabFormat, hash);
         Calendar next = cron.ceil(start);
-        if(next.after(limit)) {
-            DateFormat f = DateFormat.getDateTimeInstance();
-            String msg = "Name: " + name
-                    + " Limit: " + f.format(limit.getTime())
-                    + " Next: " + f.format(next.getTime());
-            fail(msg);
-        }
+        if (!next.after(limit)) {
+			return;
+		}
+		DateFormat f = DateFormat.getDateTimeInstance();
+		String msg = new StringBuilder().append("Name: ").append(name).append(" Limit: ").append(f.format(limit.getTime())).append(" Next: ").append(f.format(next.getTime()))
+				.toString();
+		fail(msg);
     }
 }

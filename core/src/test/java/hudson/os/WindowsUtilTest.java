@@ -44,9 +44,7 @@ public class WindowsUtilTest {
 
     @Test
     public void testQuoteArgument_OnlyQuotesWhenNecessary() {
-        for (String arg : Arrays.asList("", "foo", "foo-bar", "C:\\test\\path", "http://www.example.com/")) {
-            assertEquals(arg, WindowsUtil.quoteArgument(arg));
-        }
+        Arrays.asList("", "foo", "foo-bar", "C:\\test\\path", "http://www.example.com/").forEach(arg -> assertEquals(arg, WindowsUtil.quoteArgument(arg)));
     }
 
     @Test
@@ -59,8 +57,6 @@ public class WindowsUtilTest {
 
     @Test
     public void testQuoteArgumentForCmd_OnlyQuotesWhenNecessary() {
-        for (String arg : Arrays.asList("", "foo", "foo-bar", "C:\\test\\path", "http://www.example.com/")) {
-            assertEquals(arg, WindowsUtil.quoteArgumentForCmd(arg));
-        }
+        Arrays.asList("", "foo", "foo-bar", "C:\\test\\path", "http://www.example.com/").forEach(arg -> assertEquals(arg, WindowsUtil.quoteArgumentForCmd(arg)));
     }
 }

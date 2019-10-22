@@ -78,7 +78,28 @@ public class ClassFilterImpl extends ClassFilter {
     private static final String JENKINS_LOC = codeSource(Jenkins.class);
     private static final String REMOTING_LOC = codeSource(ClassFilter.class);
 
-    /**
+	/** Names of classes outside Jenkins core or plugins which have a special serial form but are considered safe. */
+    static final Set<String> WHITELISTED_CLASSES;
+	static {
+        try (InputStream is = ClassFilterImpl.class.getResourceAsStream("whitelisted-classes.txt")) {
+            WHITELISTED_CLASSES = ImmutableSet.copyOf(IOUtils.readLines(is, StandardCharsets.UTF_8).stream().filter(line -> !line.matches("#.*|\\s*")).collect(Collectors.toSet()));
+        } catch (IOException x) {
+            throw new ExceptionInInitializerError(x);
+        }
+    }
+
+	private static final Pattern CLASSES_JAR = Pattern.compile("(file:/.+/)WEB-INF/lib/classes[.]jar");
+
+	/** Whether a given class is blacklisted. */
+    private final Map<Class<?>, Boolean> cache = Collections.synchronizedMap(new WeakHashMap<>());
+
+	/** Whether a given code source location is whitelisted. */
+    private final Map<String, Boolean> codeSourceCache = Collections.synchronizedMap(new HashMap<>());
+
+	@VisibleForTesting
+    /*package*/ ClassFilterImpl() {}
+
+	/**
      * Register this implementation as the default in the system.
      */
     public static void register() {
@@ -94,36 +115,19 @@ public class ClassFilterImpl extends ClassFilter {
         }
     }
 
-    /**
+	/**
      * Undo {@link #register}.
      */
     public static void unregister() {
         ClassFilter.setDefault(ClassFilter.STANDARD);
     }
 
-    private static void mockOff() {
+	private static void mockOff() {
         LOGGER.warning("Disabling class filtering since we appear to be in a special test environment, perhaps Mockito/PowerMock");
         ClassFilter.setDefault(ClassFilter.NONE); // even Method on the standard blacklist is going to explode
     }
 
-    @VisibleForTesting
-    /*package*/ ClassFilterImpl() {}
-
-    /** Whether a given class is blacklisted. */
-    private final Map<Class<?>, Boolean> cache = Collections.synchronizedMap(new WeakHashMap<>());
-    /** Whether a given code source location is whitelisted. */
-    private final Map<String, Boolean> codeSourceCache = Collections.synchronizedMap(new HashMap<>());
-    /** Names of classes outside Jenkins core or plugins which have a special serial form but are considered safe. */
-    static final Set<String> WHITELISTED_CLASSES;
-    static {
-        try (InputStream is = ClassFilterImpl.class.getResourceAsStream("whitelisted-classes.txt")) {
-            WHITELISTED_CLASSES = ImmutableSet.copyOf(IOUtils.readLines(is, StandardCharsets.UTF_8).stream().filter(line -> !line.matches("#.*|\\s*")).collect(Collectors.toSet()));
-        } catch (IOException x) {
-            throw new ExceptionInInitializerError(x);
-        }
-    }
-
-    @SuppressWarnings("rawtypes")
+	@SuppressWarnings("rawtypes")
     @Override
     public boolean isBlacklisted(Class _c) {
         for (CustomClassFilter f : ExtensionList.lookup(CustomClassFilter.class)) {
@@ -167,7 +171,7 @@ public class ClassFilterImpl extends ClassFilter {
                 }
             } else {
                 ClassLoader loader = c.getClassLoader();
-                if (loader != null && loader.getClass().getName().equals("hudson.remoting.RemoteClassLoader")) {
+                if (loader != null && "hudson.remoting.RemoteClassLoader".equals(loader.getClass().getName())) {
                     LOGGER.log(Level.FINE, "permitting {0} since it was loaded by a remote class loader", name);
                     return false;
                 }
@@ -188,8 +192,7 @@ public class ClassFilterImpl extends ClassFilter {
         });
     }
 
-    private static final Pattern CLASSES_JAR = Pattern.compile("(file:/.+/)WEB-INF/lib/classes[.]jar");
-    private boolean isLocationWhitelisted(String _loc) {
+	private boolean isLocationWhitelisted(String _loc) {
         return codeSourceCache.computeIfAbsent(_loc, loc -> {
             if (loc.equals(JENKINS_LOC)) {
                 LOGGER.log(Level.FINE, "{0} seems to be the location of Jenkins core, OK", loc);
@@ -256,7 +259,7 @@ public class ClassFilterImpl extends ClassFilter {
         });
     }
 
-    /**
+	/**
      * Tries to determine what JAR file a given class was loaded from.
      * The location is an opaque string suitable only for comparison to others.
      * Similar to {@link Which#jarFile(Class)} but potentially faster, and more tolerant of unknown URL formats.
@@ -288,13 +291,13 @@ public class ClassFilterImpl extends ClassFilter {
         return r;
     }
 
-    private static boolean isPluginManifest(Manifest mf) {
+	private static boolean isPluginManifest(Manifest mf) {
         Attributes attr = mf.getMainAttributes();
         return attr.getValue("Short-Name") != null && (attr.getValue("Plugin-Version") != null || attr.getValue("Jenkins-Version") != null) ||
                "true".equals(attr.getValue("Jenkins-ClassFilter-Whitelisted"));
     }
 
-    @Override
+	@Override
     public boolean isBlacklisted(String name) {
         if (Main.isUnitTest && name.contains("$$EnhancerByMockitoWithCGLIB$$")) {
             mockOff();
@@ -314,21 +317,20 @@ public class ClassFilterImpl extends ClassFilter {
             }
         }
         // could apply a cache if the pattern search turns out to be slow
-        if (ClassFilter.STANDARD.isBlacklisted(name)) {
-            if (SUPPRESS_ALL) {
-                notifyRejected(null, name,
-                        String.format("would normally reject %s according to standard blacklist; see https://jenkins.io/redirect/class-filter/", name));
-                return false;
-            }
-            notifyRejected(null, name,
-                    String.format("rejecting %s according to standard blacklist; see https://jenkins.io/redirect/class-filter/", name));
-            return true;
-        } else {
-            return false;
-        }
+		if (!ClassFilter.STANDARD.isBlacklisted(name)) {
+			return false;
+		}
+		if (SUPPRESS_ALL) {
+		    notifyRejected(null, name,
+		            String.format("would normally reject %s according to standard blacklist; see https://jenkins.io/redirect/class-filter/", name));
+		    return false;
+		}
+		notifyRejected(null, name,
+		        String.format("rejecting %s according to standard blacklist; see https://jenkins.io/redirect/class-filter/", name));
+		return true;
     }
 
-    private void notifyRejected(@CheckForNull Class<?> clazz, @CheckForNull String clazzName, String message) {
+	private void notifyRejected(@CheckForNull Class<?> clazz, @CheckForNull String clazzName, String message) {
         Throwable cause = null;
         if (LOGGER.isLoggable(Level.FINE)) {
             cause = new SecurityException("Class rejected by the class filter: " +

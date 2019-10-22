@@ -95,8 +95,9 @@ public class AllView extends View {
     public Item doCreateItem(StaplerRequest req, StaplerResponse rsp)
             throws IOException, ServletException {
         ItemGroup<? extends TopLevelItem> ig = getOwner().getItemGroup();
-        if (ig instanceof ModifiableItemGroup)
-            return ((ModifiableItemGroup<? extends TopLevelItem>)ig).doCreateItem(req, rsp);
+        if (ig instanceof ModifiableItemGroup) {
+			return ((ModifiableItemGroup<? extends TopLevelItem>)ig).doCreateItem(req, rsp);
+		}
         return null;
     }
 
@@ -177,15 +178,11 @@ public class AllView extends View {
     public static final class DescriptorImpl extends ViewDescriptor {
         @Override
         public boolean isApplicableIn(ViewGroup owner) {
-            for (View v : owner.getViews()) {
-                if (v instanceof AllView) {
-                    return false;
-                }
-            }
-            return true;
+            return owner.getViews().stream().noneMatch(v -> v instanceof AllView);
         }
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.Hudson_ViewName();
         }
     }

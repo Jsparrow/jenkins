@@ -23,8 +23,9 @@ public class GlobalPluginConfiguration  extends GlobalConfiguration {
     @Override
     public boolean configure(StaplerRequest req, JSONObject json) throws FormException {
         try {
-            for( JSONObject o : StructuredForm.toList(json, "plugin"))
-                Jenkins.get().pluginManager.getPlugin(o.getString("name")).getPlugin().configure(req, o);
+            for( JSONObject o : StructuredForm.toList(json, "plugin")) {
+				Jenkins.get().pluginManager.getPlugin(o.getString("name")).getPlugin().configure(req, o);
+			}
             return true;
         } catch (IOException | ServletException e) {
             throw new FormException(e,"plugin");

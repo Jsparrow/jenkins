@@ -14,24 +14,28 @@ import java.util.logging.Logger;
  * @see DiskSpaceMonitorDescriptor
  */
 public abstract class AbstractDiskSpaceMonitor extends NodeMonitor {
-    /**
+    private static final Logger LOGGER = Logger.getLogger(AbstractDiskSpaceMonitor.class.getName());
+	private static final long DEFAULT_THRESHOLD = 1024L*1024*1024;
+	/**
      * The free space threshold, below which the node monitor will be triggered.
      * This is a human readable string representation as entered by the user, so that we can retain the original notation.
      */
     public final String freeSpaceThreshold;
 
-    public AbstractDiskSpaceMonitor(String threshold) throws ParseException {
+	public AbstractDiskSpaceMonitor(String threshold) throws ParseException {
         this.freeSpaceThreshold = threshold;
         DiskSpace.parse(threshold); // make sure it parses
     }
 
-    public AbstractDiskSpaceMonitor() {
+	public AbstractDiskSpaceMonitor() {
         this.freeSpaceThreshold = "1GB";
     }
 
-    public long getThresholdBytes() {
+	public long getThresholdBytes() {
         if (freeSpaceThreshold==null)
-            return DEFAULT_THRESHOLD; // backward compatibility with the data format that didn't have 'freeSpaceThreshold'
+		 {
+			return DEFAULT_THRESHOLD; // backward compatibility with the data format that didn't have 'freeSpaceThreshold'
+		}
         try {
             return DiskSpace.parse(freeSpaceThreshold).size;
         } catch (ParseException e) {
@@ -39,20 +43,19 @@ public abstract class AbstractDiskSpaceMonitor extends NodeMonitor {
         }
     }
 
-    @Override
+	@Override
     public Object data(Computer c) {
     	DiskSpace size = markNodeOfflineIfDiskspaceIsTooLow(c);
     	
-    	// mark online (again), if free space is over threshold
-        if(size!=null && size.size > getThresholdBytes() && c.isOffline() && c.getOfflineCause() instanceof DiskSpace)
-            if(this.getClass().equals(((DiskSpace)c.getOfflineCause()).getTrigger()))
-                if(getDescriptor().markOnline(c)) {
-                    LOGGER.info(Messages.DiskSpaceMonitor_MarkedOnline(c.getDisplayName()));
-                }
+    	boolean condition = size!=null && size.size > getThresholdBytes() && c.isOffline() && c.getOfflineCause() instanceof DiskSpace && this.getClass().equals(((DiskSpace)c.getOfflineCause()).getTrigger()) && getDescriptor().markOnline(c);
+		// mark online (again), if free space is over threshold
+        if(condition) {
+		    LOGGER.info(Messages.DiskSpaceMonitor_MarkedOnline(c.getDisplayName()));
+		}
         return size;
     }
 
-    /**
+	/**
      * Marks the given node as offline if free disk space is below the configured threshold.
      * @param c the node
      * @return the free space
@@ -69,7 +72,4 @@ public abstract class AbstractDiskSpaceMonitor extends NodeMonitor {
         }
         return size;
     }
-
-    private static final Logger LOGGER = Logger.getLogger(AbstractDiskSpaceMonitor.class.getName());
-    private static final long DEFAULT_THRESHOLD = 1024L*1024*1024;
 }

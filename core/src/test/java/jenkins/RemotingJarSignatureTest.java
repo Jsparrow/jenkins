@@ -32,14 +32,24 @@ public class RemotingJarSignatureTest {
         Enumeration<JarEntry> entries = myJar.entries();
         while (entries.hasMoreElements()) {
             JarEntry entry = entries.nextElement();
-            if (entry.isDirectory())    continue;
+            if (entry.isDirectory()) {
+				continue;
+			}
 
             // unsigned files that are related to signatures
             String name = entry.getName();
-            if (name.equals("META-INF/MANIFEST.MF")) continue;
-            if (name.startsWith("META-INF/") && name.endsWith(".SF")) continue;
-            if (name.startsWith("META-INF/") && name.endsWith(".RSA")) continue;
-            if (name.startsWith("META-INF/") && name.endsWith(".DSA")) continue;
+            if ("META-INF/MANIFEST.MF".equals(name)) {
+				continue;
+			}
+            if (name.startsWith("META-INF/") && name.endsWith(".SF")) {
+				continue;
+			}
+            if (name.startsWith("META-INF/") && name.endsWith(".RSA")) {
+				continue;
+			}
+            if (name.startsWith("META-INF/") && name.endsWith(".DSA")) {
+				continue;
+			}
 
             // make sure bits are signed
             IOUtils.copy(myJar.getInputStream(entry), new NullOutputStream());

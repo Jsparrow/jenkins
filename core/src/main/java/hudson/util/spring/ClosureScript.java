@@ -63,7 +63,6 @@ public abstract class ClosureScript extends Script {
     private GroovyObject delegate;
 
     protected ClosureScript() {
-        super();
     }
 
     protected ClosureScript(Binding binding) {

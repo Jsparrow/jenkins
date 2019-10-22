@@ -23,12 +23,23 @@ import static org.mockito.Mockito.when;
 
 public class PluginWrapperTest {
 
-    @Before
+    // per test
+    private final HashMap<String, PluginWrapper> plugins = new HashMap<>();
+	private final PluginManager pm = mock(PluginManager.class);
+	{
+        when(pm.getPlugin(any(String.class))).thenAnswer(new Answer<PluginWrapper>() {
+            @Override public PluginWrapper answer(InvocationOnMock invocation) throws Throwable {
+                return plugins.get(invocation.getArguments()[0]);
+            }
+        });
+    }
+
+	@Before
     public void before() throws Exception {
         Jenkins.VERSION = "2.0"; // Some value needed - tests will overwrite if necessary
     }
 
-    @Test
+	@Test
     public void dependencyTest() {
         String version = "plugin:0.0.2";
         PluginWrapper.Dependency dependency = new PluginWrapper.Dependency(version);
@@ -37,7 +48,7 @@ public class PluginWrapperTest {
         assertFalse(dependency.optional);
     }
 
-    @Test
+	@Test
     public void optionalDependencyTest() {
         String version = "plugin:0.0.2;resolution:=optional";
         PluginWrapper.Dependency dependency = new PluginWrapper.Dependency(version);
@@ -46,7 +57,7 @@ public class PluginWrapperTest {
         assertTrue(dependency.optional);
     }
 
-    @Test
+	@Test
     public void jenkinsCoreTooOld() throws Exception {
         PluginWrapper pw = pluginWrapper("fake").requiredCoreVersion("3.0").buildLoaded();
         try {
@@ -57,7 +68,7 @@ public class PluginWrapperTest {
         }
     }
 
-    @Test
+	@Test
     public void dependencyNotInstalled() throws Exception {
         PluginWrapper pw = pluginWrapper("dependee").deps("dependency:42").buildLoaded();
         try {
@@ -68,7 +79,7 @@ public class PluginWrapperTest {
         }
     }
 
-    @Test
+	@Test
     public void dependencyOutdated() throws Exception {
         pluginWrapper("dependency").version("3").buildLoaded();
         PluginWrapper pw = pluginWrapper("dependee").deps("dependency:5").buildLoaded();
@@ -80,7 +91,7 @@ public class PluginWrapperTest {
         }
     }
 
-    @Test
+	@Test
     public void dependencyFailedToLoad() throws Exception {
         pluginWrapper("dependency").version("5").buildFailed();
         PluginWrapper pw = pluginWrapper("dependee").deps("dependency:3").buildLoaded();
@@ -92,28 +103,29 @@ public class PluginWrapperTest {
         }
     }
 
-    private void assertContains(Throwable ex, String... patterns) {
+	private void assertContains(Throwable ex, String... patterns) {
         String msg = ex.getMessage();
         for (String pattern : patterns) {
             assertThat(msg, containsString(pattern));
         }
     }
 
-    private PluginWrapperBuilder pluginWrapper(String name) {
+	private PluginWrapperBuilder pluginWrapper(String name) {
         return new PluginWrapperBuilder(name);
     }
 
-    // per test
-    private final HashMap<String, PluginWrapper> plugins = new HashMap<>();
-    private final PluginManager pm = mock(PluginManager.class);
-    {
-        when(pm.getPlugin(any(String.class))).thenAnswer(new Answer<PluginWrapper>() {
-            @Override public PluginWrapper answer(InvocationOnMock invocation) throws Throwable {
-                return plugins.get(invocation.getArguments()[0]);
-            }
-        });
+	@Issue("JENKINS-52665")
+    @Test
+    public void isSnapshot() {
+        assertFalse(PluginWrapper.isSnapshot("1.0"));
+        assertFalse(PluginWrapper.isSnapshot("1.0-alpha-1"));
+        assertFalse(PluginWrapper.isSnapshot("1.0-rc9999.abc123def456"));
+        assertTrue(PluginWrapper.isSnapshot("1.0-SNAPSHOT"));
+        assertTrue(PluginWrapper.isSnapshot("1.0-20180719.153600-1"));
+        assertTrue(PluginWrapper.isSnapshot("1.0-SNAPSHOT (private-abcd1234-jqhacker)"));
     }
-    private final class PluginWrapperBuilder {
+
+	private final class PluginWrapperBuilder {
         private String name;
         private String version = "42";
         private String requiredCoreVersion = "1.0";
@@ -169,26 +181,15 @@ public class PluginWrapperTest {
             when(manifest.getMainAttributes()).thenReturn(attributes);
             return new PluginWrapper(
                     pm,
-                    new File("/tmp/" + name + ".jpi"),
+                    new File(new StringBuilder().append("/tmp/").append(name).append(".jpi").toString()),
                     manifest,
                     null,
                     null,
-                    new File("/tmp/" + name + ".jpi.disabled"),
+                    new File(new StringBuilder().append("/tmp/").append(name).append(".jpi.disabled").toString()),
                     deps,
                     optDeps
             );
         }
-    }
-
-    @Issue("JENKINS-52665")
-    @Test
-    public void isSnapshot() {
-        assertFalse(PluginWrapper.isSnapshot("1.0"));
-        assertFalse(PluginWrapper.isSnapshot("1.0-alpha-1"));
-        assertFalse(PluginWrapper.isSnapshot("1.0-rc9999.abc123def456"));
-        assertTrue(PluginWrapper.isSnapshot("1.0-SNAPSHOT"));
-        assertTrue(PluginWrapper.isSnapshot("1.0-20180719.153600-1"));
-        assertTrue(PluginWrapper.isSnapshot("1.0-SNAPSHOT (private-abcd1234-jqhacker)"));
     }
 
 }

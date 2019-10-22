@@ -56,8 +56,9 @@ public abstract class UserAvatarResolver implements ExtensionPoint {
 
     /** Regex pattern for splitting up the icon size string that is used in jelly pages. */
     static Pattern iconSizeRegex = Pattern.compile("(\\d+)x(\\d+)");
-    
-    /**
+	private static final Logger LOGGER = Logger.getLogger(UserAvatarResolver.class.getName());
+
+	/**
      * Finds an avatar image URL string for a user.
      *
      * <p>
@@ -77,8 +78,8 @@ public abstract class UserAvatarResolver implements ExtensionPoint {
      * @return null if the inference failed.
      */
     public abstract String findAvatarFor(User u, int width, int height);
-    
-    /**
+
+	/**
      * Resolve an avatar image URL string for the user.
      * Note that this method must be called from an HTTP request to be reliable; else use {@link #resolveOrNull}.
      * @param u user
@@ -87,10 +88,10 @@ public abstract class UserAvatarResolver implements ExtensionPoint {
      */
     public static String resolve(User u, String avatarSize) {
         String avatar = resolveOrNull(u, avatarSize);
-        return avatar != null ? avatar : Jenkins.get().getRootUrl() + Functions.getResourcePath() + "/images/" + avatarSize + "/user.png";
+        return avatar != null ? avatar : new StringBuilder().append(Jenkins.get().getRootUrl()).append(Functions.getResourcePath()).append("/images/").append(avatarSize).append("/user.png").toString();
     }
 
-    /**
+	/**
      * Like {@link #resolve} but returns null rather than a fallback URL in case there is no special avatar.
      * @since 1.518
      */
@@ -101,7 +102,9 @@ public abstract class UserAvatarResolver implements ExtensionPoint {
             int height = Integer.parseInt(matcher.group(2));
             for (UserAvatarResolver r : all()) {
                 String name = r.findAvatarFor(u, width, height);
-                if(name!=null) return name;
+                if(name!=null) {
+					return name;
+				}
             }
         } else {
             LOGGER.warning(String.format("Could not split up the avatar size (%s) into a width and height.", avatarSize));
@@ -110,12 +113,10 @@ public abstract class UserAvatarResolver implements ExtensionPoint {
         return null;
     }
 
-    /**
+	/**
      * Returns all the registered {@link UserAvatarResolver} descriptors.
      */
     public static ExtensionList<UserAvatarResolver> all() {
         return ExtensionList.lookup(UserAvatarResolver.class);
     }
-
-    private static final Logger LOGGER = Logger.getLogger(UserAvatarResolver.class.getName());
 }

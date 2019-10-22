@@ -76,33 +76,37 @@ import org.jenkinsci.remoting.util.AnonymousClassWarnings;
  */
 public class AnnotatedLargeText<T> extends LargeText {
     /**
+     * Used for sending the state of ConsoleAnnotator to the client, because we are deserializing this object later.
+     */
+    private static final CryptoConfidentialKey PASSING_ANNOTATOR = new CryptoConfidentialKey(AnnotatedLargeText.class,"consoleAnnotator");
+	/**
      * Can be null.
      */
     private T context;
 
-    public AnnotatedLargeText(File file, Charset charset, boolean completed, T context) {
+	public AnnotatedLargeText(File file, Charset charset, boolean completed, T context) {
         super(file, charset, completed, true);
         this.context = context;
     }
 
-    public AnnotatedLargeText(ByteBuffer memory, Charset charset, boolean completed, T context) {
+	public AnnotatedLargeText(ByteBuffer memory, Charset charset, boolean completed, T context) {
         super(memory, charset, completed);
         this.context = context;
     }
 
-    public void doProgressiveHtml(StaplerRequest req, StaplerResponse rsp) throws IOException {
+	public void doProgressiveHtml(StaplerRequest req, StaplerResponse rsp) throws IOException {
         req.setAttribute("html",true);
         doProgressText(req,rsp);
     }
 
-    /**
+	/**
      * Aliasing what I think was a wrong name in {@link LargeText}
      */
     public void doProgressiveText(StaplerRequest req, StaplerResponse rsp) throws IOException {
         doProgressText(req,rsp);
     }
 
-    /**
+	/**
      * For reusing code between text/html and text/plain, we run them both through the same code path
      * and use this request attribute to differentiate. 
      */
@@ -111,12 +115,12 @@ public class AnnotatedLargeText<T> extends LargeText {
         return req!=null && req.getAttribute("html")!=null;
     }
 
-    @Override
+	@Override
     protected void setContentType(StaplerResponse rsp) {
         rsp.setContentType(isHtml() ? "text/html;charset=UTF-8" : "text/plain;charset=UTF-8");
     }
 
-    private ConsoleAnnotator<T> createAnnotator(StaplerRequest req) throws IOException {
+	private ConsoleAnnotator<T> createAnnotator(StaplerRequest req) throws IOException {
         try {
             String base64 = req!=null ? req.getHeader("X-ConsoleAnnotator") : null;
             if (base64!=null) {
@@ -126,9 +130,10 @@ public class AnnotatedLargeText<T> extends LargeText {
                         new CipherInputStream(new ByteArrayInputStream(Base64.getDecoder().decode(base64.getBytes(StandardCharsets.UTF_8))), sym)),
                         Jenkins.get().pluginManager.uberClassLoader)) {
                     long timestamp = ois.readLong();
-                    if (TimeUnit.HOURS.toMillis(1) > abs(System.currentTimeMillis()-timestamp))
-                        // don't deserialize something too old to prevent a replay attack
+                    if (TimeUnit.HOURS.toMillis(1) > abs(System.currentTimeMillis()-timestamp)) {
+						// don't deserialize something too old to prevent a replay attack
                         return (ConsoleAnnotator) ois.readObject();
+					}
                 } catch (RuntimeException ex) {
                     throw new IOException("Could not decode input", ex);
                 }
@@ -140,16 +145,17 @@ public class AnnotatedLargeText<T> extends LargeText {
         return ConsoleAnnotator.initial(context);
     }
 
-    @CheckReturnValue
+	@CheckReturnValue
     @Override
     public long writeLogTo(long start, Writer w) throws IOException {
-        if (isHtml())
-            return writeHtmlTo(start, w);
-        else
-            return super.writeLogTo(start,w);
+        if (isHtml()) {
+			return writeHtmlTo(start, w);
+		} else {
+			return super.writeLogTo(start,w);
+		}
     }
 
-    /**
+	/**
      * Strips annotations using a {@link PlainTextConsoleOutputStream}.
      * {@inheritDoc}
      */
@@ -159,7 +165,7 @@ public class AnnotatedLargeText<T> extends LargeText {
         return super.writeLogTo(start, new PlainTextConsoleOutputStream(out));
     }
 
-    /**
+	/**
      * Calls {@link LargeText#writeLogTo(long, OutputStream)} without stripping annotations as {@link #writeLogTo(long, OutputStream)} would.
      * @since 1.577
      */
@@ -168,7 +174,7 @@ public class AnnotatedLargeText<T> extends LargeText {
         return super.writeLogTo(start, out);
     }
 
-    @CheckReturnValue
+	@CheckReturnValue
     public long writeHtmlTo(long start, Writer w) throws IOException {
         ConsoleAnnotationOutputStream<T> caw = new ConsoleAnnotationOutputStream<>(
                 w, createAnnotator(Stapler.getCurrentRequest()), context, charset);
@@ -181,13 +187,9 @@ public class AnnotatedLargeText<T> extends LargeText {
         oos.writeObject(caw.getConsoleAnnotator());
         oos.close();
         StaplerResponse rsp = Stapler.getCurrentResponse();
-        if (rsp!=null)
-            rsp.setHeader("X-ConsoleAnnotator", new String(Base64.getEncoder().encode(baos.toByteArray())));
+        if (rsp!=null) {
+			rsp.setHeader("X-ConsoleAnnotator", new String(Base64.getEncoder().encode(baos.toByteArray())));
+		}
         return r;
     }
-
-    /**
-     * Used for sending the state of ConsoleAnnotator to the client, because we are deserializing this object later.
-     */
-    private static final CryptoConfidentialKey PASSING_ANNOTATOR = new CryptoConfidentialKey(AnnotatedLargeText.class,"consoleAnnotator");
 }

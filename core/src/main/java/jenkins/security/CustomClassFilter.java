@@ -157,7 +157,7 @@ public interface CustomClassFilter extends ExtensionPoint {
             Enumeration<URL> resources = Jenkins.get().getPluginManager().uberClassLoader.getResources("META-INF/hudson.remoting.ClassFilter");
             while (resources.hasMoreElements()) {
                 try (InputStream is = resources.nextElement().openStream()) {
-                    for (String entry : IOUtils.readLines(is, StandardCharsets.UTF_8)) {
+                    IOUtils.readLines(is, StandardCharsets.UTF_8).forEach(entry -> {
                         //noinspection StatementWithEmptyBody
                         if (entry.matches("#.*|\\s*")) {
                             // skip
@@ -166,7 +166,7 @@ public interface CustomClassFilter extends ExtensionPoint {
                         } else {
                             overrides.put(entry, true);
                         }
-                    }
+                    });
                 }
             }
             Logger.getLogger(Contributed.class.getName()).log(Level.FINE, "plugin-defined entries: {0}", overrides);

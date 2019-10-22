@@ -38,11 +38,13 @@ public class UserSearchProperty extends hudson.model.UserProperty {
 
     @Extension @Symbol("search")
     public static final class DescriptorImpl extends UserPropertyDescriptor {
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.UserSearchProperty_DisplayName();
         }
 
-        public UserProperty newInstance(User user) {
+        @Override
+		public UserProperty newInstance(User user) {
             return new UserSearchProperty(DEFAULT_SEARCH_CASE_INSENSITIVE_MODE);
         }
 

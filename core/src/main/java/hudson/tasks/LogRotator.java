@@ -60,66 +60,39 @@ import jenkins.model.BuildDiscarderDescriptor;
  */
 public class LogRotator extends BuildDiscarder {
     
-    public class CollatedLogRotatorException extends IOException {
-        private static final long serialVersionUID = 5944233808072651101L;
-        
-        public final Collection<Exception> collated;
-        
-        public CollatedLogRotatorException(String msg, Exception... collated) {
-            super(msg);
-            if (collated == null || collated.length == 0) {
-                this.collated = Collections.emptyList();
-            } else {
-                this.collated = Arrays.asList(collated);
-            }
-        }
+    private static final Logger LOGGER = Logger.getLogger(LogRotator.class.getName());
 
-        public CollatedLogRotatorException(String msg, Collection<Exception> values) {
-            super(msg);
-            this.collated = (values != null) ? values : Collections.emptyList();
-        }
-    }
-    
-    /**
+	/**
      * If not -1, history is only kept up to this days.
      */
     private final int daysToKeep;
 
-    /**
+	/**
      * If not -1, only this number of build logs are kept.
      */
     private final int numToKeep;
 
-    /**
+	/**
      * If not -1 nor null, artifacts are only kept up to this days.
      * Null handling is necessary to remain data compatible with old versions.
      * @since 1.350
      */
     private final Integer artifactDaysToKeep;
 
-    /**
+	/**
      * If not -1 nor null, only this number of builds have their artifacts kept.
      * Null handling is necessary to remain data compatible with old versions.
      * @since 1.350
      */
     private final Integer artifactNumToKeep;
 
-    @DataBoundConstructor
+	@DataBoundConstructor
     public LogRotator (String daysToKeepStr, String numToKeepStr, String artifactDaysToKeepStr, String artifactNumToKeepStr) {
         this (parse(daysToKeepStr),parse(numToKeepStr),
               parse(artifactDaysToKeepStr),parse(artifactNumToKeepStr));
     }
 
-    public static int parse(String p) {
-        if(p==null)     return -1;
-        try {
-            return Integer.parseInt(p);
-        } catch (NumberFormatException e) {
-            return -1;
-        }
-    }
-
-    /**
+	/**
      * @deprecated since 1.350.
      *      Use {@link #LogRotator(int, int, int, int)}
      */
@@ -128,15 +101,27 @@ public class LogRotator extends BuildDiscarder {
         this(daysToKeep, numToKeep, -1, -1);
     }
 
-    public LogRotator(int daysToKeep, int numToKeep, int artifactDaysToKeep, int artifactNumToKeep) {
+	public LogRotator(int daysToKeep, int numToKeep, int artifactDaysToKeep, int artifactNumToKeep) {
         this.daysToKeep = daysToKeep;
         this.numToKeep = numToKeep;
         this.artifactDaysToKeep = artifactDaysToKeep;
         this.artifactNumToKeep = artifactNumToKeep;
         
     }
-    
-    @SuppressWarnings("rawtypes")
+
+	public static int parse(String p) {
+        if(p==null) {
+			return -1;
+		}
+        try {
+            return Integer.parseInt(p);
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+	@Override
+	@SuppressWarnings("rawtypes")
     public void perform(Job<?,?> job) throws IOException, InterruptedException {
         //Exceptions thrown by the deletion submethods are collated and reported
         HashMultimap<Run<?,?>, Exception> exceptionMap = HashMultimap.create();
@@ -210,18 +195,19 @@ public class LogRotator extends BuildDiscarder {
             }
         }
         
-        if (!exceptionMap.isEmpty()) {
-            //Collate all encountered exceptions into a single exception and throw that
-            String msg = String.format(
-                    "Failed to rotate logs for [%s]",
-                    Joiner.on(", ").join(exceptionMap.keySet())
-            );
-            LOGGER.severe(msg);
-            throw new CollatedLogRotatorException(msg, exceptionMap.values());
-        }
+        if (exceptionMap.isEmpty()) {
+			return;
+		}
+		//Collate all encountered exceptions into a single exception and throw that
+		String msg = String.format(
+		        "Failed to rotate logs for [%s]",
+		        Joiner.on(", ").join(exceptionMap.keySet())
+		);
+		LOGGER.severe(msg);
+		throw new CollatedLogRotatorException(msg, exceptionMap.values());
     }
 
-    private boolean shouldKeepRun(Run r, Run lsb, Run lstb) {
+	private boolean shouldKeepRun(Run r, Run lsb, Run lstb) {
         if (r.isKeepLog()) {
             LOGGER.log(FINER, "{0} is not to be removed or purged of artifacts because it’s marked as a keeper", r);
             return true;
@@ -234,14 +220,14 @@ public class LogRotator extends BuildDiscarder {
             LOGGER.log(FINER, "{0} is not to be removed or purged of artifacts because it’s the last stable build", r);
             return true;
         }
-        if (r.isBuilding()) {
-            LOGGER.log(FINER, "{0} is not to be removed or purged of artifacts because it’s still building", r);
-            return true;
-        }
-        return false;
+        if (!r.isBuilding()) {
+			return false;
+		}
+		LOGGER.log(FINER, "{0} is not to be removed or purged of artifacts because it’s still building", r);
+		return true;
     }
 
-    private boolean tooNew(Run r, Calendar cal) {
+	private boolean tooNew(Run r, Calendar cal) {
         if (!r.getTimestamp().before(cal)) {
             LOGGER.log(FINER, "{0} is not to be removed or purged of artifacts because it’s still new", r);
             return true;
@@ -250,60 +236,81 @@ public class LogRotator extends BuildDiscarder {
         }
     }
 
-    /**
+	/**
      * Creates a copy since we'll be deleting some entries from them.
      */
     private <R> Collection<R> copy(Iterable<R> src) {
         return Lists.newArrayList(src);
     }
 
-    public int getDaysToKeep() {
+	public int getDaysToKeep() {
         return daysToKeep;
     }
 
-    public int getNumToKeep() {
+	public int getNumToKeep() {
         return numToKeep;
     }
 
-    public int getArtifactDaysToKeep() {
+	public int getArtifactDaysToKeep() {
         return unbox(artifactDaysToKeep);
     }
 
-    public int getArtifactNumToKeep() {
+	public int getArtifactNumToKeep() {
         return unbox(artifactNumToKeep);
     }
 
-    public String getDaysToKeepStr() {
+	public String getDaysToKeepStr() {
         return toString(daysToKeep);
     }
 
-    public String getNumToKeepStr() {
+	public String getNumToKeepStr() {
         return toString(numToKeep);
     }
 
-    public String getArtifactDaysToKeepStr() {
+	public String getArtifactDaysToKeepStr() {
         return toString(artifactDaysToKeep);
     }
 
-    public String getArtifactNumToKeepStr() {
+	public String getArtifactNumToKeepStr() {
         return toString(artifactNumToKeep);
     }
 
-    private int unbox(Integer i) {
+	private int unbox(Integer i) {
         return i==null ? -1: i;
     }
 
-    private String toString(Integer i) {
-        if (i==null || i==-1)   return "";
+	private String toString(Integer i) {
+        if (i==null || i==-1) {
+			return "";
+		}
         return String.valueOf(i);
     }
 
+	public class CollatedLogRotatorException extends IOException {
+        private static final long serialVersionUID = 5944233808072651101L;
+        
+        public final Collection<Exception> collated;
+        
+        public CollatedLogRotatorException(String msg, Exception... collated) {
+            super(msg);
+            if (collated == null || collated.length == 0) {
+                this.collated = Collections.emptyList();
+            } else {
+                this.collated = Arrays.asList(collated);
+            }
+        }
+
+        public CollatedLogRotatorException(String msg, Collection<Exception> values) {
+            super(msg);
+            this.collated = (values != null) ? values : Collections.emptyList();
+        }
+    }
+    
     @Extension @Symbol("logRotator")
     public static final class LRDescriptor extends BuildDiscarderDescriptor {
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return "Log Rotation";
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(LogRotator.class.getName());
 }

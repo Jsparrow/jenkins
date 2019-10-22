@@ -84,8 +84,9 @@ public abstract class AlternativeUiTextProvider implements ExtensionPoint {
     public static <T> String get(Message<T> text, T context) {
         for (AlternativeUiTextProvider p : all()) {
             String s = p.getText(text, context);
-            if (s!=null)
-                return s;
+            if (s!=null) {
+				return s;
+			}
         }
         return null;
     }

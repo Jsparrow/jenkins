@@ -34,7 +34,9 @@ import java.util.ServiceLoader;
  * @author Kohsuke Kawaguchi
  */
 public class InitStrategy {
-    /**
+    private static final Logger LOGGER = Logger.getLogger(InitStrategy.class.getName());
+
+	/**
      * Returns the list of *.jpi, *.hpi and *.hpl to expand and load.
      *
      * <p>
@@ -60,16 +62,17 @@ public class InitStrategy {
 
         return r;
     }
-    
-    private void listPluginFiles(PluginManager pm, String extension, Collection<File> all) throws IOException {
+
+	private void listPluginFiles(PluginManager pm, String extension, Collection<File> all) throws IOException {
         File[] files = pm.rootDir.listFiles(new FilterByExtension(extension));
-        if (files==null)
-            throw new IOException("Jenkins is unable to create " + pm.rootDir + "\nPerhaps its security privilege is insufficient");
+        if (files==null) {
+			throw new IOException(new StringBuilder().append("Jenkins is unable to create ").append(pm.rootDir).append("\nPerhaps its security privilege is insufficient").toString());
+		}
 
         all.addAll(Arrays.asList(files));
     }
 
-    /**
+	/**
      * Lists up additional bundled plugins from the system property {@code hudson.bundled.plugins}.
      * Since 1.480 glob syntax is supported.
      * For use in the "mvn hudson-dev:run".
@@ -93,13 +96,13 @@ public class InitStrategy {
                         LOGGER.log(Level.WARNING, "could not expand " + hplLocation, x);
                     }
                 } else {
-                    LOGGER.warning("bundled plugin " + hplLocation + " does not exist");
+                    LOGGER.warning(new StringBuilder().append("bundled plugin ").append(hplLocation).append(" does not exist").toString());
                 }
             }
         }
     }
 
-    /**
+	/**
      * Selectively skip some of the initialization tasks.
      * 
      * @return
@@ -109,8 +112,7 @@ public class InitStrategy {
         return false;
     }
 
-
-    /**
+	/**
      * Obtains the instance to be used.
      */
     public static InitStrategy get(ClassLoader cl) throws IOException {
@@ -123,21 +125,16 @@ public class InitStrategy {
         return s;
     }
 
-    private static final Logger LOGGER = Logger.getLogger(InitStrategy.class.getName());
-
-    private static class FilterByExtension implements FilenameFilter {
+	private static class FilterByExtension implements FilenameFilter {
         private final List<String> extensions;
 
         public FilterByExtension(String... extensions) {
             this.extensions = Arrays.asList(extensions);
         }
 
-        public boolean accept(File dir, String name) {
-            for (String extension : extensions) {
-                if (name.endsWith(extension))
-                    return true;
-            }
-            return false;
+        @Override
+		public boolean accept(File dir, String name) {
+            return extensions.stream().anyMatch(name::endsWith);
         }
     }
 }

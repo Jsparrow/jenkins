@@ -91,6 +91,26 @@ import java.util.concurrent.Future;
 public abstract class Cloud extends Actionable implements ExtensionPoint, Describable<Cloud>, AccessControlled {
 
     /**
+     * All registered {@link Cloud} implementations.
+     *
+     * @deprecated as of 1.286
+     *      Use {@link #all()} for read access, and {@link Extension} for registration.
+     */
+    @Deprecated
+    public static final DescriptorList<Cloud> ALL = new DescriptorList<>(Cloud.class);
+
+	private static final PermissionScope PERMISSION_SCOPE = new PermissionScope(Cloud.class);
+
+	/**
+     * Permission constant to control mutation operations on {@link Cloud}.
+     *
+     * This includes provisioning a new node, as well as removing it.
+     */
+    public static final Permission PROVISION = new Permission(
+            Computer.PERMISSIONS, "Provision", Messages._Cloud_ProvisionPermission_Description(), Jenkins.ADMINISTER, PERMISSION_SCOPE
+    );
+
+	/**
      * Uniquely identifies this {@link Cloud} instance among other instances in {@link jenkins.model.Jenkins#clouds}.
      *
      * This is expected to be short ID-like string that does not contain any character unsafe as variable name or
@@ -98,15 +118,16 @@ public abstract class Cloud extends Actionable implements ExtensionPoint, Descri
      */
     public final String name;
 
-    protected Cloud(String name) {
+	protected Cloud(String name) {
         this.name = name;
     }
 
-    public String getDisplayName() {
+	@Override
+	public String getDisplayName() {
         return name;
     }
 
-    /**
+	/**
      * Get URL of the cloud.
      *
      * @since 2.64
@@ -116,18 +137,20 @@ public abstract class Cloud extends Actionable implements ExtensionPoint, Descri
         return "cloud/" + name;
     }
 
-    /**
+	/**
      * {@inheritDoc}
      */
-    public @Nonnull String getSearchUrl() {
+    @Override
+	public @Nonnull String getSearchUrl() {
         return getUrl();
     }
 
-    public ACL getACL() {
+	@Override
+	public ACL getACL() {
         return Jenkins.get().getAuthorizationStrategy().getACL(this);
     }
 
-    /**
+	/**
      * Provisions new {@link Node}s from this cloud.
      *
      * <p>
@@ -162,39 +185,20 @@ public abstract class Cloud extends Actionable implements ExtensionPoint, Descri
      */
     public abstract Collection<PlannedNode> provision(Label label, int excessWorkload);
 
-    /**
+	/**
      * Returns true if this cloud is capable of provisioning new nodes for the given label.
      */
     public abstract boolean canProvision(Label label);
 
-    public Descriptor<Cloud> getDescriptor() {
+	@Override
+	public Descriptor<Cloud> getDescriptor() {
         return Jenkins.get().getDescriptorOrDie(getClass());
     }
 
-    /**
-     * All registered {@link Cloud} implementations.
-     *
-     * @deprecated as of 1.286
-     *      Use {@link #all()} for read access, and {@link Extension} for registration.
-     */
-    @Deprecated
-    public static final DescriptorList<Cloud> ALL = new DescriptorList<>(Cloud.class);
-
-    /**
+	/**
      * Returns all the registered {@link Cloud} descriptors.
      */
     public static DescriptorExtensionList<Cloud,Descriptor<Cloud>> all() {
         return Jenkins.get().getDescriptorList(Cloud.class);
     }
-
-    private static final PermissionScope PERMISSION_SCOPE = new PermissionScope(Cloud.class);
-
-    /**
-     * Permission constant to control mutation operations on {@link Cloud}.
-     *
-     * This includes provisioning a new node, as well as removing it.
-     */
-    public static final Permission PROVISION = new Permission(
-            Computer.PERMISSIONS, "Provision", Messages._Cloud_ProvisionPermission_Description(), Jenkins.ADMINISTER, PERMISSION_SCOPE
-    );
 }

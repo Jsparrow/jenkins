@@ -49,28 +49,34 @@ public final class ResourceList {
 
     private static final Logger LOGGER = Logger.getLogger(ResourceList.class.getName());
 
-    /**
+	private static final Integer MAX_INT = Integer.MAX_VALUE;
+
+	/**
+     * Empty resource list.
+     */
+    public static final ResourceList EMPTY = new ResourceList();
+
+	/**
      * All resources (R/W.)
      */
     private final Set<Resource> all = new HashSet<>();
 
-    /**
+	/**
      * Write accesses. Values are the # of write counts that this list uses.
      *
      * The values are mostly supposed to be 1, but when {@link ResourceController}
      * uses a list to keep track of the union of all the activities, it can get larger.
      */
     private final Map<Resource,Integer> write = new HashMap<>();
-    private static final Integer MAX_INT = Integer.MAX_VALUE;
 
-    /**
+	/**
      * Creates union of all resources.
      */
     public static ResourceList union(ResourceList... lists) {
         return union(Arrays.asList(lists));
     }
 
-    /**
+	/**
      * Creates union of all resources.
      */
     public static ResourceList union(Collection<ResourceList> lists) {
@@ -81,16 +87,15 @@ public final class ResourceList {
             return lists.iterator().next();
         default:
             ResourceList r = new ResourceList();
-            for (ResourceList l : lists) {
+            lists.forEach(l -> {
                 r.all.addAll(l.all);
-                for (Entry<Resource, Integer> e : l.write.entrySet())
-                    r.write.put(e.getKey(), unbox(r.write.get(e.getKey()))+e.getValue());
-            }
+                l.write.entrySet().forEach(e -> r.write.put(e.getKey(), unbox(r.write.get(e.getKey())) + e.getValue()));
+            });
             return r;
         }
     }
 
-    /**
+	/**
      * Adds a resource for read access.
      */
     public ResourceList r(Resource r) {
@@ -98,7 +103,7 @@ public final class ResourceList {
         return this;
     }
 
-    /**
+	/**
      * Adds a resource for write access.
      */
     public ResourceList w(Resource r) {
@@ -107,7 +112,7 @@ public final class ResourceList {
         return this;
     }
 
-    /**
+	/**
      * Checks if this resource list and that resource list has any conflicting
      * resource access.
      */
@@ -115,25 +120,28 @@ public final class ResourceList {
         return getConflict(that)!=null;
     }
 
-    /**
+	/**
      * Returns the resource in this list that's colliding with the given resource list.
      */
     public Resource getConflict(ResourceList that) {
         Resource r = _getConflict(this,that);
-        if(r!=null)     return r;
+        if(r!=null) {
+			return r;
+		}
         return _getConflict(that,this);
     }
 
-    private Resource _getConflict(ResourceList lhs, ResourceList rhs) {
+	private Resource _getConflict(ResourceList lhs, ResourceList rhs) {
         for (Entry<Resource,Integer> r : lhs.write.entrySet()) {
             for (Resource l : rhs.all) {
                 Integer v = rhs.write.get(l);
-                if(v!=null) // this is write/write conflict.
-                    v += r.getValue();
-                else // Otherwise set it to a very large value, since it's read/write conflict
-                    v = MAX_INT;
+                if(v!=null) {
+					v += r.getValue();
+				} else {
+					v = MAX_INT;
+				}
                 if(r.getKey().isCollidingWith(l,unbox(v))) {
-                    LOGGER.info("Collision with " + r + " and " + l);
+                    LOGGER.info(new StringBuilder().append("Collision with ").append(r).append(" and ").append(l).toString());
                     return r.getKey();
                 }
             }
@@ -141,25 +149,18 @@ public final class ResourceList {
         return null;
     }
 
-    @Override
+	@Override
     public String toString() {
         Map<Resource,String> m = new HashMap<>();
-        for (Resource r : all)
-            m.put(r,"R");
-        for (Entry<Resource,Integer> e : write.entrySet())
-            m.put(e.getKey(),"W"+e.getValue());
+        all.forEach(r -> m.put(r, "R"));
+        write.entrySet().forEach(e -> m.put(e.getKey(), "W" + e.getValue()));
         return m.toString();
     }
 
-    /**
+	/**
      * {@link Integer} unbox operation that treats null as 0.
      */
     private static int unbox(Integer x) {
         return x==null ? 0 : x;
     }
-
-    /**
-     * Empty resource list.
-     */
-    public static final ResourceList EMPTY = new ResourceList();
 }

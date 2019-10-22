@@ -36,6 +36,13 @@ import java.io.IOException;
  */
 public interface Saveable {
     /**
+     * {@link Saveable} that doesn't save anything.
+     * @since 1.301.
+     */
+    Saveable NOOP = () -> {
+	};
+
+	/**
      * Persists the state of this object into XML.
      *
      * <p>
@@ -47,13 +54,4 @@ public interface Saveable {
      *      if the persistence failed.
      */
     void save() throws IOException;
-
-    /**
-     * {@link Saveable} that doesn't save anything.
-     * @since 1.301.
-     */
-    Saveable NOOP = new Saveable() {
-        public void save() throws IOException {
-        }
-    };
 }

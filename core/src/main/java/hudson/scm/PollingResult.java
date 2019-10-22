@@ -21,19 +21,33 @@ import java.io.Serializable;
  */
 public final class PollingResult implements Serializable {
     /**
+     * Constant to indicate no changes in the remote repository.
+     */
+    public static final PollingResult NO_CHANGES = new PollingResult(Change.NONE);
+
+	public static final PollingResult SIGNIFICANT = new PollingResult(Change.SIGNIFICANT);
+
+	/**
+     * Constant that uses {@link Change#INCOMPARABLE} which forces an immediate build.
+     */
+    public static final PollingResult BUILD_NOW = new PollingResult(Change.INCOMPARABLE);
+
+	private static final long serialVersionUID = 1L;
+
+	/**
      * Baseline of the comparison.
      * (This comes from either the workspace, or from the remote repository as of the last polling.
      * Can be null.
      */
     public final @CheckForNull SCMRevisionState baseline;
 
-    /**
+	/**
      * Current state of the remote repository. To be passed to the next invocation of the polling method.
      * Can be null.
      */
     public final @CheckForNull SCMRevisionState remote;
 
-    /**
+	/**
      * Degree of the change between baseline and remote. Never null.
      * <p>
      * The fact that this field is independent from {@link #baseline} and {@link #remote} are
@@ -43,7 +57,24 @@ public final class PollingResult implements Serializable {
      */
     public final @Nonnull Change change;
 
-    /**
+	public PollingResult(@CheckForNull SCMRevisionState baseline, @CheckForNull SCMRevisionState remote, @Nonnull Change change) {
+        if (change==null) {
+			throw new IllegalArgumentException();
+		}
+        this.baseline = baseline;
+        this.remote = remote;
+        this.change = change;
+    }
+
+	public PollingResult(@Nonnull Change change) {
+        this(null,null,change);
+    }
+
+	public boolean hasChanges() {
+        return change.ordinal() > Change.INSIGNIFICANT.ordinal();
+    }
+
+	/**
      * Degree of changes between the previous state and this state.
      */
     public enum Change {
@@ -78,33 +109,4 @@ public final class PollingResult implements Serializable {
          */
         INCOMPARABLE
     }
-
-    public PollingResult(@CheckForNull SCMRevisionState baseline, @CheckForNull SCMRevisionState remote, @Nonnull Change change) {
-        if (change==null)   throw new IllegalArgumentException();
-        this.baseline = baseline;
-        this.remote = remote;
-        this.change = change;
-    }
-
-    public PollingResult(@Nonnull Change change) {
-        this(null,null,change);
-    }
-
-    public boolean hasChanges() {
-        return change.ordinal() > Change.INSIGNIFICANT.ordinal();
-    }
-
-    /**
-     * Constant to indicate no changes in the remote repository.
-     */
-    public static final PollingResult NO_CHANGES = new PollingResult(Change.NONE);
-
-    public static final PollingResult SIGNIFICANT = new PollingResult(Change.SIGNIFICANT);
-
-    /**
-     * Constant that uses {@link Change#INCOMPARABLE} which forces an immediate build.
-     */
-    public static final PollingResult BUILD_NOW = new PollingResult(Change.INCOMPARABLE);
-
-    private static final long serialVersionUID = 1L;
 }

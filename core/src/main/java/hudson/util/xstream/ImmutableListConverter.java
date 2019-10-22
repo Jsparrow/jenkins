@@ -67,32 +67,31 @@ public class ImmutableListConverter extends CollectionConverter {
     @Override
     public Object unmarshal(HierarchicalStreamReader reader, UnmarshallingContext context) {
         String resolvesTo = reader.getAttribute("resolves-to");
-        if ("com.google.common.collect.ImmutableList$SerializedForm".equals(resolvesTo)) {
-            // Skip into the elements element. This has the real children.
-            List items = new ArrayList();
-            if (reader.hasMoreChildren()) {
-                reader.moveDown();
-	            // read the individual items from xml into a list
-	            while (reader.hasMoreChildren()) {
-	                reader.moveDown();
-	                try {
-	                    Object item = readItem(reader, context, items);
-	                    items.add(item);
-	                } catch (CriticalXStreamException e) {
-	                    throw e;
-	                } catch (XStreamException | LinkageError e) {
-	                    RobustReflectionConverter.addErrorInContext(context, e);
-	                }
-                    reader.moveUp();
-	            }
+        if (!"com.google.common.collect.ImmutableList$SerializedForm".equals(resolvesTo)) {
+			return ImmutableList.copyOf((List)super.unmarshal(reader, context));
+		}
+		// Skip into the elements element. This has the real children.
+		List items = new ArrayList();
+		if (reader.hasMoreChildren()) {
+		    reader.moveDown();
+		    // read the individual items from xml into a list
+		    while (reader.hasMoreChildren()) {
+		        reader.moveDown();
+		        try {
+		            Object item = readItem(reader, context, items);
+		            items.add(item);
+		        } catch (CriticalXStreamException e) {
+		            throw e;
+		        } catch (XStreamException | LinkageError e) {
+		            RobustReflectionConverter.addErrorInContext(context, e);
+		        }
+		        reader.moveUp();
+		    }
 
-                // move back up past the elements element.
-                reader.moveUp();
-            }
-            return ImmutableList.copyOf(items);
-        } else {
-            return ImmutableList.copyOf((List)super.unmarshal(reader, context));
-        }
+		    // move back up past the elements element.
+		    reader.moveUp();
+		}
+		return ImmutableList.copyOf(items);
     }
 
     @Override

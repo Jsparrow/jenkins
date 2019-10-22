@@ -45,12 +45,14 @@ import java.util.logging.Logger;
  */
 public abstract class AbstractCloudSlave extends Slave {
 
-    public AbstractCloudSlave(@Nonnull String name, String remoteFS, ComputerLauncher launcher)
+    private static final Logger LOGGER = Logger.getLogger(AbstractCloudSlave.class.getName());
+
+	public AbstractCloudSlave(@Nonnull String name, String remoteFS, ComputerLauncher launcher)
             throws FormException, IOException {
         super(name, remoteFS, launcher);
     }
 
-    /**
+	/**
      * Use {@link #AbstractCloudSlave(java.lang.String, java.lang.String, hudson.slaves.ComputerLauncher)}
      * @deprecated since FIXME
      */
@@ -62,7 +64,7 @@ public abstract class AbstractCloudSlave extends Slave {
         super(name, nodeDescription, remoteFS, numExecutors, mode, labelString, launcher, retentionStrategy, nodeProperties);
     }
 
-    /**
+	/**
      * Use {@link #AbstractCloudSlave(java.lang.String, java.lang.String, hudson.slaves.ComputerLauncher)}
      * @deprecated since FIXME
      */
@@ -74,10 +76,10 @@ public abstract class AbstractCloudSlave extends Slave {
         super(name, nodeDescription, remoteFS, numExecutors, mode, labelString, launcher, retentionStrategy, nodeProperties);
     }
 
-    @Override
+	@Override
     public abstract AbstractCloudComputer createComputer();
 
-    /**
+	/**
      * Releases and removes this agent.
      */
     public void terminate() throws InterruptedException, IOException {
@@ -97,10 +99,8 @@ public abstract class AbstractCloudSlave extends Slave {
         }
     }
 
-    /**
+	/**
      * Performs the removal of the underlying resource from the cloud.
      */
     protected abstract void _terminate(TaskListener listener) throws IOException, InterruptedException;
-
-    private static final Logger LOGGER = Logger.getLogger(AbstractCloudSlave.class.getName());
 }

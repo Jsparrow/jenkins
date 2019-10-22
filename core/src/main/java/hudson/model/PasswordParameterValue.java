@@ -59,11 +59,7 @@ public class PasswordParameterValue extends ParameterValue {
 
     @Override
     public VariableResolver<String> createVariableResolver(AbstractBuild<?, ?> build) {
-        return new VariableResolver<String>() {
-            public String resolve(String name) {
-                return PasswordParameterValue.this.name.equals(name) ? Secret.toString(value) : null;
-            }
-        };
+        return (String name) -> PasswordParameterValue.this.name.equals(name) ? Secret.toString(value) : null;
     }
 
     @Override
@@ -71,7 +67,8 @@ public class PasswordParameterValue extends ParameterValue {
         return true;
     }
 
-    @Nonnull
+    @Override
+	@Nonnull
     public Secret getValue() {
         return value;
     }

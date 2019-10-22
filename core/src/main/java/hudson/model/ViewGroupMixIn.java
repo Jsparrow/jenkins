@@ -32,6 +32,7 @@ import java.util.Collection;
 import java.util.List;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
+import java.util.stream.Collectors;
 
 /**
  * Implements {@link ViewGroup} to be used as a "mix-in".
@@ -61,48 +62,49 @@ import javax.annotation.Nonnull;
 public abstract class ViewGroupMixIn {
     private final ViewGroup owner;
 
-    /**
+    protected ViewGroupMixIn(ViewGroup owner) {
+        this.owner = owner;
+    }
+
+	/**
      * Returns all views in the group. This list must be modifiable and concurrently iterable.
      */
     @Nonnull
     protected abstract List<View> views();
 
-    /**
+	/**
      * Gets primary view of the mix-in.
      * @return Name of the primary view, {@code null} if there is no primary one defined.
      */
     @CheckForNull
     protected abstract String primaryView();
 
-    /**
+	/**
      * Sets the primary view.
      * @param newName Name of the primary view to be set.
      *                {@code null} to make the primary view undefined.
      */
     protected abstract void primaryView(String newName);
 
-    protected ViewGroupMixIn(ViewGroup owner) {
-        this.owner = owner;
-    }
-
-    public void addView(@Nonnull View v) throws IOException {
+	public void addView(@Nonnull View v) throws IOException {
         v.owner = owner;
         views().add(v);
         owner.save();
     }
 
-    public boolean canDelete(@Nonnull View view) {
+	public boolean canDelete(@Nonnull View view) {
         return !view.isDefault();  // Cannot delete primary view
     }
 
-    public synchronized void deleteView(@Nonnull View view) throws IOException {
-        if (views().size() <= 1)
-            throw new IllegalStateException("Cannot delete last view");
+	public synchronized void deleteView(@Nonnull View view) throws IOException {
+        if (views().size() <= 1) {
+			throw new IllegalStateException("Cannot delete last view");
+		}
         views().remove(view);
         owner.save();
     }
 
-    /**
+	/**
      * Gets a view by the specified name.
      * The method iterates through {@link ViewGroup}s if required.
      * @param name Name of the view
@@ -132,8 +134,9 @@ public abstract class ViewGroupMixIn {
         if (!name.equals(primaryView())) {
             // Fallback to subview of primary view if it is a ViewGroup
             View pv = getPrimaryView();
-            if (pv instanceof ViewGroup)
-                return ((ViewGroup)pv).getView(name);
+            if (pv instanceof ViewGroup) {
+				return ((ViewGroup)pv).getView(name);
+			}
             if (pv instanceof AllView && AllView.DEFAULT_VIEW_NAME.equals(pv.name)) {
                 // JENKINS-38606: primary view is the default AllView, is somebody using an old link to localized form?
                 for (Locale l : Locale.getAvailableLocales()) {
@@ -147,33 +150,31 @@ public abstract class ViewGroupMixIn {
         return null;
     }
 
-    /**
+	/**
      * Gets the read-only list of all {@link View}s.
      */
     @Exported
     public Collection<View> getViews() {
         List<View> orig = views();
         List<View> copy = new ArrayList<>(orig.size());
-        for (View v : orig) {
-            if (v.hasPermission(View.READ))
-                copy.add(v);
-        }
+        copy.addAll(orig.stream().filter(v -> v.hasPermission(View.READ)).collect(Collectors.toList()));
         copy.sort(View.SORTER);
         return copy;
     }
 
-    /**
+	/**
      * Returns the primary {@link View} that renders the top-page of Hudson.
      */
     @Exported
     public View getPrimaryView() {
         View v = getView(primaryView());
-        if(v==null) // fallback
-            v = views().get(0);
+        if(v==null) {
+			v = views().get(0);
+		}
         return v;
     }
 
-    public void onViewRenamed(View view, String oldName, String newName) {
+	public void onViewRenamed(View view, String oldName, String newName) {
         // If this view was the default view, change reference
         if (oldName.equals(primaryView())) {
             primaryView(newName);

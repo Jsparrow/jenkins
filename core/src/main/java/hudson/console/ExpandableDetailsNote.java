@@ -40,22 +40,23 @@ import java.util.logging.Logger;
  * @since 1.395
  */
 public class ExpandableDetailsNote extends ConsoleNote {
-    private final String caption;
-    private final String html;
+    private static final Logger LOGGER = Logger.getLogger(ExpandableDetailsNote.class.getName());
+	private final String caption;
+	private final String html;
 
-    public ExpandableDetailsNote(String caption, String html) {
+	public ExpandableDetailsNote(String caption, String html) {
         this.caption = caption;
         this.html = html;
     }
 
-    @Override
+	@Override
     public ConsoleAnnotator annotate(Object context, MarkupText text, int charPos) {
         text.addMarkup(charPos,
-                "<input type=button value='"+caption+"' class='reveal-expandable-detail'><div class='expandable-detail'>"+html+"</div>");
+                new StringBuilder().append("<input type=button value='").append(caption).append("' class='reveal-expandable-detail'><div class='expandable-detail'>").append(html).append("</div>").toString());
         return null;
     }
 
-    public static String encodeTo(String buttonCaption, String html) {
+	public static String encodeTo(String buttonCaption, String html) {
         try {
             return new ExpandableDetailsNote(buttonCaption, html).encode();
         } catch (IOException e) {
@@ -65,12 +66,11 @@ public class ExpandableDetailsNote extends ConsoleNote {
         }
     }
 
-    @Extension
+	@Extension
     public static final class DescriptorImpl extends ConsoleAnnotationDescriptor {
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return "Expandable details";
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(ExpandableDetailsNote.class.getName());
 }

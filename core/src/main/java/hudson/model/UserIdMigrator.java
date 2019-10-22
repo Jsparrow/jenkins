@@ -79,13 +79,14 @@ class UserIdMigrator {
 
     private void addEmptyUsernameIfExists(Map<String, File> users) throws IOException {
         File emptyUsernameConfigFile = new File(usersDirectory, User.CONFIG_XML);
-        if (emptyUsernameConfigFile.exists()) {
-            File newEmptyUsernameDirectory = new File(usersDirectory, EMPTY_USERNAME_DIRECTORY_NAME);
-            Files.createDirectory(newEmptyUsernameDirectory.toPath());
-            File newEmptyUsernameConfigFile = new File(newEmptyUsernameDirectory, User.CONFIG_XML);
-            Files.move(emptyUsernameConfigFile.toPath(), newEmptyUsernameConfigFile.toPath());
-            users.put("", newEmptyUsernameDirectory);
-        }
+        if (!emptyUsernameConfigFile.exists()) {
+			return;
+		}
+		File newEmptyUsernameDirectory = new File(usersDirectory, EMPTY_USERNAME_DIRECTORY_NAME);
+		Files.createDirectory(newEmptyUsernameDirectory.toPath());
+		File newEmptyUsernameConfigFile = new File(newEmptyUsernameDirectory, User.CONFIG_XML);
+		Files.move(emptyUsernameConfigFile.toPath(), newEmptyUsernameConfigFile.toPath());
+		users.put("", newEmptyUsernameDirectory);
     }
 
     void migrateUsers(UserIdMapper mapper) throws IOException {
@@ -93,7 +94,8 @@ class UserIdMigrator {
         Map<String, File> existingUsers = scanExistingUsers();
         for (Map.Entry<String, File> existingUser : existingUsers.entrySet()) {
             File newDirectory = mapper.putIfAbsent(existingUser.getKey(), false);
-            LOGGER.log(Level.INFO, "Migrating user '" + existingUser.getKey() + "' from 'users/" + existingUser.getValue().getName() + "/' to 'users/" + newDirectory.getName() + "/'");
+            LOGGER.log(Level.INFO, new StringBuilder().append("Migrating user '").append(existingUser.getKey()).append("' from 'users/").append(existingUser.getValue().getName()).append("/' to 'users/").append(newDirectory.getName())
+					.append("/'").toString());
             Files.move(existingUser.getValue().toPath(), newDirectory.toPath(), StandardCopyOption.REPLACE_EXISTING);
         }
         mapper.save();

@@ -111,9 +111,7 @@ public class UpdateSiteWarningsMonitor extends AdministrativeMonitor {
 
             PluginWrapper plugin = Jenkins.get().getPluginManager().getPlugin(pluginName);
 
-            if (!activePluginWarningsByPlugin.containsKey(plugin)) {
-                activePluginWarningsByPlugin.put(plugin, new ArrayList<>());
-            }
+            activePluginWarningsByPlugin.putIfAbsent(plugin, new ArrayList<>());
             activePluginWarningsByPlugin.get(plugin).add(warning);
         }
         return activePluginWarningsByPlugin;
@@ -124,11 +122,7 @@ public class UpdateSiteWarningsMonitor extends AdministrativeMonitor {
         UpdateSiteWarningsConfiguration configuration = ExtensionList.lookupSingleton(UpdateSiteWarningsConfiguration.class);
         HashSet<UpdateSite.Warning> activeWarnings = new HashSet<>();
 
-        for (UpdateSite.Warning warning : configuration.getApplicableWarnings()) {
-            if (!configuration.getIgnoredWarnings().contains(warning.id)) {
-                activeWarnings.add(warning);
-            }
-        }
+        configuration.getApplicableWarnings().stream().filter(warning -> !configuration.getIgnoredWarnings().contains(warning.id)).forEach(activeWarnings::add);
 
         return Collections.unmodifiableSet(activeWarnings);
     }

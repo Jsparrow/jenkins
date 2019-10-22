@@ -67,13 +67,7 @@ public final class DailyCheck extends AsyncPeriodicWork {
     }
 
     @Override protected void execute(TaskListener listener) throws IOException, InterruptedException {
-        boolean due = false;
-        for (UpdateSite site : Jenkins.get().getUpdateCenter().getSites()) {
-            if (site.isDue()) {
-                due = true;
-                break;
-            }
-        }
+        boolean due = Jenkins.get().getUpdateCenter().getSites().stream().anyMatch(UpdateSite::isDue);
         if (!due) {
             // JENKINS-32886: downloadables like the tool installer data may have never been tried if the plugin
             // was installed "after a restart", so let's give them a try here.

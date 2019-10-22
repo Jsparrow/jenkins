@@ -49,7 +49,8 @@ public class DoActionFilter implements FunctionList.Filter {
      */
     private static final Pattern DO_METHOD_REGEX = Pattern.compile("^do[^a-z].*");
     
-    public boolean keep(@Nonnull Function m) {
+    @Override
+	public boolean keep(@Nonnull Function m) {
 
         if (m.getAnnotation(StaplerNotDispatchable.class) != null) {
             return false;
@@ -68,17 +69,17 @@ public class DoActionFilter implements FunctionList.Filter {
             for (RoutingDecisionProvider provider : whitelistProviders) {
                 RoutingDecisionProvider.Decision methodDecision = provider.decide(signature);
                 if (methodDecision == RoutingDecisionProvider.Decision.ACCEPTED) {
-                    LOGGER.log(Level.CONFIG, "Action " + signature + " is acceptable because it is whitelisted by " + provider);
+                    LOGGER.log(Level.CONFIG, new StringBuilder().append("Action ").append(signature).append(" is acceptable because it is whitelisted by ").append(provider).toString());
                     return true;
                 }
                 if (methodDecision == RoutingDecisionProvider.Decision.REJECTED) {
-                    LOGGER.log(Level.CONFIG, "Action " + signature + " is not acceptable because it is blacklisted by " + provider);
+                    LOGGER.log(Level.CONFIG, new StringBuilder().append("Action ").append(signature).append(" is not acceptable because it is blacklisted by ").append(provider).toString());
                     return false;
                 }
             }
         }
 
-        if (methodName.equals("doDynamic")) {
+        if ("doDynamic".equals(methodName)) {
             // reject doDynamic because it's treated separately by Stapler.
             return false;
         }

@@ -35,27 +35,29 @@ import net.sf.json.JSONArray;
 @Restricted(NoExternalUse.class)
 public class UpgradeWizard extends InstallState {
     /**
-     * Is this instance fully upgraded?
-     */
-    private volatile boolean isUpToDate = true;
-    
-    /**
      * Whether to show the upgrade wizard
      */
     private static final String SHOW_UPGRADE_WIZARD_FLAG = UpgradeWizard.class.getName() + ".show";
 
-    /*package*/ UpgradeWizard() {
+	private static final Logger LOGGER = Logger.getLogger(UpgradeWizard.class.getName());
+
+	/**
+     * Is this instance fully upgraded?
+     */
+    private volatile boolean isUpToDate = true;
+
+	/*package*/ UpgradeWizard() {
         super("UPGRADE", false);
     }
-    
-    /**
+
+	/**
      * Get the upgrade wizard instance
      */
     public static UpgradeWizard get() {
         return (UpgradeWizard)InstallState.UPGRADE;
     }
-    
-    @Override
+
+	@Override
     public void initializeState() {
         applyForcedChanges();
         
@@ -64,14 +66,12 @@ public class UpgradeWizard extends InstallState {
         updateUpToDate();
         
         // If there are no platform updates, proceed to running
-        if (isUpToDate) {
-            if (Jenkins.get().getSetupWizard().getPlatformPluginUpdates().isEmpty()) {
-                Jenkins.get().setInstallState(InstallState.RUNNING);
-            }
-        }
+        if (isUpToDate && Jenkins.get().getSetupWizard().getPlatformPluginUpdates().isEmpty()) {
+		    Jenkins.get().setInstallState(InstallState.RUNNING);
+		}
     }
-    
-    /**
+
+	/**
      * Put here the different changes that are enforced after an update.
      */
     private void applyForcedChanges(){
@@ -79,19 +79,20 @@ public class UpgradeWizard extends InstallState {
         // in such case it means there was already an upgrade before 
         // and potentially the admin has re-enabled the features
         ApiTokenPropertyConfiguration apiTokenPropertyConfiguration = ApiTokenPropertyConfiguration.get();
-        if(!apiTokenPropertyConfiguration.hasExistingConfigFile()){
-            LOGGER.log(Level.INFO, "New API token system configured with insecure options to keep legacy behavior");
-            apiTokenPropertyConfiguration.setCreationOfLegacyTokenEnabled(false);
-            apiTokenPropertyConfiguration.setTokenGenerationOnCreationEnabled(false);
-        }
+        if (apiTokenPropertyConfiguration.hasExistingConfigFile()) {
+			return;
+		}
+		LOGGER.log(Level.INFO, "New API token system configured with insecure options to keep legacy behavior");
+		apiTokenPropertyConfiguration.setCreationOfLegacyTokenEnabled(false);
+		apiTokenPropertyConfiguration.setTokenGenerationOnCreationEnabled(false);
     }
-    
-    @Override
+
+	@Override
     public boolean isSetupComplete() {
         return !isDue();
     }
-    
-    private void updateUpToDate() {
+
+	private void updateUpToDate() {
         // If we don't have any platform plugins, it's considered 'up to date' in terms
         // of the updater
         try {
@@ -102,26 +103,29 @@ public class UpgradeWizard extends InstallState {
         }
     }
 
-    /**
+	/**
      * Do we need to show the upgrade wizard prompt?
      */
     public boolean isDue() {
-        if (isUpToDate)
-            return false;
+        if (isUpToDate) {
+			return false;
+		}
 
         // only admin users should see this
-        if (!Jenkins.get().hasPermission(Jenkins.ADMINISTER))
-            return false;
+        if (!Jenkins.get().hasPermission(Jenkins.ADMINISTER)) {
+			return false;
+		}
 
         // only show when Jenkins is fully up & running
         WebApp wa = WebApp.getCurrent();
-        if (wa==null || !(wa.getApp() instanceof Jenkins))
-            return false;
+        if (wa==null || !(wa.getApp() instanceof Jenkins)) {
+			return false;
+		}
 
         return System.currentTimeMillis() > SetupWizard.getUpdateStateFile().lastModified();
     }
-    
-    /**
+
+	/**
      * Whether to show the upgrade wizard
      */
     public boolean isShowUpgradeWizard() {
@@ -131,7 +135,8 @@ public class UpgradeWizard extends InstallState {
         }
         return false;
     }
-    /**
+
+	/**
      * Call this to show the upgrade wizard
      */
     public HttpResponse doShowUpgradeWizard() throws Exception {
@@ -140,8 +145,8 @@ public class UpgradeWizard extends InstallState {
         session.setAttribute(SHOW_UPGRADE_WIZARD_FLAG, true);
         return HttpResponses.redirectToContextRoot();
     }
-    
-    /**
+
+	/**
      * Call this to hide the upgrade wizard
      */
     public HttpResponse doHideUpgradeWizard() {
@@ -153,7 +158,7 @@ public class UpgradeWizard extends InstallState {
         return HttpResponses.redirectToContextRoot();
     }
 
-    /**
+	/**
      * Snooze the upgrade wizard notice.
      */
     @RequirePOST
@@ -165,8 +170,8 @@ public class UpgradeWizard extends InstallState {
         LOGGER.log(FINE, "Snoozed the upgrade wizard notice");
         return HttpResponses.redirectToContextRoot();
     }
-    
-    @Extension
+
+	@Extension
     public static class ListenForInstallComplete extends InstallStateFilter {
         @Override
         public InstallState getNextInstallState(InstallState current, Provider<InstallState> proceed) {
@@ -177,6 +182,4 @@ public class UpgradeWizard extends InstallState {
             return next;
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(UpgradeWizard.class.getName());
 }

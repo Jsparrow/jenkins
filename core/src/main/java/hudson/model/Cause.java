@@ -153,7 +153,8 @@ public abstract class Cause {
          * Maximum number of transitive upstream causes we want to record.
          */
         private static final int MAX_LEAF = 25;
-        private String upstreamProject, upstreamUrl;
+        private String upstreamProject;
+		private String upstreamUrl;
         private int upstreamBuild;
         /**
          * @deprecated since 2009-02-28
@@ -177,9 +178,7 @@ public abstract class Cause {
             upstreamUrl = up.getParent().getUrl();
             upstreamCauses = new ArrayList<>();
             Set<String> traversed = new HashSet<>();
-            for (Cause c : up.getCauses()) {
-                upstreamCauses.add(trim(c, MAX_DEPTH, traversed));
-            }
+            up.getCauses().forEach(c -> upstreamCauses.add(trim(c, MAX_DEPTH, traversed)));
         }
 
         private UpstreamCause(String upstreamProject, int upstreamBuild, String upstreamUrl, @Nonnull List<Cause> upstreamCauses) {
@@ -198,9 +197,7 @@ public abstract class Cause {
             }
 
             Job j = (Job)i;
-            for (Cause c : this.upstreamCauses) {
-                c.onLoad(j, upstreamBuild);
-            }
+            this.upstreamCauses.forEach(c -> c.onLoad(j, upstreamBuild));
         }
 
         /**
@@ -209,9 +206,13 @@ public abstract class Cause {
         @Override
         public boolean equals(Object rhs) {
 
-            if (this == rhs) return true;
+            if (this == rhs) {
+				return true;
+			}
 
-            if (!(rhs instanceof UpstreamCause)) return false;
+            if (!(rhs instanceof UpstreamCause)) {
+				return false;
+			}
 
             final UpstreamCause o = (UpstreamCause) rhs;
 
@@ -237,9 +238,7 @@ public abstract class Cause {
             List<Cause> cs = new ArrayList<>();
             if (depth > 0) {
                 if (traversed.add(uc.upstreamUrl + uc.upstreamBuild)) {
-                    for (Cause c2 : uc.upstreamCauses) {
-                        cs.add(trim(c2, depth - 1, traversed));
-                    }
+                    uc.upstreamCauses.forEach(c2 -> cs.add(trim(c2, depth - 1, traversed)));
                 }
             } else if (traversed.size() < MAX_LEAF) {
                 cs.add(new DeeplyNestedUpstreamCause());
@@ -309,35 +308,39 @@ public abstract class Cause {
             listener.getLogger().println(
                 Messages.Cause_UpstreamCause_ShortDescription(
                     ModelHyperlinkNote.encodeTo('/' + upstreamUrl, upstreamProject),
-                    ModelHyperlinkNote.encodeTo('/'+upstreamUrl+upstreamBuild, Integer.toString(upstreamBuild)))
+                    ModelHyperlinkNote.encodeTo(new StringBuilder().append('/').append(upstreamUrl).append(upstreamBuild).toString(), Integer.toString(upstreamBuild)))
             );
-            if (upstreamCauses != null && !upstreamCauses.isEmpty()) {
-                indent(listener, depth);
-                listener.getLogger().println(Messages.Cause_UpstreamCause_CausedBy());
-                for (Cause cause : upstreamCauses) {
-                    if (cause instanceof UpstreamCause) {
-                        ((UpstreamCause) cause).print(listener, depth + 1);
-                    } else {
-                        indent(listener, depth + 1);
-                        cause.print(listener);
-                    }
-                }
-            }
+            if (!(upstreamCauses != null && !upstreamCauses.isEmpty())) {
+				return;
+			}
+			indent(listener, depth);
+			listener.getLogger().println(Messages.Cause_UpstreamCause_CausedBy());
+			upstreamCauses.forEach(cause -> {
+			    if (cause instanceof UpstreamCause) {
+			        ((UpstreamCause) cause).print(listener, depth + 1);
+			    } else {
+			        indent(listener, depth + 1);
+			        cause.print(listener);
+			    }
+			});
         }
 
         @Override public String toString() {
-            return upstreamUrl + upstreamBuild + upstreamCauses;
+            return new StringBuilder().append(upstreamUrl).append(upstreamBuild).append(upstreamCauses).toString();
         }
 
         public static class ConverterImpl extends XStream2.PassthruConverter<UpstreamCause> {
             public ConverterImpl(XStream2 xstream) { super(xstream); }
             @Override protected void callback(UpstreamCause uc, UnmarshallingContext context) {
-                if (uc.upstreamCause != null) {
-                    if (uc.upstreamCauses == null) uc.upstreamCauses = new ArrayList<>();
-                    uc.upstreamCauses.add(uc.upstreamCause);
-                    uc.upstreamCause = null;
-                    OldDataMonitor.report(context, "1.288");
-                }
+                if (uc.upstreamCause == null) {
+					return;
+				}
+				if (uc.upstreamCauses == null) {
+					uc.upstreamCauses = new ArrayList<>();
+				}
+				uc.upstreamCauses.add(uc.upstreamCause);
+				uc.upstreamCause = null;
+				OldDataMonitor.report(context, "1.288");
             }
         }
 

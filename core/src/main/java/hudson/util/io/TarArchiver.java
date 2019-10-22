@@ -81,15 +81,20 @@ final class TarArchiver extends Archiver {
         return true;
     }
 
-    public void visit(File file, String relativePath) throws IOException {
-        if(Functions.isWindows())
-            relativePath = relativePath.replace('\\','/');
+    @Override
+	public void visit(File file, String relativePath) throws IOException {
+        if(Functions.isWindows()) {
+			relativePath = relativePath.replace('\\','/');
+		}
 
-        if(file.isDirectory())
-            relativePath+='/';
+        if(file.isDirectory()) {
+			relativePath+='/';
+		}
         TarArchiveEntry te = new TarArchiveEntry(relativePath);
         int mode = IOUtils.mode(file);
-        if (mode!=-1)   te.setMode(mode);
+        if (mode!=-1) {
+			te.setMode(mode);
+		}
         te.setModTime(file.lastModified());
         long size = 0;
 
@@ -122,7 +127,8 @@ final class TarArchiver extends Archiver {
         entriesWritten++;
     }
 
-    public void close() throws IOException {
+    @Override
+	public void close() throws IOException {
         tar.close();
     }
 }

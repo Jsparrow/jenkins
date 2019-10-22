@@ -109,9 +109,9 @@ public class UtilTest {
         // 11.25 years - Check that if the first unit has 2 or more digits, a second unit isn't used.
         assertEquals(Messages.Util_year(11), Util.getTimeSpanString(354780000000L));
         // 9.25 years - Check that if the first unit has only 1 digit, a second unit is used.
-        assertEquals(Messages.Util_year(9)+ " " + Messages.Util_month(3), Util.getTimeSpanString(291708000000L));
+        assertEquals(new StringBuilder().append(Messages.Util_year(9)).append(" ").append(Messages.Util_month(3)).toString(), Util.getTimeSpanString(291708000000L));
         // 67 seconds
-        assertEquals(Messages.Util_minute(1) + " " + Messages.Util_second(7), Util.getTimeSpanString(67000L));
+        assertEquals(new StringBuilder().append(Messages.Util_minute(1)).append(" ").append(Messages.Util_second(7)).toString(), Util.getTimeSpanString(67000L));
         // 17 seconds - Check that times less than a minute only use seconds.
         assertEquals(Messages.Util_second(17), Util.getTimeSpanString(17000L));
         // 1712ms -> 1.7sec
@@ -192,13 +192,15 @@ public class UtilTest {
 
             // test a long name
             StringBuilder buf = new StringBuilder(768);
-            for( int i=0; i<768; i++)
-                buf.append((char)('0'+(i%10)));
+            for( int i=0; i<768; i++) {
+				buf.append((char)('0'+(i%10)));
+			}
             Util.createSymlink(d,buf.toString(),"x", l);
 
             String log = baos.toString();
-            if (log.length() > 0)
-                System.err.println("log output: " + log);
+            if (log.length() > 0) {
+				System.err.println("log output: " + log);
+			}
 
             assertEquals(buf.toString(),Util.resolveSymlink(new File(d,"x")));
 
@@ -328,28 +330,6 @@ public class UtilTest {
     	}
     }
 
-    private static class DigesterThread extends Thread {
-    	private String string;
-		private String expectedDigest;
-
-		private String error;
-
-		public DigesterThread(String string, String expectedDigest) {
-    		this.string = string;
-    		this.expectedDigest = expectedDigest;
-    	}
-
-		public void run() {
-			for (int i=0; i < 1000; i++) {
-				String digest = Util.getDigestOf(this.string);
-				if (!this.expectedDigest.equals(digest)) {
-					this.error = "Expected " + this.expectedDigest + ", but got " + digest;
-					break;
-				}
-			}
-		}
-    }
-
     @Test
     public void testIsAbsoluteUri() {
         assertTrue(Util.isAbsoluteUri("http://foobar/"));
@@ -361,7 +341,7 @@ public class UtilTest {
         assertFalse(Util.isAbsoluteUri("foo/bar"));
     }
 
-    @Test
+	@Test
     @Issue("SECURITY-276")
     public void testIsSafeToRedirectTo() {
         assertFalse(Util.isSafeToRedirectTo("http://foobar/"));
@@ -381,7 +361,7 @@ public class UtilTest {
         assertTrue(Util.isSafeToRedirectTo("/?foo"));
     }
 
-    @Test
+	@Test
     public void loadProperties() throws IOException {
 
         assertEquals(0, Util.loadProperties("").size());
@@ -391,7 +371,7 @@ public class UtilTest {
         assertEquals(p.toString(), 1, p.size());
     }
 
-    @Test
+	@Test
     public void isRelativePathUnix() {
         assertThat("/", not(aRelativePath()));
         assertThat("/foo/bar", not(aRelativePath()));
@@ -404,7 +384,7 @@ public class UtilTest {
         assertThat("./foo/bar/", aRelativePath());
     }
 
-    @Test
+	@Test
     public void isRelativePathWindows() {
         assertThat("\\", aRelativePath());
         assertThat("\\foo\\bar", aRelativePath());
@@ -425,24 +405,11 @@ public class UtilTest {
         assertThat("c:/", not(aRelativePath()));
     }
 
-    private static RelativePathMatcher aRelativePath() {
+	private static RelativePathMatcher aRelativePath() {
         return new RelativePathMatcher();
     }
 
-    private static class RelativePathMatcher extends BaseMatcher<String> {
-
-        @Override
-        public boolean matches(Object item) {
-            return Util.isRelativePath((String) item);
-        }
-
-        @Override
-        public void describeTo(Description description) {
-            description.appendText("a relative path");
-        }
-    }
-
-    @Test
+	@Test
     public void testIsDescendant() throws IOException {
         File root;
         File other;
@@ -480,7 +447,7 @@ public class UtilTest {
         assertTrue(Util.isDescendant(new File(root, "."), new File(new File(root, "child"), ".")));
     }
 
-    @Test
+	@Test
     public void testModeToPermissions() throws Exception {
         assertEquals(PosixFilePermissions.fromString("rwxrwxrwx"), Util.modeToPermissions(0777));
         assertEquals(PosixFilePermissions.fromString("rwxr-xrwx"), Util.modeToPermissions(0757));
@@ -499,7 +466,7 @@ public class UtilTest {
         Util.modeToPermissions(01777);
     }
 
-    @Test
+	@Test
     public void testPermissionsToMode() throws Exception {
         assertEquals(0777, Util.permissionsToMode(PosixFilePermissions.fromString("rwxrwxrwx")));
         assertEquals(0757, Util.permissionsToMode(PosixFilePermissions.fromString("rwxr-xrwx")));
@@ -513,7 +480,7 @@ public class UtilTest {
         assertEquals(0000, Util.permissionsToMode(PosixFilePermissions.fromString("---------")));
     }
 
-    @Test
+	@Test
     public void testDifferenceDays() throws Exception {
         Date may_6_10am = parseDate("2018-05-06 10:00:00"); 
         Date may_6_11pm55 = parseDate("2018-05-06 23:55:00"); 
@@ -538,12 +505,12 @@ public class UtilTest {
         // reverse order
         assertEquals(-1, Util.daysBetween(may_8_08am, may_7_11pm));
     }
-    
-    private Date parseDate(String dateString) throws ParseException {
+
+	private Date parseDate(String dateString) throws ParseException {
         return new SimpleDateFormat("yyyy-MM-dd hh:mm:ss").parse(dateString);
     }
 
-    @Test
+	@Test
     @Issue("SECURITY-904")
     public void resolveSymlinkToFile() throws Exception {
         //  root
@@ -579,5 +546,41 @@ public class UtilTest {
         // intermediate symlinks are NOT resolved
         assertNull(Util.resolveSymlinkToFile(new File(_a, "aa")));
         assertNull(Util.resolveSymlinkToFile(new File(_a, "aa/aa.txt")));
+    }
+
+	private static class DigesterThread extends Thread {
+    	private String string;
+		private String expectedDigest;
+
+		private String error;
+
+		public DigesterThread(String string, String expectedDigest) {
+    		this.string = string;
+    		this.expectedDigest = expectedDigest;
+    	}
+
+		@Override
+		public void run() {
+			for (int i=0; i < 1000; i++) {
+				String digest = Util.getDigestOf(this.string);
+				if (!this.expectedDigest.equals(digest)) {
+					this.error = new StringBuilder().append("Expected ").append(this.expectedDigest).append(", but got ").append(digest).toString();
+					break;
+				}
+			}
+		}
+    }
+
+    private static class RelativePathMatcher extends BaseMatcher<String> {
+
+        @Override
+        public boolean matches(Object item) {
+            return Util.isRelativePath((String) item);
+        }
+
+        @Override
+        public void describeTo(Description description) {
+            description.appendText("a relative path");
+        }
     }
 }

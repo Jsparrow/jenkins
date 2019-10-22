@@ -240,17 +240,17 @@ public final class ReverseBuildTrigger extends Trigger<Job> implements Dependenc
 
     @Extension public static final class RunListenerImpl extends RunListener<Run> {
 
-        static RunListenerImpl get() {
+        private Map<Job,Collection<ReverseBuildTrigger>> upstream2Trigger;
+
+		static RunListenerImpl get() {
             return ExtensionList.lookupSingleton(RunListenerImpl.class);
         }
 
-        private Map<Job,Collection<ReverseBuildTrigger>> upstream2Trigger;
-
-        synchronized void invalidateCache() {
+		synchronized void invalidateCache() {
             upstream2Trigger = null;
         }
 
-        private Map<Job,Collection<ReverseBuildTrigger>> calculateCache() {
+		private Map<Job,Collection<ReverseBuildTrigger>> calculateCache() {
             try (ACLContext acl = ACL.as(ACL.SYSTEM)) {
                 final Map<Job, Collection<ReverseBuildTrigger>> result = new WeakHashMap<>();
                 for (Job<?, ?> downstream : Jenkins.get().allItems(Job.class)) {
@@ -275,7 +275,7 @@ public final class ReverseBuildTrigger extends Trigger<Job> implements Dependenc
             }
         }
 
-        @Override public void onCompleted(@Nonnull Run r, @Nonnull TaskListener listener) {
+		@Override public void onCompleted(@Nonnull Run r, @Nonnull TaskListener listener) {
             Collection<ReverseBuildTrigger> triggers;
             synchronized (this) {
                 if (upstream2Trigger == null) {
@@ -297,7 +297,7 @@ public final class ReverseBuildTrigger extends Trigger<Job> implements Dependenc
                         listener.getLogger().println(hudson.tasks.Messages.BuildTrigger_Disabled(ModelHyperlinkNote.encodeTo(trigger.job)));
                         continue;
                     }
-                    String name = ModelHyperlinkNote.encodeTo(trigger.job) + " #" + trigger.job.getNextBuildNumber();
+                    String name = new StringBuilder().append(ModelHyperlinkNote.encodeTo(trigger.job)).append(" #").append(trigger.job.getNextBuildNumber()).toString();
                     if (ParameterizedJobMixIn.scheduleBuild2(trigger.job, -1, new CauseAction(new Cause.UpstreamCause(r))) != null) {
                         listener.getLogger().println(hudson.tasks.Messages.BuildTrigger_Triggering(name));
                     } else {
@@ -325,8 +325,8 @@ public final class ReverseBuildTrigger extends Trigger<Job> implements Dependenc
                                 p.save();
                             } catch (IOException e) {
                                 LOGGER.log(Level.WARNING,
-                                        "Failed to persist project setting during rename from " + oldFullName + " to "
-                                                + newFullName, e);
+                                        new StringBuilder().append("Failed to persist project setting during rename from ").append(oldFullName).append(" to ").append(newFullName)
+												.toString(), e);
                             }
                         }
                     }

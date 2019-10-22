@@ -74,12 +74,58 @@ import org.kohsuke.stapler.verb.POST;
  * @see LogRecorderManager
  */
 public class LogRecorder extends AbstractModelObject implements Saveable {
-    private volatile String name;
+    private static final TargetComparator TARGET_COMPARATOR = new TargetComparator();
 
-    public final CopyOnWriteList<Target> targets = new CopyOnWriteList<>();
-    private final static TargetComparator TARGET_COMPARATOR = new TargetComparator();
-    
-    @Restricted(NoExternalUse.class)
+	/**
+     * Thread-safe reusable {@link XStream}.
+     */
+    public static final XStream XSTREAM = new XStream2();
+
+	static {
+        XSTREAM.alias("log",LogRecorder.class);
+        XSTREAM.alias("target",Target.class);
+    }
+
+	/**
+     * Log levels that can be configured for {@link Target}.
+     */
+    public static List<Level> LEVELS =
+            Arrays.asList(Level.ALL, Level.FINEST, Level.FINER, Level.FINE, Level.CONFIG, Level.INFO, Level.WARNING, Level.SEVERE, Level.OFF);
+
+	private volatile String name;
+
+	public final CopyOnWriteList<Target> targets = new CopyOnWriteList<>();
+
+	@Restricted(NoExternalUse.class)
+    transient /*almost final*/ RingBufferLogHandler handler = new RingBufferLogHandler() {
+        @Override
+        public void publish(LogRecord record) {
+            for (Target t : orderedTargets()) {
+                Boolean match = t.matches(record);
+                if (match == null) {
+                    // domain does not match, so continue looking
+                    continue;
+                }
+
+                if (match) {
+                    // most specific logger matches, so publish
+                    super.publish(record);
+                }
+                // most specific logger does not match, so don't publish
+                // allows reducing log level for more specific loggers
+                return;
+            }
+        }
+    };
+
+	public LogRecorder(String name) {
+        this.name = name;
+        // register it only once when constructed, and when this object dies
+        // WeakLogHandler will remove it
+        new WeakLogHandler(handler,Logger.getLogger(""));
+    }
+
+	@Restricted(NoExternalUse.class)
     Target[] orderedTargets() {
         // will contain targets ordered by reverse name length (place specific targets at the beginning)
         Target[] ts = targets.toArray(new Target[]{});
@@ -89,7 +135,7 @@ public class LogRecorder extends AbstractModelObject implements Saveable {
         return ts;
     }
 
-    @Restricted(NoExternalUse.class)
+	@Restricted(NoExternalUse.class)
     @VisibleForTesting
     public static Set<String> getAutoCompletionCandidates(List<String> loggerNamesList) {
         Set<String> loggerNames = new HashSet<>(loggerNamesList);
@@ -122,7 +168,7 @@ public class LogRecorder extends AbstractModelObject implements Saveable {
         return relevantPrefixes;
     }
 
-    @Restricted(NoExternalUse.class)
+	@Restricted(NoExternalUse.class)
     public AutoCompletionCandidates doAutoCompleteLoggerName(@QueryParameter String value) {
         if (value == null) {
             return new AutoCompletionCandidates();
@@ -134,11 +180,7 @@ public class LogRecorder extends AbstractModelObject implements Saveable {
         for (String part : value.split("[ ]+")) {
             HashSet<String> partCandidates = new HashSet<>();
             String lowercaseValue = part.toLowerCase(Locale.ENGLISH);
-            for (String loggerName : candidateNames) {
-                if (loggerName.toLowerCase(Locale.ENGLISH).contains(lowercaseValue)) {
-                    partCandidates.add(loggerName);
-                }
-            }
+            candidateNames.stream().filter(loggerName -> loggerName.toLowerCase(Locale.ENGLISH).contains(lowercaseValue)).forEach(partCandidates::add);
             candidateNames.retainAll(partCandidates);
         }
         AutoCompletionCandidates candidates = new AutoCompletionCandidates();
@@ -146,29 +188,163 @@ public class LogRecorder extends AbstractModelObject implements Saveable {
         return candidates;
     }
 
-    @Restricted(NoExternalUse.class)
-    transient /*almost final*/ RingBufferLogHandler handler = new RingBufferLogHandler() {
-        @Override
-        public void publish(LogRecord record) {
-            for (Target t : orderedTargets()) {
-                Boolean match = t.matches(record);
-                if (match == null) {
-                    // domain does not match, so continue looking
-                    continue;
-                }
+	@Override
+	public String getDisplayName() {
+        return name;
+    }
 
-                if (match) {
-                    // most specific logger matches, so publish
-                    super.publish(record);
+	@Override
+	public String getSearchUrl() {
+        return Util.rawEncode(name);
+    }
+
+	public String getName() {
+        return name;
+    }
+
+	public LogRecorderManager getParent() {
+        return Jenkins.get().getLog();
+    }
+
+	/**
+     * Accepts submission from the configuration page.
+     */
+    @POST
+    public synchronized void doConfigSubmit( StaplerRequest req, StaplerResponse rsp ) throws IOException, ServletException {
+        JSONObject src = req.getSubmittedForm();
+
+        String newName = src.getString("name");
+		String redirect = ".";
+        XmlFile oldFile = null;
+        if(!name.equals(newName)) {
+            Jenkins.checkGoodName(newName);
+            oldFile = getConfigFile();
+            // rename
+            getParent().logRecorders.remove(name);
+            this.name = newName;
+            getParent().logRecorders.put(name,this);
+            redirect = new StringBuilder().append("../").append(Util.rawEncode(newName)).append('/').toString();
+        }
+
+        List<Target> newTargets = req.bindJSONToList(Target.class, src.get("targets"));
+        newTargets.forEach(Target::enable);
+        targets.replaceBy(newTargets);
+
+        save();
+        if (oldFile!=null) {
+			oldFile.delete();
+		}
+        rsp.sendRedirect2(redirect);
+    }
+
+	@RequirePOST
+    public HttpResponse doClear() throws IOException {
+        handler.clear();
+        return HttpResponses.redirectToDot();
+    }
+
+	/**
+     * Loads the settings from a file.
+     */
+    public synchronized void load() throws IOException {
+        getConfigFile().unmarshal(this);
+        for (Target t : targets) {
+			t.enable();
+		}
+    }
+
+	/**
+     * Save the settings to a file.
+     */
+    @Override
+	public synchronized void save() throws IOException {
+        if(BulkChange.contains(this)) {
+			return;
+		}
+        getConfigFile().write(this);
+        SaveableListener.fireOnChange(this, getConfigFile());
+    }
+
+	/**
+     * Deletes this recorder, then go back to the parent.
+     */
+    @RequirePOST
+    public synchronized void doDoDelete(StaplerResponse rsp) throws IOException, ServletException {
+        getConfigFile().delete();
+        getParent().logRecorders.remove(name);
+        // Disable logging for all our targets,
+        // then reenable all other loggers in case any also log the same targets
+        for (Target t : targets) {
+			t.disable();
+		}
+        getParent().logRecorders.values().forEach(log -> {
+			for (Target t : log.targets) {
+				t.enable();
+			}
+		});
+        rsp.sendRedirect2("..");
+    }
+
+	/**
+     * RSS feed for log entries.
+     */
+    public void doRss( StaplerRequest req, StaplerResponse rsp ) throws IOException, ServletException {
+        LogRecorderManager.doRss(req,rsp,getLogRecords());
+    }
+
+	/**
+     * The file we save our configuration.
+     */
+    private XmlFile getConfigFile() {
+        return new XmlFile(XSTREAM, new File(LogRecorderManager.configDir(), name + ".xml"));
+    }
+
+	/**
+     * Gets a view of the log records.
+     */
+    public List<LogRecord> getLogRecords() {
+        return handler.getView();
+    }
+
+	/**
+     * Gets a view of log records per agent matching this recorder.
+     * @return a map (sorted by display name) from computer to (nonempty) list of log records
+     * @since 1.519
+     */
+    public Map<Computer,List<LogRecord>> getSlaveLogRecords() {
+        Map<Computer,List<LogRecord>> result = new TreeMap<>(new Comparator<Computer>() {
+            final Collator COLL = Collator.getInstance();
+
+            @Override
+			public int compare(Computer c1, Computer c2) {
+                return COLL.compare(c1.getDisplayName(), c2.getDisplayName());
+            }
+        });
+        for (Computer c : Jenkins.get().getComputers()) {
+            if (c.getName().isEmpty()) {
+                continue; // master
+            }
+            List<LogRecord> recs = new ArrayList<>();
+            try {
+                for (LogRecord rec : c.getLogRecords()) {
+                    for (Target t : targets) {
+                        if (t.includes(rec)) {
+                            recs.add(rec);
+                            break;
+                        }
+                    }
                 }
-                // most specific logger does not match, so don't publish
-                // allows reducing log level for more specific loggers
-                return;
+            } catch (InterruptedException | IOException x) {
+                continue;
+            }
+            if (!recs.isEmpty()) {
+                result.put(c, recs);
             }
         }
-    };
+        return result;
+    }
 
-    /**
+	/**
      * Logger that this recorder monitors, and its log level.
      * Just a pair of (logger name,level) with convenience methods.
      */
@@ -202,27 +378,33 @@ public class LogRecorder extends AbstractModelObject implements Saveable {
         @Deprecated
         public boolean includes(LogRecord r) {
             if(r.getLevel().intValue() < level)
-                return false;   // below the threshold
-            if (name.length() == 0) {
+			 {
+				return false;   // below the threshold
+			}
+            if (name.isEmpty()) {
                 return true; // like root logger, includes everything
             }
             String logName = r.getLoggerName();
             if(logName==null || !logName.startsWith(name))
-                return false;   // not within this logger
+			 {
+				return false;   // not within this logger
+			}
             String rest = logName.substring(name.length());
-            return rest.startsWith(".") || rest.length()==0;
+            return rest.startsWith(".") || rest.isEmpty();
         }
 
         public Boolean matches(LogRecord r) {
             boolean levelSufficient = r.getLevel().intValue() >= level;
-            if (name.length() == 0) {
+            if (name.isEmpty()) {
                 return levelSufficient; // include if level matches
             }
             String logName = r.getLoggerName();
             if(logName==null || !logName.startsWith(name))
-                return null; // not in the domain of this logger
+			 {
+				return null; // not in the domain of this logger
+			}
             String rest = logName.substring(name.length());
-            if (rest.startsWith(".") || rest.length()==0) {
+            if (rest.startsWith(".") || rest.isEmpty()) {
                 return levelSufficient; // include if level matches
             }
             return null;
@@ -240,8 +422,9 @@ public class LogRecorder extends AbstractModelObject implements Saveable {
          */
         public void enable() {
             Logger l = getLogger();
-            if(!l.isLoggable(getLevel()))
-                l.setLevel(getLevel());
+            if(!l.isLoggable(getLevel())) {
+				l.setLevel(getLevel());
+			}
             new SetLevel(name, getLevel()).broadcast();
         }
 
@@ -300,173 +483,4 @@ public class LogRecorder extends AbstractModelObject implements Saveable {
             }
         }
     }
-
-    public LogRecorder(String name) {
-        this.name = name;
-        // register it only once when constructed, and when this object dies
-        // WeakLogHandler will remove it
-        new WeakLogHandler(handler,Logger.getLogger(""));
-    }
-
-    public String getDisplayName() {
-        return name;
-    }
-
-    public String getSearchUrl() {
-        return Util.rawEncode(name);
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public LogRecorderManager getParent() {
-        return Jenkins.get().getLog();
-    }
-
-    /**
-     * Accepts submission from the configuration page.
-     */
-    @POST
-    public synchronized void doConfigSubmit( StaplerRequest req, StaplerResponse rsp ) throws IOException, ServletException {
-        JSONObject src = req.getSubmittedForm();
-
-        String newName = src.getString("name"), redirect = ".";
-        XmlFile oldFile = null;
-        if(!name.equals(newName)) {
-            Jenkins.checkGoodName(newName);
-            oldFile = getConfigFile();
-            // rename
-            getParent().logRecorders.remove(name);
-            this.name = newName;
-            getParent().logRecorders.put(name,this);
-            redirect = "../" + Util.rawEncode(newName) + '/';
-        }
-
-        List<Target> newTargets = req.bindJSONToList(Target.class, src.get("targets"));
-        for (Target t : newTargets)
-            t.enable();
-        targets.replaceBy(newTargets);
-
-        save();
-        if (oldFile!=null) oldFile.delete();
-        rsp.sendRedirect2(redirect);
-    }
-
-    @RequirePOST
-    public HttpResponse doClear() throws IOException {
-        handler.clear();
-        return HttpResponses.redirectToDot();
-    }
-
-    /**
-     * Loads the settings from a file.
-     */
-    public synchronized void load() throws IOException {
-        getConfigFile().unmarshal(this);
-        for (Target t : targets)
-            t.enable();
-    }
-
-    /**
-     * Save the settings to a file.
-     */
-    public synchronized void save() throws IOException {
-        if(BulkChange.contains(this))   return;
-        getConfigFile().write(this);
-        SaveableListener.fireOnChange(this, getConfigFile());
-    }
-
-    /**
-     * Deletes this recorder, then go back to the parent.
-     */
-    @RequirePOST
-    public synchronized void doDoDelete(StaplerResponse rsp) throws IOException, ServletException {
-        getConfigFile().delete();
-        getParent().logRecorders.remove(name);
-        // Disable logging for all our targets,
-        // then reenable all other loggers in case any also log the same targets
-        for (Target t : targets)
-            t.disable();
-        for (LogRecorder log : getParent().logRecorders.values())
-            for (Target t : log.targets)
-                t.enable();
-        rsp.sendRedirect2("..");
-    }
-
-    /**
-     * RSS feed for log entries.
-     */
-    public void doRss( StaplerRequest req, StaplerResponse rsp ) throws IOException, ServletException {
-        LogRecorderManager.doRss(req,rsp,getLogRecords());
-    }
-
-    /**
-     * The file we save our configuration.
-     */
-    private XmlFile getConfigFile() {
-        return new XmlFile(XSTREAM, new File(LogRecorderManager.configDir(), name + ".xml"));
-    }
-
-    /**
-     * Gets a view of the log records.
-     */
-    public List<LogRecord> getLogRecords() {
-        return handler.getView();
-    }
-
-    /**
-     * Gets a view of log records per agent matching this recorder.
-     * @return a map (sorted by display name) from computer to (nonempty) list of log records
-     * @since 1.519
-     */
-    public Map<Computer,List<LogRecord>> getSlaveLogRecords() {
-        Map<Computer,List<LogRecord>> result = new TreeMap<>(new Comparator<Computer>() {
-            final Collator COLL = Collator.getInstance();
-
-            public int compare(Computer c1, Computer c2) {
-                return COLL.compare(c1.getDisplayName(), c2.getDisplayName());
-            }
-        });
-        for (Computer c : Jenkins.get().getComputers()) {
-            if (c.getName().length() == 0) {
-                continue; // master
-            }
-            List<LogRecord> recs = new ArrayList<>();
-            try {
-                for (LogRecord rec : c.getLogRecords()) {
-                    for (Target t : targets) {
-                        if (t.includes(rec)) {
-                            recs.add(rec);
-                            break;
-                        }
-                    }
-                }
-            } catch (IOException x) {
-                continue;
-            } catch (InterruptedException x) {
-                continue;
-            }
-            if (!recs.isEmpty()) {
-                result.put(c, recs);
-            }
-        }
-        return result;
-    }
-
-    /**
-     * Thread-safe reusable {@link XStream}.
-     */
-    public static final XStream XSTREAM = new XStream2();
-
-    static {
-        XSTREAM.alias("log",LogRecorder.class);
-        XSTREAM.alias("target",Target.class);
-    }
-
-    /**
-     * Log levels that can be configured for {@link Target}.
-     */
-    public static List<Level> LEVELS =
-            Arrays.asList(Level.ALL, Level.FINEST, Level.FINER, Level.FINE, Level.CONFIG, Level.INFO, Level.WARNING, Level.SEVERE, Level.OFF);
 }

@@ -111,14 +111,17 @@ public enum BallColor implements StatusIcon {
         return image;
     }
 
-    public String getImageOf(String size) {
-        return Stapler.getCurrentRequest().getContextPath()+ Jenkins.RESOURCE_PATH+"/images/"+size+'/'+image;
+    @Override
+	public String getImageOf(String size) {
+        return new StringBuilder().append(Stapler.getCurrentRequest().getContextPath()).append(Jenkins.RESOURCE_PATH).append("/images/").append(size).append('/')
+				.append(image).toString();
     }
 
     /**
      * Gets the human-readable description used as img/@alt.
      */
-    public String getDescription() {
+    @Override
+	public String getDescription() {
         return description.toString(LocaleProvider.getLocale());
     }
 
@@ -148,16 +151,22 @@ public enum BallColor implements StatusIcon {
      * Gets the animated version.
      */
     public BallColor anime() {
-        if(isAnimated())   return this;
-        else               return valueOf(name()+"_ANIME");
+        if(isAnimated()) {
+			return this;
+		} else {
+			return valueOf(name()+"_ANIME");
+		}
     }
 
     /**
      * Gets the unanimated version.
      */
     public BallColor noAnime() {
-        if(isAnimated())   return valueOf(name().substring(0,name().length()-"_ANIME".length()));
-        else               return this;
+        if(isAnimated()) {
+			return valueOf(name().substring(0,name().length()-"_ANIME".length()));
+		} else {
+			return this;
+		}
     }
 
     /**

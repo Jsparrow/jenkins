@@ -99,11 +99,14 @@ public abstract class TaskAction extends AbstractModelObject implements Action {
      */
     public AnnotatedLargeText obtainLog() {
         WeakReference<AnnotatedLargeText> l = log;
-        if(l==null) return null;
+        if(l==null) {
+			return null;
+		}
         return l.get();
     }
 
-    public String getSearchUrl() {
+    @Override
+	public String getSearchUrl() {
         return getUrlName();
     }
 
@@ -142,8 +145,9 @@ public abstract class TaskAction extends AbstractModelObject implements Action {
     public synchronized void doClearError(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
         getACL().checkPermission(getPermission());
 
-        if(workerThread!=null && !workerThread.isRunning())
-            workerThread = null;
+        if(workerThread!=null && !workerThread.isRunning()) {
+			workerThread = null;
+		}
         rsp.sendRedirect(".");
     }
 }

@@ -43,8 +43,17 @@ import java.util.Base64;
 public class Protector {
     private static final String ALGORITHM = "DES";
     private static final String MAGIC = ":::";
+	private static final SecretKey DES_KEY;
 
-    public static String protect(String secret) {
+	static {
+        try {
+            DES_KEY = KeyGenerator.getInstance(ALGORITHM).generateKey();
+        } catch (NoSuchAlgorithmException e) {
+            throw new Error(e);
+        }
+    }
+
+	public static String protect(String secret) {
         try {
             Cipher cipher = Secret.getCipher(ALGORITHM);
             cipher.init(Cipher.ENCRYPT_MODE, DES_KEY);
@@ -54,30 +63,23 @@ public class Protector {
         }
     }
 
-    /**
+	/**
      * Returns null if fails to decrypt properly.
      */
     public static String unprotect(String data) {
-        if(data==null)      return null;
+        if(data==null) {
+			return null;
+		}
         try {
             Cipher cipher = Secret.getCipher(ALGORITHM);
             cipher.init(Cipher.DECRYPT_MODE, DES_KEY);
             String plainText = new String(cipher.doFinal(Base64.getDecoder().decode(data.getBytes(StandardCharsets.UTF_8))), StandardCharsets.UTF_8);
-            if(plainText.endsWith(MAGIC))
-                return plainText.substring(0,plainText.length()-3);
+            if(plainText.endsWith(MAGIC)) {
+				return plainText.substring(0,plainText.length()-3);
+			}
             return null;
         } catch (GeneralSecurityException | IllegalArgumentException e) {
             return null;
-        }
-    }
-
-    private static final SecretKey DES_KEY;
-
-    static {
-        try {
-            DES_KEY = KeyGenerator.getInstance(ALGORITHM).generateKey();
-        } catch (NoSuchAlgorithmException e) {
-            throw new Error(e);
         }
     }
 }

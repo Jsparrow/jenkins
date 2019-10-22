@@ -50,66 +50,26 @@ import org.jvnet.solaris.libzfs.ZFSFileSystem;
  */
 public class ZFSProvisioner extends FileSystemProvisioner implements Serializable {
     private static final LibZFS libzfs = new LibZFS();
-    private final String rootDataset;
+	private static final long serialVersionUID = 1L;
+	private final String rootDataset;
 
-    public ZFSProvisioner(Node node) throws IOException, InterruptedException {
+	public ZFSProvisioner(Node node) throws IOException, InterruptedException {
         rootDataset = node.getRootPath().act(new GetName());
     }
-    private static class GetName extends MasterToSlaveFileCallable<String> {
-            private static final long serialVersionUID = -2142349338699797436L;
-            @Override
-            public String invoke(File f, VirtualChannel channel) throws IOException {
-                ZFSFileSystem fs = libzfs.getFileSystemByMountPoint(f);
-                if(fs!=null)    return fs.getName();
 
-                // TODO: for now, only support agents that are already on ZFS.
-                throw new IOException("Not on ZFS");
-            }
-    }
-
-    public void prepareWorkspace(AbstractBuild<?,?> build, FilePath ws, final TaskListener listener) throws IOException, InterruptedException {
+	@Override
+	public void prepareWorkspace(AbstractBuild<?,?> build, FilePath ws, final TaskListener listener) throws IOException, InterruptedException {
         final String name = build.getProject().getFullName();
         
         ws.act(new PrepareWorkspace(name, listener));
     }
-    private class PrepareWorkspace extends MasterToSlaveFileCallable<Void> {
-        private final String name;
-        private final TaskListener listener;
-        PrepareWorkspace(String name, TaskListener listener) {
-            this.name = name;
-            this.listener = listener;
-        }
-            private static final long serialVersionUID = 2129531727963121198L;
-            @Override
-            public Void invoke(File f, VirtualChannel channel) throws IOException {
-                ZFSFileSystem fs = libzfs.getFileSystemByMountPoint(f);
-                if(fs!=null)    return null;    // already on ZFS
 
-                // nope. create a file system
-                String fullName = rootDataset + '/' + name;
-                listener.getLogger().println("Creating a ZFS file system "+fullName+" at "+f);
-                fs = libzfs.create(fullName, ZFSFileSystem.class);
-                fs.setMountPoint(f);
-                fs.mount();
-                return null;
-            }
-    }
-
-    public void discardWorkspace(AbstractProject<?, ?> project, FilePath ws) throws IOException, InterruptedException {
+	@Override
+	public void discardWorkspace(AbstractProject<?, ?> project, FilePath ws) throws IOException, InterruptedException {
         ws.act(new DiscardWorkspace());
     }
-    private static class DiscardWorkspace extends MasterToSlaveFileCallable<Void> {
-            private static final long serialVersionUID = 1916618107019257530L;
-            @Override
-            public Void invoke(File f, VirtualChannel channel) throws IOException {
-                ZFSFileSystem fs = libzfs.getFileSystemByMountPoint(f);
-                if(fs!=null)
-                    fs.destory(true);
-                return null;
-            }
-    }
 
-    /**
+	/**
      * @deprecated as of 1.350
      */
     @Deprecated
@@ -117,21 +77,73 @@ public class ZFSProvisioner extends FileSystemProvisioner implements Serializabl
         throw new UnsupportedOperationException();
     }
 
-    public WorkspaceSnapshot snapshot(AbstractBuild<?, ?> build, FilePath ws, String glob, TaskListener listener) throws IOException, InterruptedException {
+	@Override
+	public WorkspaceSnapshot snapshot(AbstractBuild<?, ?> build, FilePath ws, String glob, TaskListener listener) throws IOException, InterruptedException {
         throw new UnsupportedOperationException();
+    }
+    private static class GetName extends MasterToSlaveFileCallable<String> {
+            private static final long serialVersionUID = -2142349338699797436L;
+            @Override
+            public String invoke(File f, VirtualChannel channel) throws IOException {
+                ZFSFileSystem fs = libzfs.getFileSystemByMountPoint(f);
+                if(fs!=null) {
+					return fs.getName();
+				}
+
+                // TODO: for now, only support agents that are already on ZFS.
+                throw new IOException("Not on ZFS");
+            }
+    }
+
+    private class PrepareWorkspace extends MasterToSlaveFileCallable<Void> {
+        private static final long serialVersionUID = 2129531727963121198L;
+		private final String name;
+		private final TaskListener listener;
+		PrepareWorkspace(String name, TaskListener listener) {
+            this.name = name;
+            this.listener = listener;
+        }
+		@Override
+		public Void invoke(File f, VirtualChannel channel) throws IOException {
+		    ZFSFileSystem fs = libzfs.getFileSystemByMountPoint(f);
+		    if(fs!=null)
+			 {
+				return null;    // already on ZFS
+			}
+
+		    // nope. create a file system
+		    String fullName = new StringBuilder().append(rootDataset).append('/').append(name).toString();
+		    listener.getLogger().println(new StringBuilder().append("Creating a ZFS file system ").append(fullName).append(" at ").append(f).toString());
+		    fs = libzfs.create(fullName, ZFSFileSystem.class);
+		    fs.setMountPoint(f);
+		    fs.mount();
+		    return null;
+		}
+    }
+
+    private static class DiscardWorkspace extends MasterToSlaveFileCallable<Void> {
+            private static final long serialVersionUID = 1916618107019257530L;
+            @Override
+            public Void invoke(File f, VirtualChannel channel) throws IOException {
+                ZFSFileSystem fs = libzfs.getFileSystemByMountPoint(f);
+                if(fs!=null) {
+					fs.destory(true);
+				}
+                return null;
+            }
     }
 
     @Extension @Symbol("zfs")
     public static final class DescriptorImpl extends FileSystemProvisionerDescriptor {
-        public boolean discard(FilePath ws, TaskListener listener) throws IOException, InterruptedException {
+        @Override
+		public boolean discard(FilePath ws, TaskListener listener) throws IOException, InterruptedException {
             // TODO
             return false;
         }
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return "ZFS";
         }
     }
-
-    private static final long serialVersionUID = 1L;
 }

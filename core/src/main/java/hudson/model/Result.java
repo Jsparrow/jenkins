@@ -78,102 +78,9 @@ public final class Result implements Serializable, CustomExportedBean {
      * you should check {@link Executor#abortResult()} instead (starting 1.417.)
      */
     public static final @Nonnull Result ABORTED = new Result("ABORTED",BallColor.ABORTED,4,false);
-
-    private final @Nonnull String name;
-
-    /**
-     * Bigger numbers are worse.
-     */
-    public final @Nonnegative int ordinal;
-
-    /**
-     * Default ball color for this status.
-     */
-    public final @Nonnull BallColor color;
-    
-    /**
-     * Is this a complete build - i.e. did it run to the end (not aborted)?
-     * @since 1.526
-     */
-    public final boolean completeBuild;
-
-    private Result(@Nonnull String name, @Nonnull BallColor color, @Nonnegative int ordinal, boolean complete) {
-        this.name = name;
-        this.color = color;
-        this.ordinal = ordinal;
-        this.completeBuild = complete;
-    }
-
-    /**
-     * Combines two {@link Result}s and returns the worse one.
-     */
-    public @Nonnull Result combine(@Nonnull Result that) {
-        if(this.ordinal < that.ordinal)
-            return that;
-        else
-            return this;
-    }
-
-    public boolean isWorseThan(@Nonnull Result that) {
-        return this.ordinal > that.ordinal;
-    }
-
-    public boolean isWorseOrEqualTo(@Nonnull Result that) {
-        return this.ordinal >= that.ordinal;
-    }
-
-    public boolean isBetterThan(@Nonnull Result that) {
-        return this.ordinal < that.ordinal;
-    }
-
-    public boolean isBetterOrEqualTo(@Nonnull Result that) {
-        return this.ordinal <= that.ordinal;
-    }
-    
-    /**
-     * Is this a complete build - i.e. did it run to the end (not aborted)?
-     * @since 1.526
-     */
-    public boolean isCompleteBuild() {
-        return this.completeBuild;
-    }
-
-    @Override
-    public @Nonnull String toString() {
-        return name;
-    }
-
-    public @Nonnull String toExportedObject() {
-        return name;
-    }
-    
-    public static @Nonnull Result fromString(@Nonnull String s) {
-        for (Result r : all)
-            if (s.equalsIgnoreCase(r.name))
-                return r;
-        return FAILURE;
-    }
-
-    private static @Nonnull List<String> getNames() {
-        List<String> l = new ArrayList<>();
-        for (Result r : all)
-            l.add(r.name);
-        return l;
-    }
-
-    // Maintain each Result as a singleton deserialized (like build result from an agent node)
-    private Object readResolve() {
-        for (Result r : all)
-            if (ordinal==r.ordinal)
-                return r;
-        return FAILURE;
-    }
-
-    private static final long serialVersionUID = 1L;
-
-    private static final Result[] all = new Result[] {SUCCESS,UNSTABLE,FAILURE,NOT_BUILT,ABORTED};
-
-    public static final SingleValueConverter conv = new AbstractSingleValueConverter () {
+	private static final long serialVersionUID = 1L;
+	private static final Result[] all = new Result[] {SUCCESS,UNSTABLE,FAILURE,NOT_BUILT,ABORTED};
+	public static final SingleValueConverter conv = new AbstractSingleValueConverter () {
         @Override
         public boolean canConvert(Class clazz) {
             return clazz==Result.class;
@@ -184,6 +91,109 @@ public final class Result implements Serializable, CustomExportedBean {
             return Result.fromString(s);
         }
     };
+	private final @Nonnull String name;
+	/**
+     * Bigger numbers are worse.
+     */
+    public final @Nonnegative int ordinal;
+	/**
+     * Default ball color for this status.
+     */
+    public final @Nonnull BallColor color;
+	/**
+     * Is this a complete build - i.e. did it run to the end (not aborted)?
+     * @since 1.526
+     */
+    public final boolean completeBuild;
+
+	private Result(@Nonnull String name, @Nonnull BallColor color, @Nonnegative int ordinal, boolean complete) {
+        this.name = name;
+        this.color = color;
+        this.ordinal = ordinal;
+        this.completeBuild = complete;
+    }
+
+	/**
+     * Combines two {@link Result}s and returns the worse one.
+     */
+    public @Nonnull Result combine(@Nonnull Result that) {
+        if(this.ordinal < that.ordinal) {
+			return that;
+		} else {
+			return this;
+		}
+    }
+
+	public boolean isWorseThan(@Nonnull Result that) {
+        return this.ordinal > that.ordinal;
+    }
+
+	public boolean isWorseOrEqualTo(@Nonnull Result that) {
+        return this.ordinal >= that.ordinal;
+    }
+
+	public boolean isBetterThan(@Nonnull Result that) {
+        return this.ordinal < that.ordinal;
+    }
+
+	public boolean isBetterOrEqualTo(@Nonnull Result that) {
+        return this.ordinal <= that.ordinal;
+    }
+
+	/**
+     * Is this a complete build - i.e. did it run to the end (not aborted)?
+     * @since 1.526
+     */
+    public boolean isCompleteBuild() {
+        return this.completeBuild;
+    }
+
+	@Override
+    public @Nonnull String toString() {
+        return name;
+    }
+
+	@Override
+	public @Nonnull String toExportedObject() {
+        return name;
+    }
+
+	public static @Nonnull Result fromString(@Nonnull String s) {
+        for (Result r : all) {
+			if (s.equalsIgnoreCase(r.name)) {
+				return r;
+			}
+		}
+        return FAILURE;
+    }
+
+	private static @Nonnull List<String> getNames() {
+        List<String> l = new ArrayList<>();
+        for (Result r : all) {
+			l.add(r.name);
+		}
+        return l;
+    }
+
+	// Maintain each Result as a singleton deserialized (like build result from an agent node)
+    private Object readResolve() {
+        for (Result r : all) {
+			if (ordinal==r.ordinal) {
+				return r;
+			}
+		}
+        return FAILURE;
+    }
+
+	@Initializer
+    public static void init() {
+        Stapler.CONVERT_UTILS.register(new Converter() {
+            @Override
+			public Object convert(Class type, Object value) {
+                return Result.fromString(value.toString());
+            }
+        }, Result.class);
+    }
 
     @OptionHandlerExtension
     public static final class OptionHandlerImpl extends OptionHandler<Result> {
@@ -195,9 +205,9 @@ public final class Result implements Serializable, CustomExportedBean {
         public int parseArguments(Parameters params) throws CmdLineException {
             String param = params.getParameter(0);
             Result v = fromString(param.replace('-', '_'));
-            if (v==null)
-                throw new CmdLineException(owner,"No such status '"+param+"'. Did you mean "+
-                        EditDistance.findNearest(param.replace('-', '_').toUpperCase(), getNames()));
+            if (v==null) {
+				throw new CmdLineException(owner,new StringBuilder().append("No such status '").append(param).append("'. Did you mean ").append(EditDistance.findNearest(param.replace('-', '_').toUpperCase(), getNames())).toString());
+			}
             setter.addValue(v);
             return 1;
         }
@@ -206,14 +216,5 @@ public final class Result implements Serializable, CustomExportedBean {
         public String getDefaultMetaVariable() {
             return "STATUS";
         }
-    }
-
-    @Initializer
-    public static void init() {
-        Stapler.CONVERT_UTILS.register(new Converter() {
-            public Object convert(Class type, Object value) {
-                return Result.fromString(value.toString());
-            }
-        }, Result.class);
     }
 }

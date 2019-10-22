@@ -62,7 +62,7 @@ public class CreateViewCommand extends CLICommand {
 
         final String newName = newView.getViewName();
         if (jenkins.getView(newName) != null) {
-            throw new IllegalStateException("View '" + newName + "' already exists");
+            throw new IllegalStateException(new StringBuilder().append("View '").append(newName).append("' already exists").toString());
         }
 
         jenkins.addView(newView);

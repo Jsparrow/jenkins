@@ -67,9 +67,16 @@ import org.kohsuke.stapler.export.ExportedBean;
  */
 @ExportedBean
 public abstract class NodeMonitor implements ExtensionPoint, Describable<NodeMonitor> {
-    private volatile boolean ignored;
-
     /**
+     * All registered {@link NodeMonitor}s.
+     * @deprecated as of 1.286.
+     *      Use {@link #all()} for read access and {@link Extension} for registration.
+     */
+    @Deprecated
+    public static final DescriptorList<NodeMonitor> LIST = new DescriptorList<>(NodeMonitor.class);
+	private volatile boolean ignored;
+
+	/**
      * Returns the name of the column to be added to {@link ComputerSet} index.jelly.
      *
      * @return
@@ -80,18 +87,19 @@ public abstract class NodeMonitor implements ExtensionPoint, Describable<NodeMon
         return getDescriptor().getDisplayName();
     }
 
-    public AbstractNodeMonitorDescriptor<?> getDescriptor() {
+	@Override
+	public AbstractNodeMonitorDescriptor<?> getDescriptor() {
         return (AbstractNodeMonitorDescriptor<?>) Jenkins.get().getDescriptorOrDie(getClass());
     }
 
-    /**
+	/**
      * Obtains the monitoring result currently available, or null if no data is available.
      */
     public Object data(Computer c) {
         return getDescriptor().get(c);
     }
 
-    /**
+	/**
      * Starts updating the data asynchronously.
      * If there's any previous updating activity going on, it'll be interrupted and aborted.
      *
@@ -105,7 +113,7 @@ public abstract class NodeMonitor implements ExtensionPoint, Describable<NodeMon
         return getDescriptor().triggerUpdate();
     }
 
-    /**
+	/**
      * Obtains all the instances of {@link NodeMonitor}s that are alive.
      * @since 1.187
      */
@@ -113,7 +121,7 @@ public abstract class NodeMonitor implements ExtensionPoint, Describable<NodeMon
         return ComputerSet.getMonitors().toList();
     }
 
-    /**
+	/**
      * True if this monitoring shouldn't mark the agents offline.
      *
      * <p>
@@ -130,19 +138,11 @@ public abstract class NodeMonitor implements ExtensionPoint, Describable<NodeMon
         return ignored;
     }
 
-    public void setIgnored(boolean ignored) {
+	public void setIgnored(boolean ignored) {
         this.ignored = ignored;
     }
 
-    /**
-     * All registered {@link NodeMonitor}s.
-     * @deprecated as of 1.286.
-     *      Use {@link #all()} for read access and {@link Extension} for registration.
-     */
-    @Deprecated
-    public static final DescriptorList<NodeMonitor> LIST = new DescriptorList<>(NodeMonitor.class);
-
-    /**
+	/**
      * Returns all the registered {@link NodeMonitor} descriptors.
      */
     public static DescriptorExtensionList<NodeMonitor,Descriptor<NodeMonitor>> all() {

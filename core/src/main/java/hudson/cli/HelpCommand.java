@@ -56,8 +56,9 @@ public class HelpCommand extends CLICommand {
                     + CLI.usage());
         }
 
-        if (command != null)
-            return showCommandDetails();
+        if (command != null) {
+			return showCommandDetails();
+		}
 
         showAllCommands();
 
@@ -66,13 +67,12 @@ public class HelpCommand extends CLICommand {
 
     private int showAllCommands() {
         Map<String,CLICommand> commands = new TreeMap<>();
-        for (CLICommand c : CLICommand.all())
-            commands.put(c.getName(),c);
+        CLICommand.all().forEach(c -> commands.put(c.getName(), c));
 
-        for (CLICommand c : commands.values()) {
+        commands.values().forEach(c -> {
             stderr.println("  "+c.getName());
             stderr.println("    "+c.getShortDescription());
-        }
+        });
 
         return 0;
     }

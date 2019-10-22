@@ -41,44 +41,49 @@ import org.jvnet.localizer.Localizable;
  * Sortable by the owner class name.
  */
 public final class PermissionGroup implements Iterable<Permission>, Comparable<PermissionGroup> {
-    private final SortedSet<Permission> permissions = new TreeSet<>(Permission.ID_COMPARATOR);
+    /**
+     * All the permissions in the system, keyed by their owners.
+     */
+    private static final SortedSet<PermissionGroup> PERMISSIONS = new TreeSet<>();
 
-    @Nonnull
+	private final SortedSet<Permission> permissions = new TreeSet<>(Permission.ID_COMPARATOR);
+
+	@Nonnull
     public final Class owner;
 
-    /**
+	/**
      * Human readable title of this permission group.
      * This should be short.
      */
     public final Localizable title;
 
-    private final String id;
+	private final String id;
 
-    /**
+	/**
      * Both creates a registers a new permission group.
      * @param owner sets {@link #owner}
      * @param title sets {@link #title}
      * @throws IllegalStateException if this group was already registered
      */
-    public PermissionGroup(@Nonnull Class owner, Localizable title) throws IllegalStateException {
+    public PermissionGroup(@Nonnull Class owner, Localizable title) {
         this(title.toString(Locale.ENGLISH), owner, title);
     }
 
-    /**
+	/**
      * Both creates a registers a new permission group.
      * @param owner sets {@link #owner}
      * @param title sets {@link #title}
      * @throws IllegalStateException if this group was already registered
      * @since 2.127
      */
-    public PermissionGroup(String id, @Nonnull Class owner, Localizable title) throws IllegalStateException {
+    public PermissionGroup(String id, @Nonnull Class owner, Localizable title) {
         this.owner = owner;
         this.title = title;
         this.id = id;
         register(this);
     }
 
-    /**
+	/**
      * Gets ID of the permission group.
      * @return Non-localizable ID of the permission group.
      */
@@ -86,84 +91,83 @@ public final class PermissionGroup implements Iterable<Permission>, Comparable<P
         return id;
     }
 
-    public String getOwnerClassName() {
+	public String getOwnerClassName() {
         return owner.getName();
     }
 
-    public Iterator<Permission> iterator() {
+	@Override
+	public Iterator<Permission> iterator() {
         return getPermissions().iterator();
     }
 
-    /*package*/ synchronized void add(Permission p) {
+	/*package*/ synchronized void add(Permission p) {
         if (!permissions.add(p)) {
             throw new IllegalStateException("attempt to register a second Permission for " + p.getId());
         }
     }
 
-    /**
+	/**
      * Lists up all the permissions in this group.
      */
     public synchronized List<Permission> getPermissions() {
         return new ArrayList<>(permissions);
     }
 
-    public synchronized boolean hasPermissionContainedBy(PermissionScope scope) {
-        for (Permission p : permissions)
-            if (p.isContainedBy(scope))
-                return true;
-        return false;
+	public synchronized boolean hasPermissionContainedBy(PermissionScope scope) {
+        return permissions.stream().anyMatch(p -> p.isContainedBy(scope));
     }
 
-    /**
+	/**
      * Finds a permission that has the given name.
      */
     public synchronized Permission find(String name) {
-        for (Permission p : permissions) {
-            if(p.name.equals(name))
-                return p;
-        }
-        return null;
+        return permissions.stream().filter(p -> p.name.equals(name)).findFirst().orElse(null);
     }
 
-    public int compareTo(PermissionGroup that) {
+	@Override
+	public int compareTo(PermissionGroup that) {
         // first, sort by the 'compare order' number. This is so that
         // we can put Hudson.PERMISSIONS first.
         int r= this.compareOrder()-that.compareOrder();
-        if(r!=0)    return r;
+        if(r!=0) {
+			return r;
+		}
 
         // among the permissions of the same group, just sort by their names
         // so that the sort order is consistent regardless of classloading order.
         return getOwnerClassName().compareTo(that.getOwnerClassName());
     }
 
-    private int compareOrder() {
-        if(owner==Hudson.class)    return 0;
+	private int compareOrder() {
+        if(owner==Hudson.class) {
+			return 0;
+		}
         return 1;
     }
 
-    @Override public boolean equals(Object o) {
+	@Override public boolean equals(Object o) {
         return o instanceof PermissionGroup && getOwnerClassName().equals(((PermissionGroup) o).getOwnerClassName());
     }
 
-    @Override public int hashCode() {
+	@Override public int hashCode() {
         return getOwnerClassName().hashCode();
     }
 
-    public synchronized int size() {
+	public synchronized int size() {
         return permissions.size();
     }
 
-    @Override public String toString() {
-        return "PermissionGroup[" + getOwnerClassName() + "]";
+	@Override public String toString() {
+        return new StringBuilder().append("PermissionGroup[").append(getOwnerClassName()).append("]").toString();
     }
 
-    private static synchronized void register(PermissionGroup g) {
+	private static synchronized void register(PermissionGroup g) {
         if (!PERMISSIONS.add(g)) {
             throw new IllegalStateException("attempt to register a second PermissionGroup for " + g.getOwnerClassName());
         }
     }
 
-    /**
+	/**
      * Returns all the {@link PermissionGroup}s available in the system.
      * @return
      *      always non-null. Read-only.
@@ -172,22 +176,12 @@ public final class PermissionGroup implements Iterable<Permission>, Comparable<P
         return new ArrayList<>(PERMISSIONS);
     }
 
-    /**
+	/**
      * Gets the {@link PermissionGroup} whose {@link PermissionGroup#owner} is the given class.
      *
      * @return  null if not found.
      */
     public static synchronized @CheckForNull PermissionGroup get(Class owner) {
-        for (PermissionGroup g : PERMISSIONS) {
-            if (g.owner == owner) {
-                return g;
-            }
-        }
-        return null;
+        return PERMISSIONS.stream().filter(g -> g.owner == owner).findFirst().orElse(null);
     }
-
-    /**
-     * All the permissions in the system, keyed by their owners.
-     */
-    private static final SortedSet<PermissionGroup> PERMISSIONS = new TreeSet<>();
 }

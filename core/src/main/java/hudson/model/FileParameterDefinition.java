@@ -49,27 +49,15 @@ public class FileParameterDefinition extends ParameterDefinition {
         super(name, description);
     }
 
-    public FileParameterValue createValue(StaplerRequest req, JSONObject jo) {
+    @Override
+	public FileParameterValue createValue(StaplerRequest req, JSONObject jo) {
         FileParameterValue p = req.bindJSON(FileParameterValue.class, jo);
         p.setLocation(getName());
         p.setDescription(getDescription());
         return p;
     }
 
-    @Extension @Symbol({"file","fileParam"})
-    public static class DescriptorImpl extends ParameterDescriptor {
-        @Override
-        public String getDisplayName() {
-            return Messages.FileParameterDefinition_DisplayName();
-        }
-
-        @Override
-        public String getHelpFile() {
-            return "/help/parameter/file.html";
-        }
-    }
-
-	@Override
+    @Override
 	public ParameterValue createValue(StaplerRequest req) {
         FileItem src;
         try {
@@ -89,7 +77,7 @@ public class FileParameterDefinition extends ParameterDefinition {
         return p;
 	}
 
-    /**
+	/**
      * Strip off the path portion if the given path contains it.
      */
     private String getFileName(String possiblyPathName) {
@@ -98,7 +86,7 @@ public class FileParameterDefinition extends ParameterDefinition {
         return possiblyPathName;
     }
 
-    @SuppressWarnings("deprecation")
+	@SuppressWarnings("deprecation")
     @Override
     public ParameterValue createValue(CLICommand command, String value) throws IOException, InterruptedException {
         // capture the file to the server
@@ -116,5 +104,18 @@ public class FileParameterDefinition extends ParameterDefinition {
         p.setDescription(getDescription());
         p.setLocation(getName());
         return p;
+    }
+
+	@Extension @Symbol({"file","fileParam"})
+    public static class DescriptorImpl extends ParameterDescriptor {
+        @Override
+        public String getDisplayName() {
+            return Messages.FileParameterDefinition_DisplayName();
+        }
+
+        @Override
+        public String getHelpFile() {
+            return "/help/parameter/file.html";
+        }
     }
 }

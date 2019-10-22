@@ -53,25 +53,6 @@ public class ActionableTest {
         assertEquals(Arrays.asList(a2, a3), thing.getActions());
     }
 
-    static class ActionableOverride extends Actionable {
-        ArrayList<Action> specialActions = new ArrayList<>();
-
-        @Override
-        public String getDisplayName() {
-            return "nope";
-        }
-
-        @Override
-        public String getSearchUrl() {
-            return "morenope";
-        }
-
-        @Override
-        public List<Action> getActions() {
-            return specialActions;
-        }
-    }
-
     @SuppressWarnings("deprecation")
     @Issue("JENKINS-39555")
     @Test
@@ -103,7 +84,7 @@ public class ActionableTest {
         Assert.assertArrayEquals(new Object[]{invis2, invis}, myOverridden.getActions().toArray());
     }
 
-    @SuppressWarnings("deprecation")
+	@SuppressWarnings("deprecation")
     @Test
     public void addOrReplaceAction() {
         CauseAction a1 = new CauseAction();
@@ -121,7 +102,7 @@ public class ActionableTest {
         assertEquals(Arrays.asList(a2, a3), thing.getActions());
     }
 
-    @SuppressWarnings("deprecation")
+	@SuppressWarnings("deprecation")
     @Test
     public void replaceActions() {
         CauseAction a1 = new CauseAction();
@@ -135,7 +116,7 @@ public class ActionableTest {
         assertEquals(Arrays.asList(a2, a3), thing.getActions());
     }
 
-    @SuppressWarnings("deprecation")
+	@SuppressWarnings("deprecation")
     @Test
     public void removeAction() {
         CauseAction a1 = new CauseAction();
@@ -144,14 +125,14 @@ public class ActionableTest {
         thing.addAction(a2);
         assertEquals(Arrays.asList(a1, a2), thing.getActions());
         assertThat(thing.removeAction(a1), is(true));
-        assertEquals(Arrays.asList(a2), thing.getActions());
+        assertEquals(Collections.singletonList(a2), thing.getActions());
         assertThat(thing.removeAction(a1), is(false));
-        assertEquals(Arrays.asList(a2), thing.getActions());
+        assertEquals(Collections.singletonList(a2), thing.getActions());
         assertThat(thing.removeAction(null), is(false));
-        assertEquals(Arrays.asList(a2), thing.getActions());
+        assertEquals(Collections.singletonList(a2), thing.getActions());
     }
 
-    @SuppressWarnings("deprecation")
+	@SuppressWarnings("deprecation")
     @Test
     public void removeActions() {
         CauseAction a1 = new CauseAction();
@@ -160,12 +141,12 @@ public class ActionableTest {
         thing.addAction(a2);
         assertEquals(Arrays.asList(a1, a2), thing.getActions());
         assertThat(thing.removeActions(CauseAction.class), is(true));
-        assertEquals(Arrays.asList(a2), thing.getActions());
+        assertEquals(Collections.singletonList(a2), thing.getActions());
         assertThat(thing.removeActions(CauseAction.class), is(false));
-        assertEquals(Arrays.asList(a2), thing.getActions());
+        assertEquals(Collections.singletonList(a2), thing.getActions());
     }
 
-    @SuppressWarnings("deprecation")
+	@SuppressWarnings("deprecation")
     @Test
     public void addAction() {
         CauseAction a1 = new CauseAction();
@@ -177,39 +158,58 @@ public class ActionableTest {
         assertEquals(Arrays.asList(a1, a2), thing.getActions());
     }
 
-    @Test(expected = IllegalArgumentException.class)
+	@Test(expected = IllegalArgumentException.class)
     public void addAction_null() {
         thing.addAction(null);
     }
 
-    @Test(expected = IllegalArgumentException.class)
+	@Test(expected = IllegalArgumentException.class)
     public void replaceAction_null() {
         thing.replaceAction(null);
     }
 
-    @Test(expected = IllegalArgumentException.class)
+	@Test(expected = IllegalArgumentException.class)
     public void replaceActions_null() {
         thing.replaceActions(CauseAction.class, null);
     }
 
-    @Test(expected = IllegalArgumentException.class)
+	@Test(expected = IllegalArgumentException.class)
     public void replaceActions_null_null() {
         thing.replaceActions(null, null);
     }
 
-    @Test(expected = IllegalArgumentException.class)
+	@Test(expected = IllegalArgumentException.class)
     public void addOrReplaceAction_null() {
         thing.addOrReplaceAction(null);
     }
 
-    @Test
+	@Test
     public void removeAction_null() {
         assertFalse(thing.removeAction(null));
     }
 
-    @Test(expected = IllegalArgumentException.class)
+	@Test(expected = IllegalArgumentException.class)
     public void removeActions_null() {
         thing.removeActions(null);
+    }
+
+	static class ActionableOverride extends Actionable {
+        ArrayList<Action> specialActions = new ArrayList<>();
+
+        @Override
+        public String getDisplayName() {
+            return "nope";
+        }
+
+        @Override
+        public String getSearchUrl() {
+            return "morenope";
+        }
+
+        @Override
+        public List<Action> getActions() {
+            return specialActions;
+        }
     }
 
     private static class ActionableImpl extends Actionable {

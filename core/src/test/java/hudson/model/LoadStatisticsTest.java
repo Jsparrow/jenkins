@@ -48,15 +48,18 @@ public class LoadStatisticsTest {
     @Test
     public void graph() throws IOException {
         LoadStatistics ls = new LoadStatistics(0, 0) {
-            public int computeIdleExecutors() {
+            @Override
+			public int computeIdleExecutors() {
                 throw new UnsupportedOperationException();
             }
 
-            public int computeTotalExecutors() {
+            @Override
+			public int computeTotalExecutors() {
                 throw new UnsupportedOperationException();
             }
 
-            public int computeQueueLength() {
+            @Override
+			public int computeQueueLength() {
                 throw new UnsupportedOperationException();
             }
             @Override

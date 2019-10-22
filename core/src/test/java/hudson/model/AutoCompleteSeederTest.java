@@ -40,17 +40,15 @@ import static org.junit.Assert.*;
 @RunWith(Parameterized.class)
 public class AutoCompleteSeederTest {
 
-    public static class TestData {
-        private String seed;
-        private List<String> expected;
-        
-        public TestData(String seed, String... expected) {
-            this.seed = seed;
-            this.expected = Arrays.asList(expected);
-        }
+    private String seed;
+	private List<String> expected;
+
+	public AutoCompleteSeederTest(TestData dataSet) {
+        this.seed = dataSet.seed;
+        this.expected = dataSet.expected;
     }
-    
-    @Parameterized.Parameters
+
+	@Parameterized.Parameters
     public static Collection<Object[]> data() {
         return Arrays.asList( new Object[][] {
                     { new TestData("", "") },
@@ -69,18 +67,20 @@ public class AutoCompleteSeederTest {
                });
     }
 
-    private String seed;
-    private List<String> expected;
-
-    public AutoCompleteSeederTest(TestData dataSet) {
-        this.seed = dataSet.seed;
-        this.expected = dataSet.expected;
-    }
-
-    @Test
+	@Test
     public void testAutoCompleteSeeds() throws Exception {
         AutoCompleteSeeder seeder = new AbstractProject.AbstractProjectDescriptor.AutoCompleteSeeder(seed);
         assertEquals(expected, seeder.getSeeds());
 
+    }
+
+	public static class TestData {
+        private String seed;
+        private List<String> expected;
+        
+        public TestData(String seed, String... expected) {
+            this.seed = seed;
+            this.expected = Arrays.asList(expected);
+        }
     }
 }

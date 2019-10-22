@@ -25,7 +25,7 @@ public class Maven3MojoNoteTest {
 	}
 
 	private void check(final String decorated, final String input) {
-		assertTrue(input + " does not match" + Maven3MojoNote.PATTERN, Maven3MojoNote.PATTERN.matcher(input).matches());
+		assertTrue(new StringBuilder().append(input).append(" does not match").append(Maven3MojoNote.PATTERN).toString(), Maven3MojoNote.PATTERN.matcher(input).matches());
 		assertEquals(decorated, annotate(input));
 	}
 

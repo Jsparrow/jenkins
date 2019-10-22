@@ -62,7 +62,7 @@ class Build {
     }
 
     @Override public String toString() {
-        return "Build #" + n + " @" + hashCode();
+        return new StringBuilder().append("Build #").append(n).append(" @").append(hashCode()).toString();
     }
 
 }

@@ -43,16 +43,19 @@ import java.io.OutputStream;
  * @see ArchiverFactory#ZIP
  */
 final class ZipArchiver extends Archiver {
-    private final byte[] buf = new byte[8192];
-    private final ZipOutputStream zip;
+    // Bitmask indicating directories in 'external attributes' of a ZIP archive entry.
+    private static final long BITMASK_IS_DIRECTORY = 1<<4;
+	private final byte[] buf = new byte[8192];
+	private final ZipOutputStream zip;
 
-    ZipArchiver(OutputStream out) {
+	ZipArchiver(OutputStream out) {
         zip = new ZipOutputStream(out);
         zip.setEncoding(System.getProperty("file.encoding"));
         zip.setUseZip64(Zip64Mode.AsNeeded);
     }
 
-    public void visit(final File f, final String _relativePath) throws IOException {
+	@Override
+	public void visit(final File f, final String _relativePath) throws IOException {
         int mode = IOUtils.mode(f);
 
         // On Windows, the elements of relativePath are separated by 
@@ -64,19 +67,24 @@ final class ZipArchiver extends Archiver {
             ZipEntry dirZipEntry = new ZipEntry(relativePath+'/');
             // Setting this bit explicitly is needed by some unzipping applications (see JENKINS-3294).
             dirZipEntry.setExternalAttributes(BITMASK_IS_DIRECTORY);
-            if (mode!=-1)   dirZipEntry.setUnixMode(mode);
+            if (mode!=-1) {
+				dirZipEntry.setUnixMode(mode);
+			}
             dirZipEntry.setTime(f.lastModified());
             zip.putNextEntry(dirZipEntry);
             zip.closeEntry();
         } else {
             ZipEntry fileZipEntry = new ZipEntry(relativePath);
-            if (mode!=-1)   fileZipEntry.setUnixMode(mode);
+            if (mode!=-1) {
+				fileZipEntry.setUnixMode(mode);
+			}
             fileZipEntry.setTime(f.lastModified());
             zip.putNextEntry(fileZipEntry);
             try (InputStream in = Files.newInputStream(f.toPath())) {
                 int len;
-                while((len=in.read(buf))>=0)
-                    zip.write(buf,0,len);
+                while((len=in.read(buf))>=0) {
+					zip.write(buf,0,len);
+				}
             } catch (InvalidPathException e) {
                 throw new IOException(e);
             }
@@ -85,10 +93,8 @@ final class ZipArchiver extends Archiver {
         entriesWritten++;
     }
 
-    public void close() throws IOException {
+	@Override
+	public void close() throws IOException {
         zip.close();
     }
-
-    // Bitmask indicating directories in 'external attributes' of a ZIP archive entry.
-    private static final long BITMASK_IS_DIRECTORY = 1<<4;
 }

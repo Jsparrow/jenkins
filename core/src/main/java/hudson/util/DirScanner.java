@@ -25,12 +25,14 @@ import static hudson.Util.fixEmpty;
  * @see FileVisitor
  */
 public abstract class DirScanner implements Serializable {
-    /**
+    private static final long serialVersionUID = 1L;
+
+	/**
      * Scans the given directory and pass files onto the given visitor.
      */
     public abstract void scan(File dir, FileVisitor visitor) throws IOException;
 
-    /**
+	/**
      * @since 1.532
      */
     protected final void scanSingle(File f, String relative, FileVisitor visitor) throws IOException {
@@ -49,28 +51,31 @@ public abstract class DirScanner implements Serializable {
         visitor.visit(f, relative);
     }
 
-    /**
+	/**
      * Scans everything recursively.
      * <p>Note that all file paths are prefixed by the name of the root directory.
      * For example, when scanning a directory {@code /tmp/dir} containing a file {@code file},
      * the {@code relativePath} sent to the {@link FileVisitor} will be {@code dir/file}.
      */
     public static class Full extends DirScanner {
-        private void scan(File f, String path, FileVisitor visitor) throws IOException {
-            if (f.canRead()) {
-                scanSingle(f, path + f.getName(), visitor);
-                if(f.isDirectory()) {
-                    for( File child : f.listFiles() )
-                        scan(child,path+f.getName()+'/',visitor);
-                }
-            }
+        private static final long serialVersionUID = 1L;
+
+		private void scan(File f, String path, FileVisitor visitor) throws IOException {
+            if (!f.canRead()) {
+				return;
+			}
+			scanSingle(f, path + f.getName(), visitor);
+			if(f.isDirectory()) {
+			    for( File child : f.listFiles() ) {
+					scan(child,new StringBuilder().append(path).append(f.getName()).append('/').toString(),visitor);
+				}
+			}
         }
 
-        public void scan(File dir, FileVisitor visitor) throws IOException {
+		@Override
+		public void scan(File dir, FileVisitor visitor) throws IOException {
             scan(dir,"",visitor);
         }
-
-        private static final long serialVersionUID = 1L;
     }
 
     /**
@@ -78,18 +83,17 @@ public abstract class DirScanner implements Serializable {
      * <p>An initial basename is prepended as with {@link Full}.
      */
     public static class Filter extends Full {
-        private final FileFilter filter;
+        private static final long serialVersionUID = 1L;
+		private final FileFilter filter;
 
-        public Filter(FileFilter filter) {
+		public Filter(FileFilter filter) {
             this.filter = filter;
         }
 
-        @Override
+		@Override
         public void scan(File dir, FileVisitor visitor) throws IOException {
             super.scan(dir,visitor.with(filter));
         }
-
-        private static final long serialVersionUID = 1L;
     }
 
     /**
@@ -100,21 +104,26 @@ public abstract class DirScanner implements Serializable {
      * but {@code file} if it is {@code **}. (This anomaly is historical.)
      */
     public static class Glob extends DirScanner {
-        private final String includes, excludes;
+        private static final long serialVersionUID = 1L;
 
-        private boolean useDefaultExcludes = true;
+		private final String includes;
 
-        public Glob(String includes, String excludes) {
+		private final String excludes;
+
+		private boolean useDefaultExcludes = true;
+
+		public Glob(String includes, String excludes) {
             this.includes = includes;
             this.excludes = excludes;
         }
 
-        public Glob(String includes, String excludes, boolean useDefaultExcludes) {
+		public Glob(String includes, String excludes, boolean useDefaultExcludes) {
             this(includes, excludes);
             this.useDefaultExcludes = useDefaultExcludes;
         }
 
-        public void scan(File dir, FileVisitor visitor) throws IOException {
+		@Override
+		public void scan(File dir, FileVisitor visitor) throws IOException {
             if(fixEmpty(includes)==null && excludes==null) {
                 // optimization
                 new Full().scan(dir,visitor);
@@ -126,18 +135,17 @@ public abstract class DirScanner implements Serializable {
 
             fs.appendSelector(new DescendantFileSelector(fs.getDir()));
 
-            if(dir.exists()) {
-                DirectoryScanner ds = fs.getDirectoryScanner(new org.apache.tools.ant.Project());
-                // due to the DescendantFileSelector usage, 
-                // the includedFiles are only the ones that are descendant
-                for( String f : ds.getIncludedFiles()) {
-                    File file = new File(dir, f);
-                    scanSingle(file, f, visitor);
-                }
-            }
+            if (!dir.exists()) {
+				return;
+			}
+			DirectoryScanner ds = fs.getDirectoryScanner(new org.apache.tools.ant.Project());
+			// due to the DescendantFileSelector usage, 
+			// the includedFiles are only the ones that are descendant
+			for( String f : ds.getIncludedFiles()) {
+			    File file = new File(dir, f);
+			    scanSingle(file, f, visitor);
+			}
         }
-
-        private static final long serialVersionUID = 1L;
     }
     
     private static class DescendantFileSelector implements FileSelector{
@@ -152,7 +160,7 @@ public abstract class DirScanner implements Serializable {
         }
         
         @Override
-        public boolean isSelected(File basedir, String filename, File file) throws BuildException {
+        public boolean isSelected(File basedir, String filename, File file) {
             String parentName = file.getParent();
             if (parentName.length() > baseDirPathLength) {
                 // remove the trailing slash
@@ -186,6 +194,4 @@ public abstract class DirScanner implements Serializable {
             }
         }
     }
-
-    private static final long serialVersionUID = 1L;
 }

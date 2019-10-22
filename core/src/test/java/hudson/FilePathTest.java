@@ -118,15 +118,17 @@ public class FilePathTest {
             List<Future<Integer>> results = whenFileIsCopied100TimesConcurrently(tmp);
 
             // THEN copied count was always equal the expected size
-            for (Future<Integer> f : results)
-                assertEquals(fileSize,f.get().intValue());
+            for (Future<Integer> f : results) {
+				assertEquals(fileSize,f.get().intValue());
+			}
     }
 
     private void givenSomeContentInFile(File file, int size) throws IOException {
         try (OutputStream os = Files.newOutputStream(file.toPath())) {
             byte[] buf = new byte[size];
-            for (int i = 0; i < buf.length; i++)
-                buf[i] = (byte) (i % 256);
+            for (int i = 0; i < buf.length; i++) {
+				buf[i] = (byte) (i % 256);
+			}
             os.write(buf);
         }
     }
@@ -134,49 +136,48 @@ public class FilePathTest {
     private List<Future<Integer>> whenFileIsCopied100TimesConcurrently(final File file) throws InterruptedException {
         List<Callable<Integer>> r = new ArrayList<>();
         for (int i=0; i<100; i++) {
-            r.add(new Callable<Integer>() {
-                public Integer call() throws Exception {
-                    class Sink extends OutputStream {
-                        private Exception closed;
-                        private volatile int count;
+            r.add(() -> {
+			    class Sink extends OutputStream {
+			        private Exception closed;
+			        private volatile int count;
 
-                        private void checkNotClosed() throws IOException {
-                            if (closed != null)
-                                throw new IOException(closed);
-                        }
+			        private void checkNotClosed() throws IOException {
+			            if (closed != null) {
+							throw new IOException(closed);
+						}
+			        }
 
-                        @Override
-                        public void write(int b) throws IOException {
-                            count++;
-                            checkNotClosed();
-                        }
+			        @Override
+			        public void write(int b) throws IOException {
+			            count++;
+			            checkNotClosed();
+			        }
 
-                        @Override
-                        public void write(byte[] b) throws IOException {
-                            count+=b.length;
-                            checkNotClosed();
-                        }
+			        @Override
+			        public void write(byte[] b) throws IOException {
+			            count+=b.length;
+			            checkNotClosed();
+			        }
 
-                        @Override
-                        public void write(byte[] b, int off, int len) throws IOException {
-                            count+=len;
-                            checkNotClosed();
-                        }
+			        @Override
+			        public void write(byte[] b, int off, int len) throws IOException {
+			            count+=len;
+			            checkNotClosed();
+			        }
 
-                        @Override
-                        public void close() throws IOException {
-                            closed = new Exception();
-                            //if (size!=count)
-                            //    fail();
-                        }
-                    }
+			        @Override
+			        public void close() throws IOException {
+			            closed = new Exception();
+			            //if (size!=count)
+			            //    fail();
+			        }
+			    }
 
-                    FilePath f = new FilePath(channels.french, file.getPath());
-                    Sink sink = new Sink();
-                    f.copyTo(sink);
-                    return sink.count;
-                }
-            });
+			    FilePath f = new FilePath(channels.french, file.getPath());
+			    Sink sink = new Sink();
+			    f.copyTo(sink);
+			    return sink.count;
+			});
         }
 
         ExecutorService es = Executors.newFixedThreadPool(100);

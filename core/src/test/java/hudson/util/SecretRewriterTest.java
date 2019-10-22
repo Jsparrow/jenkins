@@ -22,35 +22,38 @@ import org.junit.rules.TemporaryFolder;
 
 public class SecretRewriterTest {
 
-    @Rule
+    private static final Pattern FOO_PATTERN = Pattern.compile("<foo>[{][A-Za-z0-9+/]+={0,2}[}]</foo>");
+
+	private static final Pattern MSG_PATTERN = Pattern.compile("<msg>[{][A-Za-z0-9+/]+={0,2}[}]</msg>");
+
+	private static final Pattern FOO_PATTERN2 = Pattern.compile("(<foo>[{][A-Za-z0-9+/]+={0,2}[}]</foo>){2}");
+
+	private static final Pattern ABC_FOO_PATTERN = Pattern.compile("<abc>\\s<foo>[{][A-Za-z0-9+/]+={0,2}[}]</foo>\\s</abc>");
+
+	@Rule
     public MockSecretRule mockSecretRule = new MockSecretRule();
 
-    @Rule
+	@Rule
     public ConfidentialStoreRule confidentialStoreRule = new ConfidentialStoreRule();
 
-    @Rule
+	@Rule
     public TemporaryFolder tmp = new TemporaryFolder();
 
-    private static final Pattern FOO_PATTERN = Pattern.compile("<foo>[{][A-Za-z0-9+/]+={0,2}[}]</foo>");
-    private static final Pattern MSG_PATTERN = Pattern.compile("<msg>[{][A-Za-z0-9+/]+={0,2}[}]</msg>");
-    private static final Pattern FOO_PATTERN2 = Pattern.compile("(<foo>[{][A-Za-z0-9+/]+={0,2}[}]</foo>){2}");
-    private static final Pattern ABC_FOO_PATTERN = Pattern.compile("<abc>\\s<foo>[{][A-Za-z0-9+/]+={0,2}[}]</foo>\\s</abc>");
-
-    @Test
+	@Test
     public void singleFileRewrite() throws Exception {
         String o = encryptOld("foobar"); // old
         String n = encryptNew("foobar"); // new
-        assertTrue(FOO_PATTERN.matcher(roundtrip("<foo>" + o + "</foo>")).matches());
-        assertTrue(FOO_PATTERN2.matcher(roundtrip("<foo>" + o + "</foo><foo>" + o + "</foo>")).matches());
-        assertEquals("<foo>" + n + "</foo>", roundtrip("<foo>" + n + "</foo>"));
+        assertTrue(FOO_PATTERN.matcher(roundtrip(new StringBuilder().append("<foo>").append(o).append("</foo>").toString())).matches());
+        assertTrue(FOO_PATTERN2.matcher(roundtrip(new StringBuilder().append("<foo>").append(o).append("</foo><foo>").append(o).append("</foo>").toString())).matches());
+        assertEquals(new StringBuilder().append("<foo>").append(n).append("</foo>").toString(), roundtrip(new StringBuilder().append("<foo>").append(n).append("</foo>").toString()));
         assertEquals("<foo>thisIsLegalBase64AndLongEnoughThatItCouldLookLikeSecret</foo>", roundtrip("  <foo>thisIsLegalBase64AndLongEnoughThatItCouldLookLikeSecret</foo>  "));
         // to be rewritten, it needs to be between a tag
         assertEquals("<foo>" + o, roundtrip("<foo>" + o));
         assertEquals(o + "</foo>", roundtrip(o + "</foo>"));
-        assertTrue(ABC_FOO_PATTERN.matcher(roundtrip("<abc>\n<foo>" + o + "</foo>\n</abc>")).matches());
+        assertTrue(ABC_FOO_PATTERN.matcher(roundtrip(new StringBuilder().append("<abc>\n<foo>").append(o).append("</foo>\n</abc>").toString())).matches());
     }
 
-    private String roundtrip(String before) throws Exception {
+	private String roundtrip(String before) throws Exception {
         SecretRewriter sr = new SecretRewriter(null);
         File f = File.createTempFile("test", "xml", tmp.getRoot());
         FileUtils.write(f, before, Charset.defaultCharset());
@@ -59,17 +62,17 @@ public class SecretRewriterTest {
         return FileUtils.readFileToString(f, Charset.defaultCharset()).replaceAll(System.getProperty("line.separator"), "\n").trim();
     }
 
-    private String encryptOld(String str) throws Exception {
+	private String encryptOld(String str) throws Exception {
         Cipher cipher = Secret.getCipher("AES");
         cipher.init(Cipher.ENCRYPT_MODE, HistoricalSecrets.getLegacyKey());
         return new String(Base64.getEncoder().encode(cipher.doFinal((str + HistoricalSecrets.MAGIC).getBytes(StandardCharsets.UTF_8))));
     }
 
-    private String encryptNew(String str) {
+	private String encryptNew(String str) {
         return Secret.fromString(str).getEncryptedValue();
     }
 
-    /**
+	/**
      * Directory rewrite and recursion detection
      */
     @Test
@@ -80,20 +83,19 @@ public class SecretRewriterTest {
 
         String o = encryptOld("Hello world");
         String n = encryptNew("Hello world");
-        String payload = "<msg>" + o + "</msg>";
+        String payload = new StringBuilder().append("<msg>").append(o).append("</msg>").toString();
 
         // set up some directories with stuff
         File t = tmp.newFolder("t");
         List<String> dirs = Arrays.asList("a", "b", "c", "c/d", "c/d/e");
-        for (String p : dirs) {
-            File d = new File(t, p);
-            d.mkdir();
-            try {
+        dirs.stream().map(p -> new File(t, p)).forEach(d -> {
+			d.mkdir();
+			try {
                 FileUtils.write(new File(d, "foo.xml"), payload, Charset.defaultCharset());
             } catch (IOException x) {
                 assert false : x;
             }
-        }
+		});
 
         // stuff outside
         File t2 = tmp.newFolder("t2");

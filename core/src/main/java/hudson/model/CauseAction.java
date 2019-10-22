@@ -59,32 +59,31 @@ public class CauseAction implements FoldableAction, RunAction2 {
         this.causeBag.put(c, 1);
     }
 
-    private void addCause(Cause c) {
+    public CauseAction(Cause... c) {
+        this(Arrays.asList(c));
+    }
+
+	@SuppressWarnings("CopyConstructorMissesField") // does not initialize the deprecated #cause field
+    public CauseAction(Collection<? extends Cause> causes) {
+        addCauses(causes);
+    }
+
+	public CauseAction(CauseAction ca) {
+        addCauses(ca.getCauses());
+    }
+
+	private void addCause(Cause c) {
         synchronized (causeBag) {
             Integer cnt = causeBag.get(c);
             causeBag.put(c, cnt == null ? 1 : cnt + 1);
         }
     }
-    private void addCauses(Collection<? extends Cause> causes) {
-        for (Cause cause : causes) {
-            addCause(cause);
-        }
+
+	private void addCauses(Collection<? extends Cause> causes) {
+        causes.forEach(this::addCause);
     }
 
-    public CauseAction(Cause... c) {
-        this(Arrays.asList(c));
-    }
-
-    @SuppressWarnings("CopyConstructorMissesField") // does not initialize the deprecated #cause field
-    public CauseAction(Collection<? extends Cause> causes) {
-        addCauses(causes);
-    }
-
-    public CauseAction(CauseAction ca) {
-        addCauses(ca.getCauses());
-    }
-
-    /**
+	/**
      * Lists all causes of this build.
      * Note that the current implementation does not preserve insertion order of duplicates.
      * @return an immutable list;
@@ -94,36 +93,34 @@ public class CauseAction implements FoldableAction, RunAction2 {
     @Exported(visibility=2)
     public List<Cause> getCauses() {
         List<Cause> r = new ArrayList<>();
-        for (Map.Entry<Cause,Integer> entry : causeBag.entrySet()) {
-            r.addAll(Collections.nCopies(entry.getValue(), entry.getKey()));
-        }
+        causeBag.entrySet().forEach(entry -> r.addAll(Collections.nCopies(entry.getValue(), entry.getKey())));
         return Collections.unmodifiableList(r);
     }
 
-    /**
+	/**
      * Finds the cause of the specific type.
      */
     public <T extends Cause> T findCause(Class<T> type) {
-        for (Cause c : causeBag.keySet())
-            if (type.isInstance(c))
-                return type.cast(c);
-        return null;
+        return causeBag.keySet().stream().filter(type::isInstance).findFirst().map(type::cast).orElse(null);
     }
 
-    public String getDisplayName() {
+	@Override
+	public String getDisplayName() {
         return "Cause";
     }
 
-    public String getIconFileName() {
+	@Override
+	public String getIconFileName() {
         // no icon
         return null;
     }
 
-    public String getUrlName() {
+	@Override
+	public String getUrlName() {
         return "cause";
     }
 
-    /**
+	/**
      * Get list of causes with duplicates combined into counters.
      * @return Map of Cause to number of occurrences of that Cause
      */
@@ -131,7 +128,7 @@ public class CauseAction implements FoldableAction, RunAction2 {
         return Collections.unmodifiableMap(causeBag);
     }
 
-    /**
+	/**
      * @deprecated as of 1.288
      *      but left here for backward compatibility.
      */
@@ -143,26 +140,19 @@ public class CauseAction implements FoldableAction, RunAction2 {
         return causeBag.keySet().iterator().next().getShortDescription();
     }
 
-    @Override public void onLoad(Run<?,?> owner) {
-        for (Cause c : causeBag.keySet()) {
-            if (c != null) {
-                c.onLoad(owner);
-            }
-        }
+	@Override public void onLoad(Run<?,?> owner) {
+        causeBag.keySet().stream().filter(c -> c != null).forEach(c -> c.onLoad(owner));
     }
 
-    /**
+	/**
      * When hooked up to build, notify {@link Cause}s.
      */
     @Override public void onAttached(Run<?,?> owner) {
-        for (Cause c : causeBag.keySet()) {
-            if (c != null) {
-                c.onAddedTo(owner);
-            }
-        }
+        causeBag.keySet().stream().filter(c -> c != null).forEach(c -> c.onAddedTo(owner));
     }
 
-    public void foldIntoExisting(hudson.model.Queue.Item item, Task owner, List<Action> otherActions) {
+	@Override
+	public void foldIntoExisting(hudson.model.Queue.Item item, Task owner, List<Action> otherActions) {
         CauseAction existing = item.getAction(CauseAction.class);
         if (existing!=null) {
             existing.addCauses(getCauses());
@@ -172,7 +162,7 @@ public class CauseAction implements FoldableAction, RunAction2 {
         item.addAction(new CauseAction(this));
     }
 
-    public static class ConverterImpl extends XStream2.PassthruConverter<CauseAction> {
+	public static class ConverterImpl extends XStream2.PassthruConverter<CauseAction> {
         public ConverterImpl(XStream2 xstream) { super(xstream); }
         @Override protected void callback(CauseAction ca, UnmarshallingContext context) {
             // if we are being read in from an older version

@@ -50,12 +50,34 @@ import java.util.logging.Logger;
  */
 @Extension @Symbol("connectionActivityMonitor")
 public class ConnectionActivityMonitor extends AsyncPeriodicWork {
-    public ConnectionActivityMonitor() {
+    /**
+     * Time till initial ping
+     */
+    private static final long TIME_TILL_PING = SystemProperties.getLong(ConnectionActivityMonitor.class.getName()+".timeToPing",TimeUnit.MINUTES.toMillis(3));
+
+	private static final long FREQUENCY = SystemProperties.getLong(ConnectionActivityMonitor.class.getName()+".frequency",TimeUnit.SECONDS.toMillis(10));
+
+	/**
+     * When do we abandon the effort and cut off?
+     */
+    private static final long TIMEOUT = SystemProperties.getLong(ConnectionActivityMonitor.class.getName()+".timeToPing",TimeUnit.MINUTES.toMillis(4));
+
+	private static final PingCommand PING_COMMAND = new PingCommand();
+
+	private static final Logger LOGGER = Logger.getLogger(ConnectionActivityMonitor.class.getName());
+
+	// disabled by default until proven in the production
+    public boolean enabled = SystemProperties.getBoolean(ConnectionActivityMonitor.class.getName()+".enabled");
+
+	public ConnectionActivityMonitor() {
         super("Connection Activity monitoring to agents");
     }
 
-    protected void execute(TaskListener listener) throws IOException, InterruptedException {
-        if (!enabled)   return;
+	@Override
+	protected void execute(TaskListener listener) throws IOException, InterruptedException {
+        if (!enabled) {
+			return;
+		}
 
         long now = System.currentTimeMillis();
         for (Computer c: Jenkins.get().getComputers()) {
@@ -67,13 +89,14 @@ public class ConnectionActivityMonitor extends AsyncPeriodicWork {
                     Long lastPing = (Long)channel.getProperty(ConnectionActivityMonitor.class);
 
                     if (lastPing!=null && now-lastPing > TIMEOUT) {
-                        LOGGER.info("Repeated ping attempts failed on "+c.getName()+". Disconnecting");
+                        LOGGER.info(new StringBuilder().append("Repeated ping attempts failed on ").append(c.getName()).append(". Disconnecting").toString());
                         c.disconnect(OfflineCause.create(Messages._ConnectionActivityMonitor_OfflineCause()));
                     } else {
                         // send a ping. if we receive a reply, it will be reflected in the next getLastHeard() call.
                         channel.callAsync(PING_COMMAND);
-                        if (lastPing==null)
-                            channel.setProperty(ConnectionActivityMonitor.class,now);
+                        if (lastPing==null) {
+							channel.setProperty(ConnectionActivityMonitor.class,now);
+						}
                     }
                 } else {
                     // we are receiving data nicely
@@ -83,34 +106,17 @@ public class ConnectionActivityMonitor extends AsyncPeriodicWork {
         }
     }
 
-    public long getRecurrencePeriod() {
+	@Override
+	public long getRecurrencePeriod() {
         return enabled ? FREQUENCY : TimeUnit.DAYS.toMillis(30);
     }
 
-    /**
-     * Time till initial ping
-     */
-    private static final long TIME_TILL_PING = SystemProperties.getLong(ConnectionActivityMonitor.class.getName()+".timeToPing",TimeUnit.MINUTES.toMillis(3));
+	private static final class PingCommand extends SlaveToMasterCallable<Void,RuntimeException> {
+        private static final long serialVersionUID = 1L;
 
-    private static final long FREQUENCY = SystemProperties.getLong(ConnectionActivityMonitor.class.getName()+".frequency",TimeUnit.SECONDS.toMillis(10));
-
-    /**
-     * When do we abandon the effort and cut off?
-     */
-    private static final long TIMEOUT = SystemProperties.getLong(ConnectionActivityMonitor.class.getName()+".timeToPing",TimeUnit.MINUTES.toMillis(4));
-
-
-    // disabled by default until proven in the production
-    public boolean enabled = SystemProperties.getBoolean(ConnectionActivityMonitor.class.getName()+".enabled");
-
-    private static final PingCommand PING_COMMAND = new PingCommand();
-    private static final class PingCommand extends SlaveToMasterCallable<Void,RuntimeException> {
-        public Void call() throws RuntimeException {
+		@Override
+		public Void call() {
             return null;
         }
-
-        private static final long serialVersionUID = 1L;
     }
-
-    private static final Logger LOGGER = Logger.getLogger(ConnectionActivityMonitor.class.getName());
 }

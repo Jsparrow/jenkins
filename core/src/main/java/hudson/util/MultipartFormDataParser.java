@@ -47,8 +47,7 @@ public class MultipartFormDataParser implements AutoCloseable {
 
     public MultipartFormDataParser(HttpServletRequest request) throws ServletException {
         try {
-            for( FileItem fi : upload.parseRequest(request))
-                byName.put(fi.getFieldName(),fi);
+            upload.parseRequest(request).forEach(fi -> byName.put(fi.getFieldName(), fi));
         } catch (FileUploadException e) {
             throw new ServletException(e);
         }
@@ -56,7 +55,9 @@ public class MultipartFormDataParser implements AutoCloseable {
 
     public String get(String key) {
         FileItem fi = byName.get(key);
-        if(fi==null)    return null;
+        if(fi==null) {
+			return null;
+		}
         return fi.getString();
     }
 
@@ -69,8 +70,7 @@ public class MultipartFormDataParser implements AutoCloseable {
      * Even if this method is not called, the resource will be still cleaned up later by GC.
      */
     public void cleanUp() {
-        for (FileItem item : byName.values())
-            item.delete();
+        byName.values().forEach(FileItem::delete);
     }
 
     /** Alias for {@link #cleanUp}. */

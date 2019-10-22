@@ -50,7 +50,7 @@ public final class NamingThreadFactory implements ThreadFactory {
 
     @Override public Thread newThread(Runnable r) {
         Thread t = delegate.newThread(r);
-        t.setName(name + " [#" + threadNum.incrementAndGet() + "]");
+        t.setName(new StringBuilder().append(name).append(" [#").append(threadNum.incrementAndGet()).append("]").toString());
         return t;
     }
 

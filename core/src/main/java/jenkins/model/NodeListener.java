@@ -63,13 +63,13 @@ public abstract class NodeListener implements ExtensionPoint {
      * @param node A node being created.
      */
     public static void fireOnCreated(@Nonnull Node node) {
-        for (NodeListener nl: all()) {
+        all().forEach(nl -> {
             try {
                 nl.onCreated(node);
             } catch (Throwable ex) {
                 LOGGER.log(Level.WARNING, "Listener invocation failed", ex);
             }
-        }
+        });
     }
 
     /**
@@ -79,13 +79,13 @@ public abstract class NodeListener implements ExtensionPoint {
      * @param newOne New Configuration.
      */
     public static void fireOnUpdated(@Nonnull Node oldOne, @Nonnull Node newOne) {
-        for (NodeListener nl: all()) {
+        all().forEach(nl -> {
             try {
                 nl.onUpdated(oldOne, newOne);
             } catch (Throwable ex) {
                 LOGGER.log(Level.WARNING, "Listener invocation failed", ex);
             }
-        }
+        });
     }
 
     /**
@@ -94,13 +94,13 @@ public abstract class NodeListener implements ExtensionPoint {
      * @param node A node being removed.
      */
     public static void fireOnDeleted(@Nonnull Node node) {
-        for (NodeListener nl: all()) {
+        all().forEach(nl -> {
             try {
                 nl.onDeleted(node);
             } catch (Throwable ex) {
                 LOGGER.log(Level.WARNING, "Listener invocation failed", ex);
             }
-        }
+        });
     }
 
     /**

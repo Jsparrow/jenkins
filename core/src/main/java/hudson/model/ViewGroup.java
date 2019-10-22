@@ -73,11 +73,7 @@ public interface ViewGroup extends Saveable, ModelObject, AccessControlled {
     default Collection<View> getAllViews() {
         final Collection<View> views = new LinkedHashSet<>(getViews());
 
-        for (View view : getViews()) {
-            if (view instanceof ViewGroup) {
-                views.addAll(((ViewGroup) view).getAllViews());
-            }
-        }
+        getViews().stream().filter(view -> view instanceof ViewGroup).forEach(view -> views.addAll(((ViewGroup) view).getAllViews()));
 
         return views;
     }

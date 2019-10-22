@@ -89,9 +89,10 @@ public class MyViewsProperty extends UserProperty implements ModifiableViewGroup
 
     @Restricted(NoExternalUse.class)
     public Object readResolve() {
-        if (views == null)
-            // this shouldn't happen, but an error in 1.319 meant the last view could be deleted
+        if (views == null) {
+			// this shouldn't happen, but an error in 1.319 meant the last view could be deleted
             views = new CopyOnWriteArrayList<>();
+		}
 
         if (views.isEmpty()) {
             // preserve the non-empty invariant
@@ -103,9 +104,12 @@ public class MyViewsProperty extends UserProperty implements ModifiableViewGroup
         }
 
         viewGroupMixIn = new ViewGroupMixIn(this) {
-            protected List<View> views() { return views; }
-            protected String primaryView() { return primaryViewName; }
-            protected void primaryView(String name) { primaryViewName=name; }
+            @Override
+			protected List<View> views() { return views; }
+            @Override
+			protected String primaryView() { return primaryViewName; }
+            @Override
+			protected void primaryView(String name) { primaryViewName=name; }
         };
 
         return this;
@@ -130,31 +134,38 @@ public class MyViewsProperty extends UserProperty implements ModifiableViewGroup
     }
 
     ///// ViewGroup methods /////
-    public String getUrl() {
+    @Override
+	public String getUrl() {
         return user.getUrl() + "/my-views/";
     }
 
-    public void save() throws IOException {
+    @Override
+	public void save() throws IOException {
         user.save();
     }
 
-    public Collection<View> getViews() {
+    @Override
+	public Collection<View> getViews() {
         return viewGroupMixIn.getViews();
     }
 
-    public View getView(String name) {
+    @Override
+	public View getView(String name) {
         return viewGroupMixIn.getView(name);
     }
 
-    public boolean canDelete(View view) {
+    @Override
+	public boolean canDelete(View view) {
         return viewGroupMixIn.canDelete(view);
     }
 
-    public void deleteView(View view) throws IOException {
+    @Override
+	public void deleteView(View view) throws IOException {
         viewGroupMixIn.deleteView(view);
     }
 
-    public void onViewRenamed(View view, String oldName, String newName) {
+    @Override
+	public void onViewRenamed(View view, String oldName, String newName) {
         viewGroupMixIn.onViewRenamed(view,oldName,newName);
     }
 
@@ -163,12 +174,13 @@ public class MyViewsProperty extends UserProperty implements ModifiableViewGroup
         viewGroupMixIn.addView(view);
     }
 
-    public View getPrimaryView() {
+    @Override
+	public View getPrimaryView() {
         return viewGroupMixIn.getPrimaryView();
     }
 
     public HttpResponse doIndex() {
-        return new HttpRedirect("view/" + Util.rawEncode(getPrimaryView().getViewName()) + "/");
+        return new HttpRedirect(new StringBuilder().append("view/").append(Util.rawEncode(getPrimaryView().getViewName())).append("/").toString());
     }
 
     @POST
@@ -187,7 +199,9 @@ public class MyViewsProperty extends UserProperty implements ModifiableViewGroup
         checkPermission(View.CREATE);
 
         String view = Util.fixEmpty(value);
-        if (view == null) return FormValidation.ok();
+        if (view == null) {
+			return FormValidation.ok();
+		}
         if (exists) {
         	return (getView(view)!=null) ?
             		FormValidation.ok() :
@@ -199,24 +213,54 @@ public class MyViewsProperty extends UserProperty implements ModifiableViewGroup
         }
     }
 
-    public ACL getACL() {
+    @Override
+	public ACL getACL() {
         return user.getACL();
     }
 
     ///// Action methods /////
-    public String getDisplayName() {
+    @Override
+	public String getDisplayName() {
         return Messages.MyViewsProperty_DisplayName();
     }
 
-    public String getIconFileName() {
+    @Override
+	public String getIconFileName() {
         return "user.png";
     }
 
-    public String getUrlName() {
+    @Override
+	public String getUrlName() {
         return "my-views";
     }
 
-    @Extension @Symbol("myView")
+    @Override
+    public UserProperty reconfigure(StaplerRequest req, JSONObject form) throws FormException {
+    	req.bindJSON(this, form);
+    	return this;
+    }
+
+	@Override
+	public ViewsTabBar getViewsTabBar() {
+        return Jenkins.get().getViewsTabBar();
+    }
+
+	@Override
+	public List<Action> getViewActions() {
+        // Jenkins.get().getViewActions() are tempting but they are in a wrong scope
+        return Collections.emptyList();
+    }
+
+	@Override
+	public Object getStaplerFallback() {
+        return getPrimaryView();
+    }
+
+	public MyViewsTabBar getMyViewsTabBar() {
+        return Jenkins.get().getMyViewsTabBar();
+    }
+
+	@Extension @Symbol("myView")
     public static class DescriptorImpl extends UserPropertyDescriptor {
 
         @Override
@@ -230,36 +274,15 @@ public class MyViewsProperty extends UserProperty implements ModifiableViewGroup
         }
     }
     
-    @Override
-    public UserProperty reconfigure(StaplerRequest req, JSONObject form) throws FormException {
-    	req.bindJSON(this, form);
-    	return this;
-    }
-
-    public ViewsTabBar getViewsTabBar() {
-        return Jenkins.get().getViewsTabBar();
-    }
-
-    public List<Action> getViewActions() {
-        // Jenkins.get().getViewActions() are tempting but they are in a wrong scope
-        return Collections.emptyList();
-    }
-
-    public Object getStaplerFallback() {
-        return getPrimaryView();
-    }
-
-    public MyViewsTabBar getMyViewsTabBar() {
-        return Jenkins.get().getMyViewsTabBar();
-    }
-    
     @Extension @Symbol("myView")
     public static class GlobalAction implements RootAction {
 
+		@Override
 		public String getDisplayName() {
 			return Messages.MyViewsProperty_GlobalAction_DisplayName();
 		}
 
+		@Override
 		public String getIconFileName() {
 			// do not show when not logged in
 			if (User.current() == null ) {
@@ -269,6 +292,7 @@ public class MyViewsProperty extends UserProperty implements ModifiableViewGroup
 			return "user.png";
 		}
 
+		@Override
 		public String getUrlName() {
 			return "/me/my-views";
 		}

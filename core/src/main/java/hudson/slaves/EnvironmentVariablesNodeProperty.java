@@ -86,7 +86,15 @@ public class EnvironmentVariablesNodeProperty extends NodeProperty<Node> {
         env.putAll(envVars);
     }
 
-    @Extension @Symbol("envVars")
+    private static EnvVars toMap(List<Entry> entries) {
+		EnvVars map = new EnvVars();
+        if (entries!=null) {
+			entries.forEach(entry -> map.put(entry.key, entry.value));
+		}
+		return map;
+	}
+
+	@Extension @Symbol("envVars")
     public static class DescriptorImpl extends NodePropertyDescriptor {
 
         @Override
@@ -108,25 +116,18 @@ public class EnvironmentVariablesNodeProperty extends NodeProperty<Node> {
     }
 	
 	public static class Entry {
-		public String key, value;
-
-		private Entry(Map.Entry<String,String> e) {
-		    this(e.getKey(), e.getValue());
-        }
+		public String key;
+		public String value;
 
 		@DataBoundConstructor
 		public Entry(String key, String value) {
 			this.key = key;
 			this.value = value;
 		}
-	}
-	
-	private static EnvVars toMap(List<Entry> entries) {
-		EnvVars map = new EnvVars();
-        if (entries!=null)
-            for (Entry entry: entries)
-                map.put(entry.key,entry.value);
-		return map;
+
+		private Entry(Map.Entry<String,String> e) {
+		    this(e.getKey(), e.getValue());
+        }
 	}
 
 }

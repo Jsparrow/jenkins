@@ -55,21 +55,33 @@ import javax.annotation.Nullable;
 
 public class Hudson extends Jenkins {
 
-    /**
+    static {
+        XSTREAM.alias("hudson",Hudson.class);
+    }
+
+	/**
      * List of registered {@link hudson.model.listeners.ItemListener}s.
      * @deprecated as of 1.286
      */
     @Deprecated
-    private transient final CopyOnWriteList<ItemListener> itemListeners = ExtensionListView.createCopyOnWriteList(ItemListener.class);
+    private final transient CopyOnWriteList<ItemListener> itemListeners = ExtensionListView.createCopyOnWriteList(ItemListener.class);
 
-    /**
+	/**
     * List of registered {@link hudson.slaves.ComputerListener}s.
      * @deprecated as of 1.286
      */
     @Deprecated
-    private transient final CopyOnWriteList<ComputerListener> computerListeners = ExtensionListView.createCopyOnWriteList(ComputerListener.class);
+    private final transient CopyOnWriteList<ComputerListener> computerListeners = ExtensionListView.createCopyOnWriteList(ComputerListener.class);
 
-    /** @deprecated Here only for compatibility. Use {@link Jenkins#get} instead. */
+	public Hudson(File root, ServletContext context) throws IOException, InterruptedException, ReactorException {
+        this(root,context,null);
+    }
+
+	public Hudson(File root, ServletContext context, PluginManager pluginManager) throws IOException, InterruptedException, ReactorException {
+        super(root, context, pluginManager);
+    }
+
+	/** @deprecated Here only for compatibility. Use {@link Jenkins#get} instead. */
     @Deprecated
     @CLIResolver
     @Nullable
@@ -77,15 +89,7 @@ public class Hudson extends Jenkins {
         return (Hudson)Jenkins.get();
     }
 
-    public Hudson(File root, ServletContext context) throws IOException, InterruptedException, ReactorException {
-        this(root,context,null);
-    }
-
-    public Hudson(File root, ServletContext context, PluginManager pluginManager) throws IOException, InterruptedException, ReactorException {
-        super(root, context, pluginManager);
-    }
-
-    /**
+	/**
      * Gets all the installed {@link ItemListener}s.
      *
      * @deprecated as of 1.286.
@@ -96,7 +100,7 @@ public class Hudson extends Jenkins {
         return itemListeners;
     }
 
-    /**
+	/**
      * Gets all the installed {@link ComputerListener}s.
      *
      * @deprecated as of 1.286.
@@ -107,7 +111,7 @@ public class Hudson extends Jenkins {
         return computerListeners;
     }
 
-    /**
+	/**
      * Gets the agent of the give name, hooked under this Hudson.
      *
      * @deprecated
@@ -116,12 +120,13 @@ public class Hudson extends Jenkins {
     @Deprecated
     public Slave getSlave(String name) {
         Node n = getNode(name);
-        if (n instanceof Slave)
-            return (Slave)n;
+        if (n instanceof Slave) {
+			return (Slave)n;
+		}
         return null;
     }
 
-    /**
+	/**
      * @deprecated
      *      Use {@link #getNodes()}. Since 1.252.
      */
@@ -130,7 +135,7 @@ public class Hudson extends Jenkins {
         return (List)getNodes();
     }
 
-    /**
+	/**
      * Updates the agent list.
      *
      * @deprecated
@@ -141,7 +146,7 @@ public class Hudson extends Jenkins {
         setNodes(slaves);
     }
 
-    /**
+	/**
      * @deprecated
      *      Left only for the compatibility of URLs.
      *      Should not be invoked for any other purpose.
@@ -151,22 +156,17 @@ public class Hudson extends Jenkins {
         return getItem(name);
     }
 
-    /**
+	/**
      * @deprecated
      *      Used only for mapping jobs to URL in a case-insensitive fashion.
      */
     @Deprecated
     public TopLevelItem getJobCaseInsensitive(String name) {
         String match = Functions.toEmailSafeString(name);
-        for(TopLevelItem item : getItems()) {
-            if(Functions.toEmailSafeString(item.getName()).equalsIgnoreCase(match)) {
-        return item;
-    }
-                }
-        return null;
+        return getItems().stream().filter(item -> Functions.toEmailSafeString(item.getName()).equalsIgnoreCase(match)).findFirst().orElse(null);
     }
 
-    /**
+	/**
      * @deprecated as of 1.317
      *      Use {@link #doQuietDown()} instead.
      */
@@ -176,7 +176,7 @@ public class Hudson extends Jenkins {
         doQuietDown().generateResponse(null, rsp, this);
     }
 
-    /**
+	/**
      * RSS feed for log entries.
      *
      * @deprecated
@@ -188,7 +188,7 @@ public class Hudson extends Jenkins {
         rsp.sendRedirect2("./log/rss"+(qs==null?"":'?'+qs));
     }
 
-    /**
+	/**
      * @deprecated as of 1.294
      *      Define your own check method, instead of relying on this generic one.
      */
@@ -201,7 +201,7 @@ public class Hudson extends Jenkins {
                 fixEmpty(req.getParameter("warningText"))).generateResponse(req,rsp,this);
     }
 
-    /**
+	/**
      * Checks if the value for a field is set; if not an error or warning text is displayed.
      * If the parameter "value" is not set then the parameter "errorText" is displayed
      * as an error text. If the parameter "errorText" is not set, then the parameter "warningText"
@@ -220,23 +220,27 @@ public class Hudson extends Jenkins {
                                        @QueryParameter(fixEmpty=true) String errorText,
                                        @QueryParameter(fixEmpty=true) String warningText) {
         if (value == null) {
-            if (errorText != null)
-                return FormValidation.error(errorText);
-            if (warningText != null)
-                return FormValidation.warning(warningText);
+            if (errorText != null) {
+				return FormValidation.error(errorText);
+			}
+            if (warningText != null) {
+				return FormValidation.warning(warningText);
+			}
             return FormValidation.error("No error or warning text was set for fieldCheck().");
         }
 
         if (type != null) {
             try {
-                if (type.equalsIgnoreCase("number")) {
+                if ("number".equalsIgnoreCase(type)) {
                     NumberFormat.getInstance().parse(value);
-                } else if (type.equalsIgnoreCase("number-positive")) {
-                    if (NumberFormat.getInstance().parse(value).floatValue() <= 0)
-                        return FormValidation.error(Messages.Hudson_NotAPositiveNumber());
-                } else if (type.equalsIgnoreCase("number-negative")) {
-                    if (NumberFormat.getInstance().parse(value).floatValue() >= 0)
-                        return FormValidation.error(Messages.Hudson_NotANegativeNumber());
+                } else if ("number-positive".equalsIgnoreCase(type)) {
+                    if (NumberFormat.getInstance().parse(value).floatValue() <= 0) {
+						return FormValidation.error(Messages.Hudson_NotAPositiveNumber());
+					}
+                } else if ("number-negative".equalsIgnoreCase(type)) {
+                    if (NumberFormat.getInstance().parse(value).floatValue() >= 0) {
+						return FormValidation.error(Messages.Hudson_NotANegativeNumber());
+					}
                 }
             } catch (ParseException e) {
                 return FormValidation.error(Messages.Hudson_NotANumber());
@@ -246,7 +250,7 @@ public class Hudson extends Jenkins {
         return FormValidation.ok();
     }
 
-    /**
+	/**
      * @deprecated
      *      Use {@link Functions#isWindows()}.
      */
@@ -255,7 +259,7 @@ public class Hudson extends Jenkins {
         return File.pathSeparatorChar==';';
     }
 
-    /**
+	/**
      * @deprecated
      *      Use {@link hudson.Platform#isDarwin()}
      */
@@ -264,7 +268,7 @@ public class Hudson extends Jenkins {
         return Platform.isDarwin();
     }
 
-    /**
+	/**
      * @deprecated since 2007-12-18.
      *      Use {@link #checkPermission(hudson.security.Permission)}
      */
@@ -273,19 +277,21 @@ public class Hudson extends Jenkins {
         return adminCheck(Stapler.getCurrentRequest(), Stapler.getCurrentResponse());
     }
 
-    /**
+	/**
      * @deprecated since 2007-12-18.
      *      Use {@link #checkPermission(hudson.security.Permission)}
      */
     @Deprecated
     public static boolean adminCheck(StaplerRequest req,StaplerResponse rsp) throws IOException {
-        if (isAdmin(req)) return true;
+        if (isAdmin(req)) {
+			return true;
+		}
 
         rsp.sendError(StaplerResponse.SC_FORBIDDEN);
         return false;
     }
 
-    /**
+	/**
      * Checks if the current user (for which we are processing the current request)
      * has the admin access.
      *
@@ -308,7 +314,7 @@ public class Hudson extends Jenkins {
         return Jenkins.get().getACL().hasPermission(ADMINISTER);
     }
 
-    /**
+	/**
      * @deprecated since 2007-12-18.
      *      Define a custom {@link hudson.security.Permission} and check against ACL.
      *      See {@link #isAdmin()} for more instructions.
@@ -318,11 +324,7 @@ public class Hudson extends Jenkins {
         return isAdmin();
     }
 
-    static {
-        XSTREAM.alias("hudson",Hudson.class);
-    }
-
-    /**
+	/**
      * @deprecated  only here for backward comp
      */
     @Deprecated
@@ -340,7 +342,7 @@ public class Hudson extends Jenkins {
         }
 
         public CloudList() {// needed for XStream deserialization
-            super();
+            
         }
     }
 }

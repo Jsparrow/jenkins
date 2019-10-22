@@ -75,7 +75,9 @@ public class HudsonAuthenticationEntryPoint extends AuthenticationProcessingFilt
         } else {
             // give the opportunity to include the target URL
             String uriFrom = req.getRequestURI();
-            if(!Strings.isNullOrEmpty(req.getQueryString())) uriFrom += "?" + req.getQueryString();
+            if(!Strings.isNullOrEmpty(req.getQueryString())) {
+				uriFrom += "?" + req.getQueryString();
+			}
             String loginForm = req.getContextPath()+getLoginFormUrl();
             loginForm = MessageFormat.format(loginForm, URLEncoder.encode(uriFrom,"UTF-8"));
             req.setAttribute("loginForm", loginForm);
@@ -87,12 +89,10 @@ public class HudsonAuthenticationEntryPoint extends AuthenticationProcessingFilt
 
             AccessDeniedException2 cause = null;
             // report the diagnosis information if possible
-            if (reason instanceof InsufficientAuthenticationException) {
-                if (reason.getCause() instanceof AccessDeniedException2) {
-                    cause = (AccessDeniedException2) reason.getCause();
-                    cause.reportAsHeaders(rsp);
-                }
-            }
+            if (reason instanceof InsufficientAuthenticationException && reason.getCause() instanceof AccessDeniedException2) {
+			    cause = (AccessDeniedException2) reason.getCause();
+			    cause.reportAsHeaders(rsp);
+			}
 
             PrintWriter out;
             try {
@@ -101,25 +101,21 @@ public class HudsonAuthenticationEntryPoint extends AuthenticationProcessingFilt
                 out = rsp.getWriter();
             }
             out.printf(
-                "<html><head>" +
-                "<meta http-equiv='refresh' content='1;url=%1$s'/>" +
-                "<script>window.location.replace('%1$s');</script>" +
-                "</head>" +
-                "<body style='background-color:white; color:white;'>%n" +
-                "%n%n"+
-                "Authentication required%n"+
-                "<!--%n",loginForm);
+                new StringBuilder().append("<html><head>").append("<meta http-equiv='refresh' content='1;url=%1$s'/>").append("<script>window.location.replace('%1$s');</script>").append("</head>").append("<body style='background-color:white; color:white;'>%n").append("%n%n").append("Authentication required%n")
+						.append("<!--%n").toString(),loginForm);
 
-            if (cause!=null)
-                cause.report(out);
+            if (cause!=null) {
+				cause.report(out);
+			}
 
             out.printf(
                 "-->%n%n"+
                 "</body></html>");
             // Turn Off "Show Friendly HTTP Error Messages" Feature on the Server Side.
             // See http://support.microsoft.com/kb/294807
-            for (int i=0; i < 10; i++)
-                out.print("                              ");
+            for (int i=0; i < 10; i++) {
+				out.print("                              ");
+			}
             out.close();
         }
     }

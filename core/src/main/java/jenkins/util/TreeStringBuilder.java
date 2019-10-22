@@ -23,9 +23,41 @@ import java.util.Map;
 @SuppressWarnings({"PMD", "all"})
 //CHECKSTYLE:OFF
 public class TreeStringBuilder {
-    Child root = new Child(new TreeString());
+    /**
+     * Place holder that represents no child node, until one is added.
+     */
+    private static final Map<String, Child> NO_CHILDREN = Collections.emptyMap();
+	Child root = new Child(new TreeString());
 
-    private static class Child {
+	/**
+     * Interns a string.
+     */
+    public TreeString intern(final String s) {
+        if (s==null) {
+			return null;
+		}
+        return root.intern(s).node;
+    }
+
+	/**
+     * Interns a {@link TreeString} created elsewhere.
+     */
+    public TreeString intern(final TreeString s) {
+        if (s==null) {
+			return null;
+		}
+        return root.intern(s.toString()).node;
+    }
+
+	/**
+     * Further reduces the memory footprint by finding the same labels across
+     * multiple {@link TreeString}s.
+     */
+    public void dedup() {
+        root.dedup(new HashMap<>());
+    }
+
+	private static class Child {
         private final TreeString node;
 
         private Map<String, Child> children = NO_CHILDREN;
@@ -39,7 +71,7 @@ public class TreeStringBuilder {
          * if any.
          */
         public Child intern(final String s) {
-            if (s.length() == 0) {
+            if (s.isEmpty()) {
                 return this;
             }
 
@@ -78,7 +110,7 @@ public class TreeStringBuilder {
          */
         private void makeWritable() {
             if (children == NO_CHILDREN) {
-                children = new HashMap<String, Child>();
+                children = new HashMap<>();
             }
         }
 
@@ -116,39 +148,8 @@ public class TreeStringBuilder {
          */
         private void dedup(final Map<String, char[]> table) {
             node.dedup(table);
-            for (Child child : children.values()) {
-                child.dedup(table);
-            }
+            children.values().forEach(child -> child.dedup(table));
         }
     }
-
-    /**
-     * Interns a string.
-     */
-    public TreeString intern(final String s) {
-        if (s==null)    return null;
-        return root.intern(s).node;
-    }
-
-    /**
-     * Interns a {@link TreeString} created elsewhere.
-     */
-    public TreeString intern(final TreeString s) {
-        if (s==null)    return null;
-        return root.intern(s.toString()).node;
-    }
-
-    /**
-     * Further reduces the memory footprint by finding the same labels across
-     * multiple {@link TreeString}s.
-     */
-    public void dedup() {
-        root.dedup(new HashMap<String, char[]>());
-    }
-
-    /**
-     * Place holder that represents no child node, until one is added.
-     */
-    private static final Map<String, Child> NO_CHILDREN = Collections.emptyMap();
 
 }

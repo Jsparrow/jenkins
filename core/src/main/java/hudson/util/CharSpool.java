@@ -41,7 +41,8 @@ public final class CharSpool extends Writer {
     private char[] last = new char[1024];
     private int pos;
 
-    public void write(char[] cbuf, int off, int len) {
+    @Override
+	public void write(char[] cbuf, int off, int len) {
         while(len>0) {
             int sz = Math.min(last.length-pos,len);
             System.arraycopy(cbuf,off,last,pos,sz);
@@ -53,26 +54,31 @@ public final class CharSpool extends Writer {
     }
 
     private void renew() {
-        if(pos<last.length)
-            return;
+        if(pos<last.length) {
+			return;
+		}
 
-        if(buf==null)
-            buf = new LinkedList<>();
+        if(buf==null) {
+			buf = new LinkedList<>();
+		}
         buf.add(last);
         last = new char[1024];
         pos = 0;
     }
 
-    public void write(int c) {
+    @Override
+	public void write(int c) {
         renew();
         last[pos++] = (char)c;
     }
 
-    public void flush() {
+    @Override
+	public void flush() {
         // noop
     }
 
-    public void close() {
+    @Override
+	public void close() {
         // noop
     }
 

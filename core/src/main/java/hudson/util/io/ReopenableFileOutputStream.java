@@ -54,13 +54,14 @@ import java.nio.file.StandardOpenOption;
     }
 
     private synchronized OutputStream current() throws IOException {
-        if (current==null)
-            try {
+        if (current==null) {
+			try {
                 current = Files.newOutputStream(out.toPath(), StandardOpenOption.CREATE,
                         appendOnNextOpen ? StandardOpenOption.APPEND : StandardOpenOption.TRUNCATE_EXISTING);
             } catch (FileNotFoundException | NoSuchFileException | InvalidPathException e) {
                 throw new IOException("Failed to open "+out,e);
             }
+		}
         return current;
     }
 
@@ -86,11 +87,12 @@ import java.nio.file.StandardOpenOption;
 
     @Override
     public synchronized void close() throws IOException {
-        if (current!=null) {
-            current.close();
-            appendOnNextOpen = true;
-            current = null;
-        }
+        if (current == null) {
+			return;
+		}
+		current.close();
+		appendOnNextOpen = true;
+		current = null;
     }
 
     /**

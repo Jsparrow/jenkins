@@ -185,15 +185,16 @@ public class ResourceDomainConfiguration extends GlobalConfiguration {
     }
 
     public void setUrl(String url) {
-        if (checkUrl(url, false).kind == FormValidation.Kind.OK) {
-            // only accept valid configurations, both with and without URL, but allow for networking issues
-            url = Util.fixEmpty(url);
-            if (url != null && !url.endsWith("/")) {
-                url += "/";
-            }
-            this.url = url;
-            save();
-        }
+        if (checkUrl(url, false).kind != FormValidation.Kind.OK) {
+			return;
+		}
+		// only accept valid configurations, both with and without URL, but allow for networking issues
+		url = Util.fixEmpty(url);
+		if (url != null && !url.endsWith("/")) {
+		    url += "/";
+		}
+		this.url = url;
+		save();
     }
 
     /**

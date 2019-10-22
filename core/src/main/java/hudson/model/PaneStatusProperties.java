@@ -13,14 +13,14 @@ import org.kohsuke.stapler.Stapler;
 
 public class PaneStatusProperties extends UserProperty implements Saveable {
 	
-	private final PersistedList<String> collapsed = new PersistedList<>(this);
-	
 	private static final PaneStatusProperties FALLBACK = new PaneStatusPropertiesSessionFallback();
-	
+
+	private final PersistedList<String> collapsed = new PersistedList<>(this);
+
 	public boolean isCollapsed(String paneId) {
 		return collapsed.contains(paneId);
 	}
-	
+
 	/**
 	 * @param paneId panel name
 	 * @return the actual state of panel
@@ -34,16 +34,25 @@ public class PaneStatusProperties extends UserProperty implements Saveable {
 			return true;
 		}
 	}
-	
+
+	@Override
 	public void save() throws IOException {
         user.save();
     }
-	
+
 	private Object readResolve() {
 		collapsed.setOwner(this);
 		return this;
 	}
-	
+
+	public static PaneStatusProperties forCurrentUser() {
+		final User current = User.current();
+		if (current == null) {
+			return FALLBACK;
+		}
+		return current.getProperty(PaneStatusProperties.class);
+	}
+
 	@Extension @Symbol("paneStatus")
 	public static class DescriptorImpl extends UserPropertyDescriptor {
 
@@ -81,14 +90,6 @@ public class PaneStatusProperties extends UserProperty implements Saveable {
 		    session.removeAttribute(property);
 		    return false;
 		}
-	}
-
-	public static PaneStatusProperties forCurrentUser() {
-		final User current = User.current();
-		if (current == null) {
-			return FALLBACK;
-		}
-		return current.getProperty(PaneStatusProperties.class);
 	}
 
 }

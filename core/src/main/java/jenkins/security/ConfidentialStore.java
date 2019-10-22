@@ -38,12 +38,19 @@ import java.util.logging.Logger;
  */
 public abstract class ConfidentialStore {
     /**
+     * Testing only. Used for testing {@link ConfidentialKey} without {@link Jenkins}
+     */
+    /*package*/ static ThreadLocal<ConfidentialStore> TEST = null;
+
+	private static final Logger LOGGER = Logger.getLogger(ConfidentialStore.class.getName());
+
+	/**
      * Persists the payload of {@link ConfidentialKey} to a persisted storage (such as disk.)
      * The expectation is that the persisted form is secure.
      */
     protected abstract void store(ConfidentialKey key, byte[] payload) throws IOException;
 
-    /**
+	/**
      * Reverse operation of {@link #store(ConfidentialKey, byte[])}
      *
      * @return
@@ -51,18 +58,20 @@ public abstract class ConfidentialStore {
      */
     protected abstract @CheckForNull byte[] load(ConfidentialKey key) throws IOException;
 
-    /**
+	/**
      * Works like {@link SecureRandom#nextBytes(byte[])}.
      *
      * This enables implementations to consult other entropy sources, if it's available.
      */
     public abstract byte[] randomBytes(int size);
 
-    /**
+	/**
      * Retrieves the currently active singleton instance of {@link ConfidentialStore}.
      */
     public static @Nonnull ConfidentialStore get() {
-        if (TEST!=null) return TEST.get();
+        if (TEST!=null) {
+			return TEST.get();
+		}
 
         Jenkins j = Jenkins.get();
         Lookup lookup = j.lookup;
@@ -78,23 +87,17 @@ public abstract class ConfidentialStore {
                 // fall through
             }
 
-            if (cs==null)
-                try {
+            if (cs==null) {
+				try {
                     cs = new DefaultConfidentialStore();
                 } catch (Exception e) {
                     // if it's still null, bail out
                     throw new Error(e);
                 }
+			}
 
             cs = lookup.setIfNull(ConfidentialStore.class,cs);
         }
         return cs;
     }
-
-    /**
-     * Testing only. Used for testing {@link ConfidentialKey} without {@link Jenkins}
-     */
-    /*package*/ static ThreadLocal<ConfidentialStore> TEST = null;
-
-    private static final Logger LOGGER = Logger.getLogger(ConfidentialStore.class.getName());
 }

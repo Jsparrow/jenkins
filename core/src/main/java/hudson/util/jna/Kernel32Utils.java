@@ -40,13 +40,16 @@ import com.sun.jna.WString;
  * @author Kohsuke Kawaguchi
  */
 public class Kernel32Utils {
-    /**
+    private static final Logger LOGGER = Logger.getLogger(Kernel32Utils.class.getName());
+
+	/**
      * Given the process handle, waits for its completion and returns the exit code.
      */
     public static int waitForExitProcess(Pointer hProcess) throws InterruptedException {
         while (true) {
-            if (Thread.interrupted())
-                throw new InterruptedException();
+            if (Thread.interrupted()) {
+				throw new InterruptedException();
+			}
 
             Kernel32.INSTANCE.WaitForSingleObject(hProcess,1000);
             IntByReference exitCode = new IntByReference();
@@ -60,7 +63,7 @@ public class Kernel32Utils {
         }
     }
 
-    /**
+	/**
      * @deprecated Use {@link java.nio.file.Files#readAttributes} with
      * {@link java.nio.file.attribute.DosFileAttributes} and reflective calls to
      * WindowsFileAttributes if necessary.
@@ -85,7 +88,7 @@ public class Kernel32Utils {
       return Kernel32.INSTANCE.GetFileAttributesW(new WString(path));
     }
 
-    /**
+	/**
      * @param target
      *      If relative, resolved against the location of the symlink.
      *      If absolute, it's absolute.
@@ -100,11 +103,11 @@ public class Kernel32Utils {
         if (!Kernel32.INSTANCE.CreateSymbolicLinkW(
                 new WString(symlink.getPath()), new WString(target),
                 dirLink?Kernel32.SYMBOLIC_LINK_FLAG_DIRECTORY:0)) {
-            throw new WinIOException("Failed to create a symlink "+symlink+" to "+target);
+            throw new WinIOException(new StringBuilder().append("Failed to create a symlink ").append(symlink).append(" to ").append(target).toString());
         }
     }
 
-    /**
+	/**
      * @deprecated Use {@link Util#isSymlink} to detect symbolic links and junctions instead.
      */
     @Deprecated
@@ -112,7 +115,7 @@ public class Kernel32Utils {
         return Util.isSymlink(file);
     }
 
-    public static File getTempDir() {
+	public static File getTempDir() {
         Memory buf = new Memory(1024);
         if (Kernel32.INSTANCE.GetTempPathW(512,buf)!=0) {// the first arg is number of wchar
             return new File(buf.getWideString(0));
@@ -121,7 +124,7 @@ public class Kernel32Utils {
         }
     }
 
-    /*package*/ static Kernel32 load() {
+	/*package*/ static Kernel32 load() {
         try {
             return (Kernel32) Native.loadLibrary("kernel32", Kernel32.class);
         } catch (Throwable e) {
@@ -129,7 +132,5 @@ public class Kernel32Utils {
             return InitializationErrorInvocationHandler.create(Kernel32.class,e);
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(Kernel32Utils.class.getName());
 
 }

@@ -43,7 +43,7 @@ public interface AccessControlled {
     /**
      * Convenient short-cut for {@code getACL().checkPermission(permission)}
      */
-    default void checkPermission(@Nonnull Permission permission) throws AccessDeniedException {
+    default void checkPermission(@Nonnull Permission permission) {
         getACL().checkPermission(permission);
     }
 

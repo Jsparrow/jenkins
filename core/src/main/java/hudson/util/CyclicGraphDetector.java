@@ -43,14 +43,20 @@ public abstract class CyclicGraphDetector<N> {
     protected abstract Iterable<? extends N> getEdges(N n);
 
     private void visit(N p) throws CycleDetectedException {
-        if (!visited.add(p))    return;
+        if (!visited.add(p)) {
+			return;
+		}
 
         visiting.add(p);
         path.push(p);
         for (N q : getEdges(p)) {
-            if (q==null)        continue;   // ignore unresolved references
-            if (visiting.contains(q))
-                detectedCycle(q);
+            if (q==null)
+			 {
+				continue;   // ignore unresolved references
+			}
+            if (visiting.contains(q)) {
+				detectedCycle(q);
+			}
             visit(q);
         }
         visiting.remove(p);

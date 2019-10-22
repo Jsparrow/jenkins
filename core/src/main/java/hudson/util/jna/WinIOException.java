@@ -31,7 +31,7 @@ public class WinIOException extends IOException {
 
     @Override
     public String getMessage() {
-        return super.getMessage()+" error="+errorCode+":"+ Util.getWin32ErrorMessage(errorCode);
+        return new StringBuilder().append(super.getMessage()).append(" error=").append(errorCode).append(":").append(Util.getWin32ErrorMessage(errorCode)).toString();
     }
 
     public int getErrorCode() {

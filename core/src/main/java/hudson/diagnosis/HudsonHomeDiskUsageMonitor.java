@@ -53,7 +53,8 @@ public final class HudsonHomeDiskUsageMonitor extends AdministrativeMonitor {
         super("hudsonHomeIsFull");
     }
 
-    public boolean isActivated() {
+    @Override
+	public boolean isActivated() {
         return activated;
     }
     
@@ -83,10 +84,7 @@ public final class HudsonHomeDiskUsageMonitor extends AdministrativeMonitor {
      * Binds a solution to the URL.
      */
     public Solution getSolution(String id) {
-        for( Solution s : Solution.all() )
-            if(s.id.equals(id))
-                return s;
-        return null;
+        return Solution.all().stream().filter(s -> s.id.equals(id)).findFirst().orElse(null);
     }
 
     /**
@@ -107,7 +105,7 @@ public final class HudsonHomeDiskUsageMonitor extends AdministrativeMonitor {
      * </dd>
      * </dl>
      */
-    public static abstract class Solution extends AbstractModelObject implements ExtensionPoint {
+    public abstract static class Solution extends AbstractModelObject implements ExtensionPoint {
         /**
          * Human-readable ID of this monitor, which needs to be unique within the system.
          *
@@ -129,7 +127,7 @@ public final class HudsonHomeDiskUsageMonitor extends AdministrativeMonitor {
          * Returns the URL of this monitor, relative to the context path.
          */
         public String getUrl() {
-            return HudsonHomeDiskUsageMonitor.get().getUrl()+"/solution/"+id;
+            return new StringBuilder().append(HudsonHomeDiskUsageMonitor.get().getUrl()).append("/solution/").append(id).toString();
         }
 
         /**

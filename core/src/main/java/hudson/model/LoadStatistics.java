@@ -73,39 +73,51 @@ import javax.annotation.CheckForNull;
 @ExportedBean
 public abstract class LoadStatistics {
     /**
+     * With 0.90 decay ratio for every 10sec, half reduction is about 1 min.
+     * 
+     * Put differently, the half reduction time is {@code CLOCK*log(0.5)/log(DECAY)}
+     */
+    public static final float DECAY = Float.parseFloat(SystemProperties.getString(LoadStatistics.class.getName()+".decay","0.9"));
+
+	/**
+     * Load statistics clock cycle in milliseconds. Specify a small value for quickly debugging this feature and node provisioning through cloud.
+     */
+    public static int CLOCK = SystemProperties.getInteger(LoadStatistics.class.getName() + ".clock", (int)TimeUnit.SECONDS.toMillis(10));
+
+	/**
      * {@code true} if and only if the new way of building statistics has been implemented by this class.
      * @since 1.607
      */
     private final boolean modern;
 
-    /**
+	/**
      * Number of executors defined for Jenkins and how it changes over time.
      * @since 1.607
      */
     @Exported
     public final MultiStageTimeSeries definedExecutors;
 
-    /**
+	/**
      * Number of executors on-line and how it changes over time. Replaces {@link #totalExecutors}
      * @since 1.607
      */
     @Exported
     public final MultiStageTimeSeries onlineExecutors;
 
-    /**
+	/**
      * Number of executors in the process of coming on-line and how it changes over time.
      * @since 1.607
      */
     @Exported
     public final MultiStageTimeSeries connectingExecutors;
 
-    /**
+	/**
      * Number of busy executors and how it changes over time.
      */
     @Exported
     public final MultiStageTimeSeries busyExecutors;
 
-    /**
+	/**
      * Number of executors not executing and how it changes over time. Note the these executors may not be able to
      * take work, see {@link #availableExecutors}.
      * @since 1.607
@@ -113,14 +125,14 @@ public abstract class LoadStatistics {
     @Exported
     public final MultiStageTimeSeries idleExecutors;
 
-    /**
+	/**
      * Number of executors not executing and available to take work and how it changes over time.
      * @since 1.607
      */
     @Exported
     public final MultiStageTimeSeries availableExecutors;
 
-    /**
+	/**
      * Number of total executors and how it changes over time.
      * @deprecated use {@link #onlineExecutors}. Note {@code totalExecutors==onlineExecutors} for backward
      * compatibility support.
@@ -129,14 +141,14 @@ public abstract class LoadStatistics {
     @Deprecated
     public final MultiStageTimeSeries totalExecutors;
 
-    /**
+	/**
      * Number of {@link hudson.model.Queue.BuildableItem}s that can run on any node in this node set but blocked.
      */
     @Exported
     public final MultiStageTimeSeries queueLength;
 
 
-    protected LoadStatistics(int initialOnlineExecutors, int initialBusyExecutors) {
+	protected LoadStatistics(int initialOnlineExecutors, int initialBusyExecutors) {
         this.definedExecutors = new MultiStageTimeSeries(Messages._LoadStatistics_Legends_DefinedExecutors(),
                 ColorPalette.YELLOW, initialOnlineExecutors, DECAY);
         this.onlineExecutors = new MultiStageTimeSeries(
@@ -155,7 +167,7 @@ public abstract class LoadStatistics {
         modern = isModern(getClass());
     }
 
-    /*package*/ static boolean isModern(Class<? extends LoadStatistics> clazz) {
+	/*package*/ static boolean isModern(Class<? extends LoadStatistics> clazz) {
         // cannot use Util.isOverridden as these are protected methods.
         boolean hasGetNodes = false;
         boolean hasMatches = false;
@@ -183,7 +195,7 @@ public abstract class LoadStatistics {
         return hasGetNodes && hasMatches;
     }
 
-    /**
+	/**
      * @deprecated use {@link #idleExecutors} directly.
      */
     @Deprecated
@@ -191,28 +203,28 @@ public abstract class LoadStatistics {
         return idleExecutors.pick(timeScale).getLatest();
     }
 
-    /**
+	/**
      * Computes the # of idle executors right now and obtains the snapshot value.
      * @deprecated use {@link #computeSnapshot()} and then {@link LoadStatisticsSnapshot#getIdleExecutors()}
      */
     @Deprecated
     public abstract int computeIdleExecutors();
 
-    /**
+	/**
      * Computes the # of total executors right now and obtains the snapshot value.
      * @deprecated use {@link #computeSnapshot()} and then {@link LoadStatisticsSnapshot#getOnlineExecutors()}
      */
     @Deprecated
     public abstract int computeTotalExecutors();
 
-    /**
+	/**
      * Computes the # of queue length right now and obtains the snapshot value.
      * @deprecated use {@link #computeSnapshot()} and then {@link LoadStatisticsSnapshot#getQueueLength()}
      */
     @Deprecated
     public abstract int computeQueueLength();
 
-    /**
+	/**
      * Creates a trend chart.
      */
     public JFreeChart createChart(CategoryDataset ds) {
@@ -254,14 +266,14 @@ public abstract class LoadStatistics {
         return chart;
     }
 
-    protected void configureRenderer(LineAndShapeRenderer renderer) {
+	protected void configureRenderer(LineAndShapeRenderer renderer) {
         renderer.setSeriesPaint(0, ColorPalette.BLUE);  // online
         renderer.setSeriesPaint(1, ColorPalette.RED);   // busy
         renderer.setSeriesPaint(2, ColorPalette.GREY);  // queue
         renderer.setSeriesPaint(3, ColorPalette.YELLOW);// available
     }
 
-    /**
+	/**
      * Creates {@link CategoryDataset} which then becomes the basis
      * of the load statistics graph.
      */
@@ -269,18 +281,18 @@ public abstract class LoadStatistics {
         return MultiStageTimeSeries.createTrendChart(timeScale,onlineExecutors,busyExecutors,queueLength,availableExecutors);
     }
 
-    /**
+	/**
      * Generates the load statistics graph.
      */
     public TrendChart doGraph(@QueryParameter String type) throws IOException {
         return createTrendChart(TimeScale.parse(type));
     }
 
-    public Api getApi() {
+	public Api getApi() {
         return new Api(this);
     }
 
-    /**
+	/**
      * @deprecated use {@link #updateCounts(LoadStatisticsSnapshot)}
      */
     @Deprecated
@@ -288,7 +300,7 @@ public abstract class LoadStatistics {
         updateCounts(computeSnapshot());
     }
 
-    /**
+	/**
      * Updates all the series from the current snapshot.
      * @param current the current snapshot.
      * @since 1.607
@@ -303,14 +315,14 @@ public abstract class LoadStatistics {
         queueLength.update(current.getQueueLength());
     }
 
-    /**
+	/**
      * Returns the {@link Node} instances that this statistic counts.
      * @return the {@link Node}
      * @since 1.607
      */
     protected abstract Iterable<Node> getNodes();
 
-    /**
+	/**
      * Returns {@code true} is the specified {@link SubTask} from the {@link Queue} should be counted.
      * @param item the {@link Queue.Item} that the {@link SubTask belongs to}
      * @param subTask the {@link SubTask}
@@ -319,7 +331,7 @@ public abstract class LoadStatistics {
      */
     protected abstract boolean matches(Queue.Item item, SubTask subTask);
 
-    /**
+	/**
      * Computes a self-consistent snapshot of the load statistics.
      *
      * Note: The original method of computing load statistics would compute the total and idle counts independently
@@ -340,7 +352,7 @@ public abstract class LoadStatistics {
         }
     }
 
-    /**
+	/**
      * Computes the self-consistent snapshot with the specified queue items.
 
      * @param queue the queue items.
@@ -360,42 +372,32 @@ public abstract class LoadStatistics {
             for (Queue.BuildableItem item : queue) {
                 
                 for (SubTask st : item.task.getSubTasks()) {
-                    if (matches(item, st))
-                        q++;
+                    if (matches(item, st)) {
+						q++;
+					}
                 }
             }
         }
         return builder.withQueueLength(q).build();
     }
 
-    /**
-     * With 0.90 decay ratio for every 10sec, half reduction is about 1 min.
-     * 
-     * Put differently, the half reduction time is {@code CLOCK*log(0.5)/log(DECAY)}
-     */
-    public static final float DECAY = Float.parseFloat(SystemProperties.getString(LoadStatistics.class.getName()+".decay","0.9"));
-    /**
-     * Load statistics clock cycle in milliseconds. Specify a small value for quickly debugging this feature and node provisioning through cloud.
-     */
-    public static int CLOCK = SystemProperties.getInteger(LoadStatistics.class.getName() + ".clock", (int)TimeUnit.SECONDS.toMillis(10));
-
-    /**
+	/**
      * Periodically update the load statistics average.
      */
     @Extension @Symbol("loadStatistics")
     public static class LoadStatisticsUpdater extends PeriodicWork {
-        public long getRecurrencePeriod() {
+        @Override
+		public long getRecurrencePeriod() {
             return CLOCK;
         }
 
-        protected void doRun() {
+        @Override
+		protected void doRun() {
             Jenkins j = Jenkins.get();
             List<Queue.BuildableItem> bis = j.getQueue().getBuildableItems();
 
             // update statistics on agents
-            for( Label l : j.getLabels() ) {
-                l.loadStatistics.updateCounts(l.loadStatistics.computeSnapshot(bis));
-            }
+			j.getLabels().forEach(l -> l.loadStatistics.updateCounts(l.loadStatistics.computeSnapshot(bis)));
 
             // update statistics of the entire system
             j.unlabeledLoad.updateCounts(j.unlabeledLoad.computeSnapshot(bis));
@@ -592,7 +594,11 @@ public abstract class LoadStatistics {
             return sb.toString();
         }
 
-        /**
+        public static Builder builder() {
+            return new Builder();
+        }
+
+		/**
          * Use a builder so we can add more stats if needed.
          * Not thread safe
          * @since 1.607
@@ -633,16 +639,18 @@ public abstract class LoadStatistics {
                 if (computer.isOnline()) {
                     final List<Executor> executors = computer.getExecutors();
                     final boolean acceptingTasks = computer.isAcceptingTasks();
-                    for (Executor e : executors) {
+                    executors.forEach(e -> {
                         definedExecutors++;
                         onlineExecutors++;
                         if (e.getCurrentWorkUnit() != null) {
                             busyExecutors++;
                         } else {
                             idleExecutors++;
-                            if (acceptingTasks) availableExecutors++;
+                            if (acceptingTasks) {
+								availableExecutors++;
+							}
                         }
-                    }
+                    });
                 } else {
                     final int numExecutors = computer.getNumExecutors();
                     definedExecutors += numExecutors;
@@ -653,10 +661,6 @@ public abstract class LoadStatistics {
                 return this;
             }
 
-        }
-
-        public static Builder builder() {
-            return new Builder();
         }
     }
 

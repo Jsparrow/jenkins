@@ -103,20 +103,17 @@ public class Nodes implements Saveable {
      * @throws IOException if the new list of nodes could not be persisted.
      */
     public void setNodes(final @Nonnull Collection<? extends Node> nodes) throws IOException {
-        Queue.withLock(new Runnable() {
-            @Override
-            public void run() {
-                Set<String> toRemove = new HashSet<>(Nodes.this.nodes.keySet());
-                for (Node n : nodes) {
-                    final String name = n.getNodeName();
-                    toRemove.remove(name);
-                    Nodes.this.nodes.put(name, n);
-                }
-                Nodes.this.nodes.keySet().removeAll(toRemove); // directory clean up will be handled by save
-                jenkins.updateComputerList();
-                jenkins.trimLabels();
-            }
-        });
+        Queue.withLock(() -> {
+		    Set<String> toRemove = new HashSet<>(Nodes.this.nodes.keySet());
+		    nodes.forEach(n -> {
+		        final String name = n.getNodeName();
+		        toRemove.remove(name);
+		        Nodes.this.nodes.put(name, n);
+		    });
+		    Nodes.this.nodes.keySet().removeAll(toRemove); // directory clean up will be handled by save
+		    jenkins.updateComputerList();
+		    jenkins.trimLabels();
+		});
         save();
     }
 
@@ -128,40 +125,35 @@ public class Nodes implements Saveable {
      */
     public void addNode(final @Nonnull Node node) throws IOException {
         Node oldNode = nodes.get(node.getNodeName());
-        if (node != oldNode) {
-            // TODO we should not need to lock the queue for adding nodes but until we have a way to update the
-            // computer list for just the new node
-            AtomicReference<Node> old = new AtomicReference<>();
-            Queue.withLock(new Runnable() {
-                @Override
-                public void run() {
-                    old.set(nodes.put(node.getNodeName(), node));
-                    jenkins.updateComputerList();
-                    jenkins.trimLabels();
-                }
-            });
-            // TODO there is a theoretical race whereby the node instance is updated/removed after lock release
-            try {
-                persistNode(node);
-            } catch (IOException | RuntimeException e) {
-                // JENKINS-50599: If persisting the node throws an exception, we need to remove the node from
-                // memory before propagating the exception.
-                Queue.withLock(new Runnable() {
-                    @Override
-                    public void run() {
-                        nodes.compute(node.getNodeName(), (ignoredNodeName, ignoredNode) -> oldNode);
-                        jenkins.updateComputerList();
-                        jenkins.trimLabels();
-                    }
-                });
-                throw e;
-            }
-            if (old.get() != null) {
-                NodeListener.fireOnUpdated(old.get(), node);
-            } else {
-                NodeListener.fireOnCreated(node);
-            }
-        }
+        if (node == oldNode) {
+			return;
+		}
+		// TODO we should not need to lock the queue for adding nodes but until we have a way to update the
+		// computer list for just the new node
+		AtomicReference<Node> old = new AtomicReference<>();
+		Queue.withLock(() -> {
+		    old.set(nodes.put(node.getNodeName(), node));
+		    jenkins.updateComputerList();
+		    jenkins.trimLabels();
+		});
+		// TODO there is a theoretical race whereby the node instance is updated/removed after lock release
+		try {
+		    persistNode(node);
+		} catch (IOException | RuntimeException e) {
+		    // JENKINS-50599: If persisting the node throws an exception, we need to remove the node from
+		    // memory before propagating the exception.
+		    Queue.withLock(() -> {
+			    nodes.compute(node.getNodeName(), (ignoredNodeName, ignoredNode) -> oldNode);
+			    jenkins.updateComputerList();
+			    jenkins.trimLabels();
+			});
+		    throw e;
+		}
+		if (old.get() != null) {
+		    NodeListener.fireOnUpdated(old.get(), node);
+		} else {
+		    NodeListener.fireOnCreated(node);
+		}
     }
 
     /**
@@ -198,11 +190,11 @@ public class Nodes implements Saveable {
             exists = Queue.withLock(new Callable<Boolean>() {
                 @Override
                 public Boolean call() throws Exception {
-                    if (node == nodes.get(node.getNodeName())) {
-                        jenkins.trimLabels();
-                        return true;
-                    }
-                    return false;
+                    if (node != nodes.get(node.getNodeName())) {
+						return false;
+					}
+					jenkins.trimLabels();
+					return true;
                 }
             });
         } catch (RuntimeException e) {
@@ -212,13 +204,13 @@ public class Nodes implements Saveable {
             // can never happen
             exists = false;
         }
-        if (exists) {
-            // TODO there is a theoretical race whereby the node instance is updated/removed after lock release
-            persistNode(node);
-            // TODO should this fireOnUpdated?
-            return true;
-        }
-        return false;
+        if (!exists) {
+			return false;
+		}
+		// TODO there is a theoretical race whereby the node instance is updated/removed after lock release
+		persistNode(node);
+		// TODO should this fireOnUpdated?
+		return true;
     }
 
     /**
@@ -228,26 +220,22 @@ public class Nodes implements Saveable {
      * @since 2.8
      */
     public boolean replaceNode(final Node oldOne, final @Nonnull Node newOne) throws IOException {
-        if (oldOne == nodes.get(oldOne.getNodeName())) {
-            // use the queue lock until Nodes has a way of directly modifying a single node.
-            Queue.withLock(new Runnable() {
-                public void run() {
-                    Nodes.this.nodes.remove(oldOne.getNodeName());
-                    Nodes.this.nodes.put(newOne.getNodeName(), newOne);
-                    jenkins.updateComputerList();
-                    jenkins.trimLabels();
-                }
-            });
-            updateNode(newOne);
-            if (!newOne.getNodeName().equals(oldOne.getNodeName())) {
-                Util.deleteRecursive(new File(getNodesDir(), oldOne.getNodeName()));
-            }
-            NodeListener.fireOnUpdated(oldOne, newOne);
-
-            return true;
-        } else {
-            return false;
-        }
+        if (oldOne != nodes.get(oldOne.getNodeName())) {
+			return false;
+		}
+		// use the queue lock until Nodes has a way of directly modifying a single node.
+		Queue.withLock(() -> {
+		    Nodes.this.nodes.remove(oldOne.getNodeName());
+		    Nodes.this.nodes.put(newOne.getNodeName(), newOne);
+		    jenkins.updateComputerList();
+		    jenkins.trimLabels();
+		});
+		updateNode(newOne);
+		if (!newOne.getNodeName().equals(oldOne.getNodeName())) {
+		    Util.deleteRecursive(new File(getNodesDir(), oldOne.getNodeName()));
+		}
+		NodeListener.fireOnUpdated(oldOne, newOne);
+		return true;
     }
 
     /**
@@ -258,26 +246,23 @@ public class Nodes implements Saveable {
      * @throws IOException if the list of nodes could not be persisted.
      */
     public void removeNode(final @Nonnull Node node) throws IOException {
-        if (node == nodes.get(node.getNodeName())) {
-            Queue.withLock(new Runnable() {
-                @Override
-                public void run() {
-                    Computer c = node.toComputer();
-                    if (c != null) {
-                        c.recordTermination();
-                        c.disconnect(OfflineCause.create(hudson.model.Messages._Hudson_NodeBeingRemoved()));
-                    }
-                    if (node == nodes.remove(node.getNodeName())) {
-                        jenkins.updateComputerList();
-                        jenkins.trimLabels();
-                    }
-                }
-            });
-            // no need for a full save() so we just do the minimum
-            Util.deleteRecursive(new File(getNodesDir(), node.getNodeName()));
-
-            NodeListener.fireOnDeleted(node);
-        }
+        if (node != nodes.get(node.getNodeName())) {
+			return;
+		}
+		Queue.withLock(() -> {
+		    Computer c = node.toComputer();
+		    if (c != null) {
+		        c.recordTermination();
+		        c.disconnect(OfflineCause.create(hudson.model.Messages._Hudson_NodeBeingRemoved()));
+		    }
+		    if (node == nodes.remove(node.getNodeName())) {
+		        jenkins.updateComputerList();
+		        jenkins.trimLabels();
+		    }
+		});
+		// no need for a full save() so we just do the minimum
+		Util.deleteRecursive(new File(getNodesDir(), node.getNodeName()));
+		NodeListener.fireOnDeleted(node);
     }
 
     /**
@@ -299,12 +284,7 @@ public class Nodes implements Saveable {
             xmlFile.write(n);
             SaveableListener.fireOnChange(this, xmlFile);
         }
-        for (File forDeletion : nodesDir.listFiles(new FileFilter() {
-            @Override
-            public boolean accept(File pathname) {
-                return pathname.isDirectory() && !existing.contains(pathname.getName());
-            }
-        })) {
+        for (File forDeletion : nodesDir.listFiles((File pathname) -> pathname.isDirectory() && !existing.contains(pathname.getName()))) {
             Util.deleteRecursive(forDeletion);
         }
     }
@@ -327,11 +307,7 @@ public class Nodes implements Saveable {
      */
     public void load() throws IOException {
         final File nodesDir = getNodesDir();
-        final File[] subdirs = nodesDir.listFiles(new FileFilter() {
-            public boolean accept(File child) {
-                return child.isDirectory();
-            }
-        });
+        final File[] subdirs = nodesDir.listFiles(File::isDirectory);
         final Map<String, Node> newNodes = new TreeMap<>();
         if (subdirs != null) {
             for (File subdir : subdirs) {
@@ -346,15 +322,12 @@ public class Nodes implements Saveable {
                 }
             }
         }
-        Queue.withLock(new Runnable() {
-            @Override
-            public void run() {
-                nodes.entrySet().removeIf(stringNodeEntry -> !(stringNodeEntry.getValue() instanceof EphemeralNode));
-                nodes.putAll(newNodes);
-                jenkins.updateComputerList();
-                jenkins.trimLabels();
-            }
-        });
+        Queue.withLock(() -> {
+		    nodes.entrySet().removeIf(stringNodeEntry -> !(stringNodeEntry.getValue() instanceof EphemeralNode));
+		    nodes.putAll(newNodes);
+		    jenkins.updateComputerList();
+		    jenkins.trimLabels();
+		});
     }
 
     /**

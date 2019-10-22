@@ -100,9 +100,10 @@ public class RewindableFileOutputStream extends OutputStream {
     }
 
     private void closeCurrent() throws IOException {
-        if (current != null) {
-            current.close();
-            current = null;
-        }
+        if (current == null) {
+			return;
+		}
+		current.close();
+		current = null;
     }
 }

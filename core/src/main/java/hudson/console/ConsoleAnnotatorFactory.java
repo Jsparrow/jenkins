@@ -87,10 +87,11 @@ public abstract class ConsoleAnnotatorFactory<T> implements ExtensionPoint {
      */
     public Class<?> type() {
         Type type = Types.getBaseClass(getClass(), ConsoleAnnotatorFactory.class);
-        if (type instanceof ParameterizedType)
-            return Types.erasure(Types.getTypeArgument(type,0));
-        else
-            return Object.class;
+        if (type instanceof ParameterizedType) {
+			return Types.erasure(Types.getTypeArgument(type,0));
+		} else {
+			return Object.class;
+		}
     }
 
     /**

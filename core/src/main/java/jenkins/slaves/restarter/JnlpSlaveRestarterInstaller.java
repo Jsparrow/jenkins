@@ -32,11 +32,34 @@ import jenkins.security.MasterToSlaveCallable;
  */
 @Extension
 public class JnlpSlaveRestarterInstaller extends ComputerListener implements Serializable {
-    @Override
+    private static final Logger LOGGER = Logger.getLogger(JnlpSlaveRestarterInstaller.class.getName());
+
+	private static final long serialVersionUID = 1L;
+
+	@Override
     public void onOnline(final Computer c, final TaskListener listener) throws IOException, InterruptedException {
         MasterComputer.threadPoolForRemoting.submit(new Install(c, listener));
     }
-    private static class Install implements Callable<Void> {
+
+	private static void install(Computer c, TaskListener listener) {
+        try {
+            final List<SlaveRestarter> restarters = new ArrayList<>(SlaveRestarter.all());
+
+            VirtualChannel ch = c.getChannel();
+            if (ch==null)
+			 {
+				return;  // defensive check
+			}
+
+            List<SlaveRestarter> effective = ch.call(new FindEffectiveRestarters(restarters));
+
+            LOGGER.log(FINE, "Effective SlaveRestarter on {0}: {1}", new Object[] {c.getName(), effective});
+        } catch (Throwable e) {
+            Functions.printStackTrace(e, listener.error("Failed to install restarter"));
+        }
+    }
+
+	private static class Install implements Callable<Void> {
         private final Computer c;
         private final TaskListener listener;
         Install(Computer c, TaskListener listener) {
@@ -50,20 +73,6 @@ public class JnlpSlaveRestarterInstaller extends ComputerListener implements Ser
         }
     }
 
-    private static void install(Computer c, TaskListener listener) {
-        try {
-            final List<SlaveRestarter> restarters = new ArrayList<>(SlaveRestarter.all());
-
-            VirtualChannel ch = c.getChannel();
-            if (ch==null) return;  // defensive check
-
-            List<SlaveRestarter> effective = ch.call(new FindEffectiveRestarters(restarters));
-
-            LOGGER.log(FINE, "Effective SlaveRestarter on {0}: {1}", new Object[] {c.getName(), effective});
-        } catch (Throwable e) {
-            Functions.printStackTrace(e, listener.error("Failed to install restarter"));
-        }
-    }
     private static class FindEffectiveRestarters extends MasterToSlaveCallable<List<SlaveRestarter>, IOException> {
         private final List<SlaveRestarter> restarters;
         FindEffectiveRestarters(List<SlaveRestarter> restarters) {
@@ -72,7 +81,10 @@ public class JnlpSlaveRestarterInstaller extends ComputerListener implements Ser
         @Override
         public List<SlaveRestarter> call() throws IOException {
             Engine e = Engine.current();
-            if (e == null) return null;    // not running under Engine
+            if (e == null)
+			 {
+				return null;    // not running under Engine
+			}
 
             try {
                 Engine.class.getMethod("addListener", EngineListener.class);
@@ -87,14 +99,14 @@ public class JnlpSlaveRestarterInstaller extends ComputerListener implements Ser
                 @Override
                 public void onReconnect() {
                     try {
-                        for (SlaveRestarter r : restarters) {
+                        restarters.forEach(r -> {
                             try {
                                 LOGGER.info("Restarting agent via "+r);
                                 r.restart();
                             } catch (Exception x) {
                                 LOGGER.log(SEVERE, "Failed to restart agent with "+r, x);
                             }
-                        }
+                        });
                     } finally {
                         // if we move on to the reconnection without restart,
                         // don't let the current implementations kick in when the agent loses connection again
@@ -106,8 +118,4 @@ public class JnlpSlaveRestarterInstaller extends ComputerListener implements Ser
             return restarters;
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(JnlpSlaveRestarterInstaller.class.getName());
-
-    private static final long serialVersionUID = 1L;
 }

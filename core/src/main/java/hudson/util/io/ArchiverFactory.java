@@ -38,48 +38,47 @@ import java.io.Serializable;
 */
 public abstract class ArchiverFactory implements Serializable {
     /**
-     * Creates an archiver on top of the given stream.
-     */
-    public abstract Archiver create(OutputStream out) throws IOException;
-
-    /**
      * Uncompressed tar format.
      */
     public static ArchiverFactory TAR = new TarArchiverFactory(TarCompression.NONE);
 
-    /**
+	/**
      * tar+gz
      */
     public static ArchiverFactory TARGZ = new TarArchiverFactory(TarCompression.GZIP);
 
-    /**
+	/**
      * Zip format.
      */
     public static ArchiverFactory ZIP = new ZipArchiverFactory();
 
+	private static final long serialVersionUID = 1L;
 
+	/**
+     * Creates an archiver on top of the given stream.
+     */
+    public abstract Archiver create(OutputStream out) throws IOException;
 
-    private static final class TarArchiverFactory extends ArchiverFactory {
-        private final TarCompression method;
+	private static final class TarArchiverFactory extends ArchiverFactory {
+        private static final long serialVersionUID = 1L;
+		private final TarCompression method;
 
-        private TarArchiverFactory(TarCompression method) {
+		private TarArchiverFactory(TarCompression method) {
             this.method = method;
         }
 
-        public Archiver create(OutputStream out) throws IOException {
+		@Override
+		public Archiver create(OutputStream out) throws IOException {
             return new TarArchiver(method.compress(out));
         }
-
-        private static final long serialVersionUID = 1L;
     }
 
     private static final class ZipArchiverFactory extends ArchiverFactory {
-        public Archiver create(OutputStream out) {
+        private static final long serialVersionUID = 1L;
+
+		@Override
+		public Archiver create(OutputStream out) {
             return new ZipArchiver(out);
         }
-
-        private static final long serialVersionUID = 1L;
     }
-
-    private static final long serialVersionUID = 1L;
 }

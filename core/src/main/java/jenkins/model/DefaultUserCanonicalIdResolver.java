@@ -40,28 +40,31 @@ import java.util.Map;
 @Extension
 public class DefaultUserCanonicalIdResolver extends User.CanonicalIdResolver {
 
-    @Override
+    public static final Descriptor<User.CanonicalIdResolver> DESCRIPTOR = new Descriptor<User.CanonicalIdResolver>() {
+        @Override
+		public String getDisplayName() {
+            return "compute default user ID";
+        }
+    };
+
+	@Override
     public String resolveCanonicalId(String idOrFullName, Map<String, ?> context) {
         String id = idOrFullName.replace('\\', '_').replace('/', '_').replace('<','_')
                 .replace('>', '_');  // 4 replace() still faster than regex
-        if (Functions.isWindows()) id = id.replace(':','_');
+        if (Functions.isWindows()) {
+			id = id.replace(':','_');
+		}
         return id;
     }
 
-    @Override
+	@Override
     public int getPriority() {
         return Integer.MIN_VALUE;
     }
 
-    @Override
+	@Override
     public Descriptor<User.CanonicalIdResolver> getDescriptor() {
         return DESCRIPTOR;
     }
-
-    public static final Descriptor<User.CanonicalIdResolver> DESCRIPTOR = new Descriptor<User.CanonicalIdResolver>() {
-        public String getDisplayName() {
-            return "compute default user ID";
-        }
-    };
 
 }

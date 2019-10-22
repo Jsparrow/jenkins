@@ -46,18 +46,13 @@ public class XStreamDOMTest {
 
     private XStream2 xs;
 
-    public static class Foo {
-        XStreamDOM bar;
-        XStreamDOM zot;
-    }
-
     @Before
     public void setUp() throws Exception {
         xs = new XStream2();
         xs.alias("foo", Foo.class);
     }
 
-    @Test
+	@Test
     public void testMarshal() throws IOException {
         Foo foo = createSomeFoo();
         String xml = xs.toXML(foo);
@@ -65,23 +60,22 @@ public class XStreamDOMTest {
         assertEquals(getTestData1().trim(), xml.trim());
     }
 
-    private String getTestData1() throws IOException {
+	private String getTestData1() throws IOException {
         return getTestData("XStreamDOMTest.data1.xml");
     }
 
-    private String getTestData(String resourceName) throws IOException {
+	private String getTestData(String resourceName) throws IOException {
         return IOUtils.toString(getClass().getResourceAsStream(resourceName)).replaceAll("\r\n", "\n");
     }
 
-
-    private Foo createSomeFoo() {
+	private Foo createSomeFoo() {
         Foo foo = new Foo();
         foo.bar = new XStreamDOM("test1", Collections.singletonMap("key", "value"),"text!");
         foo.zot = new XStreamDOM("test2", Collections.singletonMap("key","value"),Collections.singletonList(foo.bar));
         return foo;
     }
 
-    @Test
+	@Test
     public void testUnmarshal() throws Exception {
         Foo foo;
         try (InputStream is = XStreamDOMTest.class.getResourceAsStream("XStreamDOMTest.data1.xml")) {
@@ -92,7 +86,7 @@ public class XStreamDOMTest {
         assertEquals("text!",foo.bar.getValue());
     }
 
-    @Test
+	@Test
     public void testWriteToDOM() throws Exception {
         // roundtrip via DOM
         XStreamDOM dom = XStreamDOM.from(xs, createSomeFoo());
@@ -103,7 +97,7 @@ public class XStreamDOMTest {
         assertEquals(getTestData1().trim(), xml.trim());
     }
 
-    @Test
+	@Test
     public void testNoChild() {
         String[] in = new String[0];
         XStreamDOM dom = XStreamDOM.from(xs, in);
@@ -112,7 +106,7 @@ public class XStreamDOMTest {
         assertEquals(in.length, out.length);
     }
 
-    @Test
+	@Test
     public void testNameEscape() {
         Object o = new Name_That_Gets_Escaped();
         XStreamDOM dom = XStreamDOM.from(xs, o);
@@ -121,13 +115,7 @@ public class XStreamDOMTest {
         assertEquals(o.getClass(),out.getClass());
     }
 
-    public static class Name_That_Gets_Escaped {}
-
-    public static class DomInMap {
-        Map<String,XStreamDOM> values = new HashMap<>();
-    }
-
-    @Test
+	@Test
     public void testDomInMap() {
         DomInMap v = new DomInMap();
         v.values.put("foo",createSomeFoo().bar);
@@ -136,8 +124,8 @@ public class XStreamDOMTest {
         assertTrue(v2 instanceof DomInMap);
         assertXStreamDOMEquals(v.values.get("foo"), ((DomInMap)v2).values.get("foo"));
     }
-    
-    private void assertXStreamDOMEquals(XStreamDOM expected, XStreamDOM actual) {
+
+	private void assertXStreamDOMEquals(XStreamDOM expected, XStreamDOM actual) {
         assertEquals(expected.getTagName(), actual.getTagName());
         assertEquals(expected.getValue(), actual.getValue());
         
@@ -158,7 +146,7 @@ public class XStreamDOMTest {
         }
     }
 
-    @Test
+	@Test
     public void readFromInputStream() throws Exception {
         for (String name : new String[]{"XStreamDOMTest.data1.xml","XStreamDOMTest.data2.xml"}) {
             String input = getTestData(name);
@@ -169,7 +157,7 @@ public class XStreamDOMTest {
         }
     }
 
-    /**
+	/**
      * Regardless of how we read XML into XStreamDOM, XStreamDOM should retain the raw XML infoset,
      * which means escaped names.
      */
@@ -194,8 +182,19 @@ public class XStreamDOMTest {
         assertTrue(s.contains("zot__bar"));
     }
 
-    private void assertNamesAreEscaped(List<XStreamDOM> children) {
+	private void assertNamesAreEscaped(List<XStreamDOM> children) {
         assertEquals("bar_-bar", children.get(0).getTagName());
         assertEquals("zot__bar", children.get(1).getTagName());
+    }
+
+	public static class Foo {
+        XStreamDOM bar;
+        XStreamDOM zot;
+    }
+
+    public static class Name_That_Gets_Escaped {}
+
+    public static class DomInMap {
+        Map<String,XStreamDOM> values = new HashMap<>();
     }
 }

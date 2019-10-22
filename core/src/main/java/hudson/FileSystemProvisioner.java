@@ -120,6 +120,11 @@ import java.io.OutputStream;
  */
 public abstract class FileSystemProvisioner implements ExtensionPoint, Describable<FileSystemProvisioner> {
     /**
+     * Default implementation.
+     */
+    public static final FileSystemProvisioner DEFAULT = new Default();
+
+	/**
      * Called very early in the build (before a build places any files
      * in the workspace, such as SCM checkout) to provision a workspace
      * for the build.
@@ -138,7 +143,7 @@ public abstract class FileSystemProvisioner implements ExtensionPoint, Describab
      */
     public abstract void prepareWorkspace(AbstractBuild<?,?> build, FilePath ws, TaskListener listener) throws IOException, InterruptedException;
 
-    /**
+	/**
      * When a project is deleted, this method is called to undo the effect of
      * {@link #prepareWorkspace(AbstractBuild, FilePath, TaskListener)}.
      *
@@ -150,57 +155,55 @@ public abstract class FileSystemProvisioner implements ExtensionPoint, Describab
      */
     public abstract void discardWorkspace(AbstractProject<?, ?> project, FilePath ws) throws IOException, InterruptedException;
 
-//    public abstract void moveWorkspace(AbstractProject<?,?> project, File oldWorkspace, File newWorkspace) throws IOException;
+	//    public abstract void moveWorkspace(AbstractProject<?,?> project, File oldWorkspace, File newWorkspace) throws IOException;
+	
+	    /**
+	     * Obtains the snapshot of the workspace of the given build.
+	     *
+	     * <p>
+	     * The state of the build when this method is invoked depends on
+	     * the project type. Most would call this at the end of the build,
+	     * but for example {@code MatrixBuild} would call this after
+	     * SCM check out so that the state of the fresh workspace
+	     * can be then propagated to elsewhere.
+	     *
+	     * <p>
+	     * If the implementation of this method needs to store data in a file system,
+	     * do so under {@link AbstractBuild#getRootDir()}, since the lifecycle of
+	     * the snapshot is tied to the life cycle of a build.
+	     *
+	     * @param ws
+	     *      New workspace should be prepared in this location. This is the same value as
+	     *      {@code build.getWorkspace()} but passed separately for convenience.
+	     * @param glob
+	     *      Ant-style file glob for files to include in the snapshot. May not be pertinent for all
+	     *      implementations.
+	     */
+	    public abstract WorkspaceSnapshot snapshot(AbstractBuild<?,?> build, FilePath ws, String glob, TaskListener listener) throws IOException, InterruptedException;
 
-    /**
-     * Obtains the snapshot of the workspace of the given build.
-     *
-     * <p>
-     * The state of the build when this method is invoked depends on
-     * the project type. Most would call this at the end of the build,
-     * but for example {@code MatrixBuild} would call this after
-     * SCM check out so that the state of the fresh workspace
-     * can be then propagated to elsewhere.
-     *
-     * <p>
-     * If the implementation of this method needs to store data in a file system,
-     * do so under {@link AbstractBuild#getRootDir()}, since the lifecycle of
-     * the snapshot is tied to the life cycle of a build.
-     *
-     * @param ws
-     *      New workspace should be prepared in this location. This is the same value as
-     *      {@code build.getWorkspace()} but passed separately for convenience.
-     * @param glob
-     *      Ant-style file glob for files to include in the snapshot. May not be pertinent for all
-     *      implementations.
-     */
-    public abstract WorkspaceSnapshot snapshot(AbstractBuild<?,?> build, FilePath ws, String glob, TaskListener listener) throws IOException, InterruptedException;
-
-    public FileSystemProvisionerDescriptor getDescriptor() {
+	@Override
+	public FileSystemProvisionerDescriptor getDescriptor() {
         return (FileSystemProvisionerDescriptor) Jenkins.get().getDescriptorOrDie(getClass());
     }
 
-    /**
-     * Default implementation.
-     */
-    public static final FileSystemProvisioner DEFAULT = new Default();
-
-    /**
+	/**
      * Returns all the registered {@link FileSystemProvisioner} descriptors.
      */
     public static DescriptorExtensionList<FileSystemProvisioner,FileSystemProvisionerDescriptor> all() {
         return Jenkins.get().getDescriptorList(FileSystemProvisioner.class);
     }
 
-    /**
+	/**
      * Default implementation that doesn't rely on any file system specific capability,
      * and thus can be used anywhere that Hudson runs.
      */
     public static final class Default extends FileSystemProvisioner {
-        public void prepareWorkspace(AbstractBuild<?, ?> build, FilePath ws, TaskListener listener) throws IOException, InterruptedException {
+        @Override
+		public void prepareWorkspace(AbstractBuild<?, ?> build, FilePath ws, TaskListener listener) throws IOException, InterruptedException {
         }
 
-        public void discardWorkspace(AbstractProject<?, ?> project, FilePath ws) throws IOException, InterruptedException {
+        @Override
+		public void discardWorkspace(AbstractProject<?, ?> project, FilePath ws) throws IOException, InterruptedException {
         }
 
         /**
@@ -214,7 +217,8 @@ public abstract class FileSystemProvisioner implements ExtensionPoint, Describab
         /**
          * Creates a tar ball.
          */
-        public WorkspaceSnapshot snapshot(AbstractBuild<?, ?> build, FilePath ws, String glob, TaskListener listener) throws IOException, InterruptedException {
+        @Override
+		public WorkspaceSnapshot snapshot(AbstractBuild<?, ?> build, FilePath ws, String glob, TaskListener listener) throws IOException, InterruptedException {
             File wss = new File(build.getRootDir(),"workspace.tgz");
             try (OutputStream os = new BufferedOutputStream(Files.newOutputStream(wss.toPath()))) {
                 ws.archive(ArchiverFactory.TARGZ, os, glob);
@@ -225,7 +229,8 @@ public abstract class FileSystemProvisioner implements ExtensionPoint, Describab
         }
 
         public static final class WorkspaceSnapshotImpl extends WorkspaceSnapshot {
-            public void restoreTo(AbstractBuild<?,?> owner, FilePath dst, TaskListener listener) throws IOException, InterruptedException {
+            @Override
+			public void restoreTo(AbstractBuild<?,?> owner, FilePath dst, TaskListener listener) throws IOException, InterruptedException {
                 File zip = new File(owner.getRootDir(),"workspace.zip");
                 if (zip.exists()) {// we used to keep it in zip
                     new FilePath(zip).unzip(dst);
@@ -238,13 +243,15 @@ public abstract class FileSystemProvisioner implements ExtensionPoint, Describab
 
         @Extension @Symbol("standard")
         public static final class DescriptorImpl extends FileSystemProvisionerDescriptor {
-            public boolean discard(FilePath ws, TaskListener listener) throws IOException, InterruptedException {
+            @Override
+			public boolean discard(FilePath ws, TaskListener listener) throws IOException, InterruptedException {
                 // the default provisioner does not do anything special,
                 // so allow other types to manage it
                 return false;
             }
 
-            public String getDisplayName() {
+            @Override
+			public String getDisplayName() {
                 return "Default";
             }
         }

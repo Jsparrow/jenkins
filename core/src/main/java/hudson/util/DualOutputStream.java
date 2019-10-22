@@ -30,14 +30,16 @@ import java.io.OutputStream;
  * @author Kohsuke Kawaguchi
  */
 public class DualOutputStream extends OutputStream {
-    private final OutputStream lhs,rhs;
+    private final OutputStream lhs;
+	private final OutputStream rhs;
 
     public DualOutputStream(OutputStream lhs, OutputStream rhs) {
         this.lhs = lhs;
         this.rhs = rhs;
     }
 
-    public void write(int b) throws IOException {
+    @Override
+	public void write(int b) throws IOException {
         lhs.write(b);
         rhs.write(b);
     }

@@ -68,12 +68,17 @@ import org.kohsuke.accmod.restrictions.ProtectedExternally;
  */
 public interface TaskListener extends SerializableOnlyOverRemoting {
     /**
+     * {@link TaskListener} that discards the output.
+     */
+    TaskListener NULL = new StreamTaskListener(new NullStream());
+
+	/**
      * This writer will receive the output of the build
      */
     @Nonnull
     PrintStream getLogger();
 
-    /**
+	/**
      * A charset to use for methods returning {@link PrintWriter}.
      * Should match that used to construct {@link #getLogger}.
      * @return by default, UTF-8
@@ -84,7 +89,7 @@ public interface TaskListener extends SerializableOnlyOverRemoting {
         return StandardCharsets.UTF_8;
     }
 
-    @Restricted(NoExternalUse.class) // TODO Java 9 make private
+	@Restricted(NoExternalUse.class) // TODO Java 9 make private
     default PrintWriter _error(String prefix, String msg) {
         PrintStream out = getLogger();
         out.print(prefix);
@@ -95,7 +100,7 @@ public interface TaskListener extends SerializableOnlyOverRemoting {
         return new PrintWriter(charset != null ? new OutputStreamWriter(out, charset) : new OutputStreamWriter(out), true);
     }
 
-    /**
+	/**
      * Annotates the current position in the output log by using the given annotation.
      * If the implementation doesn't support annotated output log, this method might be no-op.
      * @since 1.349
@@ -105,7 +110,7 @@ public interface TaskListener extends SerializableOnlyOverRemoting {
         ann.encodeTo(getLogger());
     }
 
-    /**
+	/**
      * Places a {@link HyperlinkNote} on the given text.
      *
      * @param url
@@ -116,7 +121,7 @@ public interface TaskListener extends SerializableOnlyOverRemoting {
         getLogger().print(text);
     }
 
-    /**
+	/**
      * An error in the build.
      *
      * @return
@@ -127,7 +132,7 @@ public interface TaskListener extends SerializableOnlyOverRemoting {
         return _error("ERROR: ", msg);
     }
 
-    /**
+	/**
      * {@link Formatter#format(String, Object[])} version of {@link #error(String)}.
      */
     @Nonnull
@@ -135,7 +140,7 @@ public interface TaskListener extends SerializableOnlyOverRemoting {
         return error(String.format(format,args));
     }
 
-    /**
+	/**
      * A fatal error in the build.
      *
      * @return
@@ -146,16 +151,11 @@ public interface TaskListener extends SerializableOnlyOverRemoting {
         return _error("FATAL: ", msg);
     }
 
-    /**
+	/**
      * {@link Formatter#format(String, Object[])} version of {@link #fatalError(String)}.
      */
     @Nonnull
     default PrintWriter fatalError(String format, Object... args) {
         return fatalError(String.format(format, args));
     }
-
-    /**
-     * {@link TaskListener} that discards the output.
-     */
-    TaskListener NULL = new StreamTaskListener(new NullStream());
 }

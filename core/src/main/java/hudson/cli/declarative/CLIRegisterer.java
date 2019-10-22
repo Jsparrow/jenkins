@@ -72,32 +72,39 @@ import java.util.logging.Logger;
  */
 @Extension
 public class CLIRegisterer extends ExtensionFinder {
-    @Override
+    private static final Logger LOGGER = Logger.getLogger(CLIRegisterer.class.getName());
+
+	@Override
     public ExtensionComponentSet refresh() throws ExtensionRefreshException {
         // TODO: this is not complex. just bit tedious.
         return ExtensionComponentSet.EMPTY;
     }
 
-    public <T> Collection<ExtensionComponent<T>> find(Class<T> type, Hudson jenkins) {
-        if (type==CLICommand.class)
-            return (List)discover(jenkins);
-        else
-            return Collections.emptyList();
+	@Override
+	public <T> Collection<ExtensionComponent<T>> find(Class<T> type, Hudson jenkins) {
+        if (type==CLICommand.class) {
+			return (List)discover(jenkins);
+		} else {
+			return Collections.emptyList();
+		}
     }
 
-    /**
+	/**
      * Finds a resolved method annotated with {@link CLIResolver}.
      */
     private Method findResolver(Class type) throws IOException {
         List<Method> resolvers = Util.filter(Index.list(CLIResolver.class, Jenkins.get().getPluginManager().uberClassLoader), Method.class);
-        for ( ; type!=null; type=type.getSuperclass())
-            for (Method m : resolvers)
-                if (m.getReturnType()==type)
-                    return m;
+        for ( ; type!=null; type=type.getSuperclass()) {
+			for (Method m : resolvers) {
+				if (m.getReturnType()==type) {
+					return m;
+				}
+			}
+		}
         return null;
     }
 
-    private List<ExtensionComponent<CLICommand>> discover(@Nonnull final Jenkins jenkins) {
+	private List<ExtensionComponent<CLICommand>> discover(@Nonnull final Jenkins jenkins) {
         LOGGER.fine("Listing up @CLIMethod");
         List<ExtensionComponent<CLICommand>> r = new ArrayList<>();
 
@@ -108,7 +115,7 @@ public class CLIRegisterer extends ExtensionFinder {
                     final String name = m.getAnnotation(CLIMethod.class).name();
 
                     final ResourceBundleHolder res = loadMessageBundle(m);
-                    res.format("CLI."+name+".shortDescription");   // make sure we have the resource, to fail early
+                    res.format(new StringBuilder().append("CLI.").append(name).append(".shortDescription").toString());   // make sure we have the resource, to fail early
 
                     r.add(new ExtensionComponent<>(new CloneableCLICommand() {
                         @Override
@@ -119,7 +126,7 @@ public class CLIRegisterer extends ExtensionFinder {
                         @Override
                         public String getShortDescription() {
                             // format by using the right locale
-                            return res.format("CLI." + name + ".shortDescription");
+                            return res.format(new StringBuilder().append("CLI.").append(name).append(".shortDescription").toString());
                         }
 
                         @Override
@@ -138,7 +145,9 @@ public class CLIRegisterer extends ExtensionFinder {
                             while (true) {
                                 chains.push(method);
                                 if (Modifier.isStatic(method.getModifiers()))
-                                    break; // the chain is complete.
+								 {
+									break; // the chain is complete.
+								}
 
                                 // the method in question is an instance method, so we need to resolve the instance by using another resolver
                                 Class<?> type = method.getDeclaringClass();
@@ -152,8 +161,9 @@ public class CLIRegisterer extends ExtensionFinder {
                                 }
                             }
 
-                            while (!chains.isEmpty())
-                                binders.add(new MethodBinder(chains.pop(), this, parser));
+                            while (!chains.isEmpty()) {
+								binders.add(new MethodBinder(chains.pop(), this, parser));
+							}
 
                             return parser;
                         }
@@ -214,17 +224,20 @@ public class CLIRegisterer extends ExtensionFinder {
 
                                     // resolve them
                                     Object instance = null;
-                                    for (MethodBinder binder : binders)
-                                        instance = binder.call(instance);
+                                    for (MethodBinder binder : binders) {
+										instance = binder.call(instance);
+									}
 
-                                    if (instance instanceof Integer)
-                                        return (Integer) instance;
-                                    else
-                                        return 0;
+                                    if (instance instanceof Integer) {
+										return (Integer) instance;
+									} else {
+										return 0;
+									}
                                 } catch (InvocationTargetException e) {
                                     Throwable t = e.getTargetException();
-                                    if (t instanceof Exception)
-                                        throw (Exception) t;
+                                    if (t instanceof Exception) {
+										throw (Exception) t;
+									}
                                     throw e;
                                 } finally {
                                     sc.setAuthentication(old); // restore
@@ -256,7 +269,7 @@ public class CLIRegisterer extends ExtensionFinder {
                                 String id = UUID.randomUUID().toString();
                                 LOGGER.log(Level.INFO, "CLI login attempt failed: " + id, e);
                                 stderr.println();
-                                stderr.println("ERROR: Bad Credentials. Search the server log for " + id + " for more details.");
+                                stderr.println(new StringBuilder().append("ERROR: Bad Credentials. Search the server log for ").append(id).append(" for more details.").toString());
                                 return 7;
                             } catch (Throwable e) {
                                 final String errorMsg = String.format("Unexpected exception occurred while performing %s command.",
@@ -269,7 +282,8 @@ public class CLIRegisterer extends ExtensionFinder {
                             }
                         }
 
-                        protected int run() throws Exception {
+                        @Override
+						protected int run() throws Exception {
                             throw new UnsupportedOperationException();
                         }
                     }));
@@ -284,7 +298,7 @@ public class CLIRegisterer extends ExtensionFinder {
         return r;
     }
 
-    /**
+	/**
      * Locates the {@link ResourceBundleHolder} for this CLI method.
      */
     private ResourceBundleHolder loadMessageBundle(Method m) throws ClassNotFoundException {
@@ -292,6 +306,4 @@ public class CLIRegisterer extends ExtensionFinder {
         Class<?> msg = c.getClassLoader().loadClass(c.getName().substring(0, c.getName().lastIndexOf(".")) + ".Messages");
         return ResourceBundleHolder.get(msg);
     }
-
-    private static final Logger LOGGER = Logger.getLogger(CLIRegisterer.class.getName());
 }

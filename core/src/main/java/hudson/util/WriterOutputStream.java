@@ -44,29 +44,33 @@ import java.nio.*;
  */
 @Deprecated
 public class WriterOutputStream extends OutputStream {
-    private final Writer writer;
-    private final CharsetDecoder decoder;
+    private static final Charset DEFAULT_CHARSET = getDefaultCharset();
+	private final Writer writer;
+	private final CharsetDecoder decoder;
+	private java.nio.ByteBuffer buf = java.nio.ByteBuffer.allocate(1024);
+	private CharBuffer out = CharBuffer.allocate(1024);
 
-    private java.nio.ByteBuffer buf = java.nio.ByteBuffer.allocate(1024);
-    private CharBuffer out = CharBuffer.allocate(1024);
-
-    public WriterOutputStream(Writer out) {
+	public WriterOutputStream(Writer out) {
         this.writer = out;
         decoder = DEFAULT_CHARSET.newDecoder();
         decoder.onMalformedInput(CodingErrorAction.REPLACE);
         decoder.onUnmappableCharacter(CodingErrorAction.REPLACE);
     }
 
-    public void write(int b) throws IOException {
-        if(buf.remaining()==0)
-            decode(false);
+	@Override
+	public void write(int b) throws IOException {
+        if(buf.remaining()==0) {
+			decode(false);
+		}
         buf.put((byte)b);
     }
 
-    public void write(byte[] b, int off, int len) throws IOException {
+	@Override
+	public void write(byte[] b, int off, int len) throws IOException {
         while(len>0) {
-            if(buf.remaining()==0)
-                decode(false);
+            if(buf.remaining()==0) {
+				decode(false);
+			}
             int sz = Math.min(buf.remaining(),len);
             buf.put(b,off,sz);
             off += sz;
@@ -74,18 +78,20 @@ public class WriterOutputStream extends OutputStream {
         }
     }
 
-    public void flush() throws IOException {
+	@Override
+	public void flush() throws IOException {
         decode(false);
         flushOutput();
         writer.flush();
     }
 
-    private void flushOutput() throws IOException {
+	private void flushOutput() throws IOException {
         writer.write(out.array(),0,out.position());
         out.clear();
     }
 
-    public void close() throws IOException {
+	@Override
+	public void close() throws IOException {
         decode(true);
         flushOutput();
         writer.close();
@@ -93,7 +99,7 @@ public class WriterOutputStream extends OutputStream {
         buf.rewind();
     }
 
-    /**
+	/**
      * Decodes the contents of {@link #buf} as much as possible to {@link #out}.
      * If necessary {@link #out} is further sent to {@link #writer}.
      *
@@ -121,9 +127,7 @@ public class WriterOutputStream extends OutputStream {
         }
     }
 
-    private static final Charset DEFAULT_CHARSET = getDefaultCharset();
-
-    private static Charset getDefaultCharset() {
+	private static Charset getDefaultCharset() {
         try {
             String encoding = System.getProperty("file.encoding");
             return Charset.forName(encoding);

@@ -81,7 +81,8 @@ public class ResponseTimeMonitor extends NodeMonitor {
             return monitoringData;
         }
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.ResponseTimeMonitor_DisplayName();
         }
 
@@ -91,56 +92,62 @@ public class ResponseTimeMonitor extends NodeMonitor {
         }
     };
 
-    private static final class Step1 extends MasterToSlaveCallable<Data,IOException> {
-        private Data cur;
+	/**
+     * Time out interval in milliseconds.
+     */
+    private static final long TIMEOUT = 5000;
 
-        private Step1(Data cur) {
+	private static final Logger LOGGER = Logger.getLogger(ResponseTimeMonitor.class.getName());
+
+    private static final class Step1 extends MasterToSlaveCallable<Data,IOException> {
+        private static final long serialVersionUID = 1L;
+		private Data cur;
+
+		private Step1(Data cur) {
             this.cur = cur;
         }
 
-        public Data call() {
+		@Override
+		public Data call() {
             // this method must be being invoked locally, which means the roundtrip time is zero and zero forever
             return new Data(cur,0);
         }
 
-        private Object writeReplace() {
+		private Object writeReplace() {
             return new Step2(cur);
         }
-
-        private static final long serialVersionUID = 1L;
     }
 
     private static final class Step2 extends MasterToSlaveCallable<Step3,IOException> {
-        private final Data cur;
-        private final long start = System.currentTimeMillis();
+        private static final long serialVersionUID = 1L;
+		private final Data cur;
+		private final long start = System.currentTimeMillis();
 
-        public Step2(Data cur) {
+		public Step2(Data cur) {
             this.cur = cur;
         }
 
-        public Step3 call() {
+		@Override
+		public Step3 call() {
             // this method must be being invoked locally, which means the roundtrip time is zero and zero forever
             return new Step3(cur,start);
         }
-
-        private static final long serialVersionUID = 1L;
     }
 
     private static final class Step3 implements Serializable {
-        private final Data cur;
-        private final long start;
+        private static final long serialVersionUID = 1L;
+		private final Data cur;
+		private final long start;
 
-        private Step3(Data cur, long start) {
+		private Step3(Data cur, long start) {
             this.cur = cur;
             this.start = start;
         }
 
-        private Object readResolve() {
+		private Object readResolve() {
             long end = System.currentTimeMillis();
             return new Data(cur,(end-start));
         }
-
-        private static final long serialVersionUID = 1L;
     }
 
     /**
@@ -148,16 +155,17 @@ public class ResponseTimeMonitor extends NodeMonitor {
      */
     @ExportedBean
     public static final class Data extends MonitorOfflineCause implements Serializable {
-        /**
+        private static final long serialVersionUID = 1L;
+		/**
          * Record of the past 5 times. -1 if time out. Otherwise in milliseconds.
          * Old ones first.
          */
         private final long[] past5;
 
-        private Data(Data old, long newDataPoint) {
-            if(old==null)
-                past5 = new long[] {newDataPoint};
-            else {
+		private Data(Data old, long newDataPoint) {
+            if(old==null) {
+				past5 = new long[] {newDataPoint};
+			} else {
                 past5 = new long[Math.min(5,old.past5.length+1)];
                 int copyLen = past5.length - 1;
                 System.arraycopy(old.past5, old.past5.length-copyLen, this.past5, 0, copyLen);
@@ -165,35 +173,38 @@ public class ResponseTimeMonitor extends NodeMonitor {
             }
         }
 
-        /**
+		/**
          * Computes the recurrence of the time out
          */
         private int failureCount() {
             int cnt=0;
             //noinspection StatementWithEmptyBody
-            for(int i=past5.length-1; i>=0 && past5[i]<0; i--, cnt++)
-                ;
+            for(int i=past5.length-1; i>=0 && past5[i]<0; i--, cnt++) {
+			}
             return cnt;
         }
 
-        /**
+		/**
          * Computes the average response time, by taking the time out into account.
          */
         @Exported
         public long getAverage() {
             long total=0;
             for (long l : past5) {
-                if(l<0)     total += TIMEOUT;
-                else        total += l;
+                if(l<0) {
+					total += TIMEOUT;
+				} else {
+					total += l;
+				}
             }
             return total/past5.length;
         }
 
-        public boolean hasTooManyTimeouts() {
+		public boolean hasTooManyTimeouts() {
             return failureCount()>=5;
         }
 
-        /**
+		/**
          * String rendering of the data
          */
         @Override
@@ -205,23 +216,15 @@ public class ResponseTimeMonitor extends NodeMonitor {
 //            }
 //            return buf.toString();
             int fc = failureCount();
-            if(fc>0)
-                return Messages.ResponseTimeMonitor_TimeOut(fc);
+            if(fc>0) {
+				return Messages.ResponseTimeMonitor_TimeOut(fc);
+			}
             return getAverage()+"ms";
         }
 
-        @Override
+		@Override
         public Class<? extends NodeMonitor> getTrigger() {
             return ResponseTimeMonitor.class;
         }
-
-        private static final long serialVersionUID = 1L;
     }
-
-    /**
-     * Time out interval in milliseconds.
-     */
-    private static final long TIMEOUT = 5000;
-
-    private static final Logger LOGGER = Logger.getLogger(ResponseTimeMonitor.class.getName());
 }

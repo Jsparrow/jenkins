@@ -61,85 +61,42 @@ import java.io.IOException;
  * @author Kohsuke Kawaguchi
  */
 public class NodeProvisioner {
-    /**
-     * The node addition activity in progress.
-     */
-    public static class PlannedNode {
-        /**
-         * Used to display this planned node to UI. Should ideally include the identifier unique to the node
-         * being provisioned (like the instance ID), but if such an identifier doesn't readily exist, this
-         * can be just a name of the template being provisioned (like the machine image ID.)
-         */
-        public final String displayName;
+    private static final Logger LOGGER = Logger.getLogger(NodeProvisioner.class.getName());
 
-        /**
-         * Used to launch and return a {@link Node} object. {@link NodeProvisioner} will check
-         * this {@link Future}'s isDone() method to determine when to finalize this object.
-         */
-        public final Future<Node> future;
+	private static final float MARGIN = SystemProperties.getInteger(NodeProvisioner.class.getName()+".MARGIN",10)/100f;
 
-        /**
-         * The number of executors that will be provided by the {@link Node} launched by
-         * this object. This is used for capacity planning in {@link NodeProvisioner#update}.
-         */
-        public final int numExecutors;
+	private static final float MARGIN0 = Math.max(MARGIN, getFloatSystemProperty(NodeProvisioner.class.getName()+".MARGIN0",0.5f));
 
-        /**
-         * Construct a PlannedNode instance without {@link Cloud} callback for finalization.
-         *
-         * @param displayName Used to display this object in the UI.
-         * @param future Used to launch a @{link Node} object.
-         * @param numExecutors The number of executors that will be provided by the launched {@link Node}.
-         */
-        public PlannedNode(String displayName, Future<Node> future, int numExecutors) {
-            if(displayName==null || future==null || numExecutors<1)  throw new IllegalArgumentException();
-            this.displayName = displayName;
-            this.future = future;
-            this.numExecutors = numExecutors;
-        }
+	private static final float MARGIN_DECAY = getFloatSystemProperty(NodeProvisioner.class.getName()+".MARGIN_DECAY",0.5f);
 
-        /**
-         * Indicate that this {@link PlannedNode} is being finalized.
-         *
-         * <p>
-         * {@link NodeProvisioner} will call this method when it's done with {@link PlannedNode}.
-         * This indicates that the {@link PlannedNode}'s work has been completed
-         * (successfully or otherwise) and it is about to be removed from the list of pending
-         * {@link Node}s to be launched.
-         *
-         * <p>
-         * Create a subtype of this class and override this method to add any necessary behaviour.
-         *
-         * @since 1.503
-         */
-        public void spent() {
-        }
-    }
+	// TODO: picker should be selectable
+    private static final TimeScale TIME_SCALE = TimeScale.SEC10;
 
-    /**
+	/**
      * Load for the label.
      */
     private final LoadStatistics stat;
 
-    /**
+	/**
      * For which label are we working?
      * Null if this {@link NodeProvisioner} is working for the entire Hudson,
      * for jobs that are unassigned to any particular node.
      */
     private final Label label;
 
-    private final AtomicReference<List<PlannedNode>> pendingLaunches
+	private final AtomicReference<List<PlannedNode>> pendingLaunches
             = new AtomicReference<>(new ArrayList<>());
 
-    private final Lock provisioningLock = new ReentrantLock();
+	private final Lock provisioningLock = new ReentrantLock();
 
-    @GuardedBy("provisioningLock")
+	@GuardedBy("provisioningLock")
     private StrategyState provisioningState = null;
 
-    private transient volatile long lastSuggestedReview;
-    private transient volatile boolean queuedReview;
+	private transient volatile long lastSuggestedReview;
 
-    /**
+	private transient volatile boolean queuedReview;
+
+	/**
      * Exponential moving average of the "planned capacity" over time, which is the number of
      * additional executors being brought up.
      *
@@ -149,12 +106,12 @@ public class NodeProvisioner {
     private final MultiStageTimeSeries plannedCapacitiesEMA =
             new MultiStageTimeSeries(Messages._NodeProvisioner_EmptyString(),Color.WHITE,0,DECAY);
 
-    public NodeProvisioner(Label label, LoadStatistics loadStatistics) {
+	public NodeProvisioner(Label label, LoadStatistics loadStatistics) {
         this.label = label;
         this.stat = loadStatistics;
     }
 
-    /**
+	/**
      * Nodes that are being launched.
      *
      * @return
@@ -165,7 +122,7 @@ public class NodeProvisioner {
         return new ArrayList<>(pendingLaunches.get());
     }
 
-    /**
+	/**
      * Give the {@link NodeProvisioner} a hint that now would be a good time to think about provisioning some nodes.
      * Hints are throttled to one every second.
      *
@@ -182,10 +139,10 @@ public class NodeProvisioner {
                 });
             } else {
                 queuedReview = true;
-                LOGGER.fine(() -> "running suggested review in " + delay + " ms for " + label);
+                LOGGER.fine(() -> new StringBuilder().append("running suggested review in ").append(delay).append(" ms for ").append(label).toString());
                 Timer.get().schedule(() -> {
                     lastSuggestedReview = System.currentTimeMillis();
-                    LOGGER.fine(() -> "running suggested review for " + label + " after " + delay + " ms");
+                    LOGGER.fine(() -> new StringBuilder().append("running suggested review for ").append(label).append(" after ").append(delay).append(" ms").toString());
                     update();
                 }, delay, TimeUnit.MILLISECONDS);
             }
@@ -194,7 +151,7 @@ public class NodeProvisioner {
         }
     }
 
-    /**
+	/**
      * Periodically invoked to keep track of the load.
      * Launches additional nodes if necessary.
      *
@@ -259,7 +216,8 @@ public class NodeProvisioner {
                                         fireOnCommit(f, node);
                                     } catch (IOException e) {
                                         LOGGER.log(Level.WARNING,
-                                                "Provisioned agent " + f.displayName + " failed to launch",
+                                                new StringBuilder().append("Provisioned agent ").append(f.displayName).append(" failed to launch")
+														.toString(),
                                                 e);
                                         fireOnRollback(f, node, e);
                                     }
@@ -340,12 +298,86 @@ public class NodeProvisioner {
             provisioningLock.unlock();
         }
         if (LOGGER.isLoggable(Level.FINER)) {
-            LOGGER.finer(() -> "ran update on " + label + " in " + (System.nanoTime() - start) / 1_000_000 + "ms");
+            LOGGER.finer(() -> new StringBuilder().append("ran update on ").append(label).append(" in ").append((System.nanoTime() - start) / 1_000_000).append("ms").toString());
+        }
+    }
+
+	private static float getFloatSystemProperty(String propName, float defaultValue) {
+        String v = SystemProperties.getString(propName);
+        if (v!=null) {
+			try {
+                return Float.parseFloat(v);
+            } catch (NumberFormatException e) {
+                LOGGER.warning(new StringBuilder().append("Failed to parse a float value from system property ").append(propName).append(". value was ").append(v).toString());
+            }
+		}
+        return defaultValue;
+    }
+
+	private static void fireOnFailure(final NodeProvisioner.PlannedNode plannedNode, final Throwable cause) {
+        for (CloudProvisioningListener cl : CloudProvisioningListener.all()) {
+            try {
+                cl.onFailure(plannedNode, cause);
+            } catch (Error e) {
+                throw e;
+            } catch (Throwable e) {
+                LOGGER.log(Level.SEVERE, new StringBuilder().append("Unexpected uncaught exception encountered while ").append("processing onFailure() listener call in ").append(cl).append(" for agent ").append(plannedNode.displayName).toString(), e);
+            }
+        }
+    }
+
+	private static void fireOnRollback(final NodeProvisioner.PlannedNode plannedNode, final Node newNode,
+                                       final Throwable cause) {
+        for (CloudProvisioningListener cl : CloudProvisioningListener.all()) {
+            try {
+                cl.onRollback(plannedNode, newNode, cause);
+            } catch (Error e) {
+                throw e;
+            } catch (Throwable e) {
+                LOGGER.log(Level.SEVERE, new StringBuilder().append("Unexpected uncaught exception encountered while ").append("processing onRollback() listener call in ").append(cl).append(" for agent ").append(newNode.getDisplayName()).toString(), e);
+            }
+        }
+    }
+
+	private static void fireOnComplete(final NodeProvisioner.PlannedNode plannedNode, final Node newNode) {
+        for (CloudProvisioningListener cl : CloudProvisioningListener.all()) {
+            try {
+                cl.onComplete(plannedNode, newNode);
+            } catch (Error e) {
+                throw e;
+            } catch (Throwable e) {
+                LOGGER.log(Level.SEVERE, new StringBuilder().append("Unexpected uncaught exception encountered while ").append("processing onComplete() listener call in ").append(cl).append(" for agent ").append(plannedNode.displayName).toString(), e);
+            }
+        }
+    }
+
+	private static void fireOnCommit(final NodeProvisioner.PlannedNode plannedNode, final Node newNode) {
+        for (CloudProvisioningListener cl : CloudProvisioningListener.all()) {
+            try {
+                cl.onCommit(plannedNode, newNode);
+            } catch (Error e) {
+                throw e;
+            } catch (Throwable e) {
+                LOGGER.log(Level.SEVERE, new StringBuilder().append("Unexpected uncaught exception encountered while ").append("processing onCommit() listener call in ").append(cl).append(" for agent ").append(newNode.getDisplayName()).toString(), e);
+            }
+        }
+    }
+
+	private static void fireOnStarted(final Cloud cloud, final Label label,
+                                      final Collection<NodeProvisioner.PlannedNode> plannedNodes) {
+        for (CloudProvisioningListener cl : CloudProvisioningListener.all()) {
+            try {
+                cl.onStarted(cloud, label, plannedNodes);
+            } catch (Error e) {
+                throw e;
+            } catch (Throwable e) {
+                LOGGER.log(Level.SEVERE, new StringBuilder().append("Unexpected uncaught exception encountered while ").append("processing onStarted() listener call in ").append(cl).append(" for label ").append(label.toString()).toString(), e);
+            }
         }
     }
 
 
-    /**
+	/**
      * Represents the decision taken by an individual {@link hudson.slaves.NodeProvisioner.Strategy}.
      * @since 1.588
      */
@@ -366,11 +398,68 @@ public class NodeProvisioner {
         PROVISIONING_COMPLETED
     }
 
+	/**
+     * The node addition activity in progress.
+     */
+    public static class PlannedNode {
+        /**
+         * Used to display this planned node to UI. Should ideally include the identifier unique to the node
+         * being provisioned (like the instance ID), but if such an identifier doesn't readily exist, this
+         * can be just a name of the template being provisioned (like the machine image ID.)
+         */
+        public final String displayName;
+
+        /**
+         * Used to launch and return a {@link Node} object. {@link NodeProvisioner} will check
+         * this {@link Future}'s isDone() method to determine when to finalize this object.
+         */
+        public final Future<Node> future;
+
+        /**
+         * The number of executors that will be provided by the {@link Node} launched by
+         * this object. This is used for capacity planning in {@link NodeProvisioner#update}.
+         */
+        public final int numExecutors;
+
+        /**
+         * Construct a PlannedNode instance without {@link Cloud} callback for finalization.
+         *
+         * @param displayName Used to display this object in the UI.
+         * @param future Used to launch a @{link Node} object.
+         * @param numExecutors The number of executors that will be provided by the launched {@link Node}.
+         */
+        public PlannedNode(String displayName, Future<Node> future, int numExecutors) {
+            if(displayName==null || future==null || numExecutors<1) {
+				throw new IllegalArgumentException();
+			}
+            this.displayName = displayName;
+            this.future = future;
+            this.numExecutors = numExecutors;
+        }
+
+        /**
+         * Indicate that this {@link PlannedNode} is being finalized.
+         *
+         * <p>
+         * {@link NodeProvisioner} will call this method when it's done with {@link PlannedNode}.
+         * This indicates that the {@link PlannedNode}'s work has been completed
+         * (successfully or otherwise) and it is about to be removed from the list of pending
+         * {@link Node}s to be launched.
+         *
+         * <p>
+         * Create a subtype of this class and override this method to add any necessary behaviour.
+         *
+         * @since 1.503
+         */
+        public void spent() {
+        }
+    }
+
     /**
      * Extension point for node provisioning strategies.
      * @since 1.588
      */
-    public static abstract class Strategy implements ExtensionPoint {
+    public abstract static class Strategy implements ExtensionPoint {
 
         /**
          * Called by {@link NodeProvisioner#update()} to apply this strategy against the specified state.
@@ -613,11 +702,8 @@ public class NodeProvisioner {
          */
         @Override
         public String toString() {
-            String sb = "StrategyState{" + "label=" + label +
-                    ", snapshot=" + snapshot +
-                    ", plannedCapacitySnapshot=" + plannedCapacitySnapshot +
-                    ", additionalPlannedCapacity=" + additionalPlannedCapacity +
-                    '}';
+            String sb = new StringBuilder().append("StrategyState{").append("label=").append(label).append(", snapshot=").append(snapshot).append(", plannedCapacitySnapshot=")
+					.append(plannedCapacitySnapshot).append(", additionalPlannedCapacity=").append(additionalPlannedCapacity).append('}').toString();
             return sb;
         }
     }
@@ -691,10 +777,7 @@ public class NodeProvisioner {
                 }
                 float m = calcThresholdMargin(state.getTotalSnapshot());
                 if (excessWorkload > 1 - m) {// and there's more work to do...
-                    LOGGER.log(Level.FINE, "Excess workload {0,number,#.###} detected. "
-                                    + "(planned capacity={1,number,#.###},connecting capacity={7,number,#.###},"
-                                    + "Qlen={2,number,#.###},available={3,number,#.###}&{4,number,integer},"
-                                    + "online={5,number,integer},m={6,number,#.###})",
+                    LOGGER.log(Level.FINE, new StringBuilder().append("Excess workload {0,number,#.###} detected. ").append("(planned capacity={1,number,#.###},connecting capacity={7,number,#.###},").append("Qlen={2,number,#.###},available={3,number,#.###}&{4,number,integer},").append("online={5,number,integer},m={6,number,#.###})").toString(),
                             new Object[]{
                                     excessWorkload, plannedCapacity, qlen, available, snapshot.getAvailableExecutors(),
                                     snapshot.getOnlineExecutors(), m , snapshot.getConnectingExecutors()
@@ -811,7 +894,8 @@ public class NodeProvisioner {
             return INITIALDELAY;
         }
 
-        public long getRecurrencePeriod() {
+        @Override
+		public long getRecurrencePeriod() {
             return RECURRENCEPERIOD;
         }
 
@@ -819,99 +903,7 @@ public class NodeProvisioner {
         protected void doRun() {
             Jenkins j = Jenkins.get();
             j.unlabeledNodeProvisioner.update();
-            for( Label l : j.getLabels() )
-                l.nodeProvisioner.update();
-        }
-    }
-
-    private static final Logger LOGGER = Logger.getLogger(NodeProvisioner.class.getName());
-    private static final float MARGIN = SystemProperties.getInteger(NodeProvisioner.class.getName()+".MARGIN",10)/100f;
-    private static final float MARGIN0 = Math.max(MARGIN, getFloatSystemProperty(NodeProvisioner.class.getName()+".MARGIN0",0.5f));
-    private static final float MARGIN_DECAY = getFloatSystemProperty(NodeProvisioner.class.getName()+".MARGIN_DECAY",0.5f);
-
-    // TODO: picker should be selectable
-    private static final TimeScale TIME_SCALE = TimeScale.SEC10;
-
-    private static float getFloatSystemProperty(String propName, float defaultValue) {
-        String v = SystemProperties.getString(propName);
-        if (v!=null)
-            try {
-                return Float.parseFloat(v);
-            } catch (NumberFormatException e) {
-                LOGGER.warning("Failed to parse a float value from system property "+propName+". value was "+v);
-            }
-        return defaultValue;
-    }
-
-    private static void fireOnFailure(final NodeProvisioner.PlannedNode plannedNode, final Throwable cause) {
-        for (CloudProvisioningListener cl : CloudProvisioningListener.all()) {
-            try {
-                cl.onFailure(plannedNode, cause);
-            } catch (Error e) {
-                throw e;
-            } catch (Throwable e) {
-                LOGGER.log(Level.SEVERE, "Unexpected uncaught exception encountered while "
-                        + "processing onFailure() listener call in " + cl + " for agent "
-                        + plannedNode.displayName, e);
-            }
-        }
-    }
-
-    private static void fireOnRollback(final NodeProvisioner.PlannedNode plannedNode, final Node newNode,
-                                       final Throwable cause) {
-        for (CloudProvisioningListener cl : CloudProvisioningListener.all()) {
-            try {
-                cl.onRollback(plannedNode, newNode, cause);
-            } catch (Error e) {
-                throw e;
-            } catch (Throwable e) {
-                LOGGER.log(Level.SEVERE, "Unexpected uncaught exception encountered while "
-                        + "processing onRollback() listener call in " + cl + " for agent "
-                        + newNode.getDisplayName(), e);
-            }
-        }
-    }
-
-    private static void fireOnComplete(final NodeProvisioner.PlannedNode plannedNode, final Node newNode) {
-        for (CloudProvisioningListener cl : CloudProvisioningListener.all()) {
-            try {
-                cl.onComplete(plannedNode, newNode);
-            } catch (Error e) {
-                throw e;
-            } catch (Throwable e) {
-                LOGGER.log(Level.SEVERE, "Unexpected uncaught exception encountered while "
-                        + "processing onComplete() listener call in " + cl + " for agent "
-                        + plannedNode.displayName, e);
-            }
-        }
-    }
-
-    private static void fireOnCommit(final NodeProvisioner.PlannedNode plannedNode, final Node newNode) {
-        for (CloudProvisioningListener cl : CloudProvisioningListener.all()) {
-            try {
-                cl.onCommit(plannedNode, newNode);
-            } catch (Error e) {
-                throw e;
-            } catch (Throwable e) {
-                LOGGER.log(Level.SEVERE, "Unexpected uncaught exception encountered while "
-                        + "processing onCommit() listener call in " + cl + " for agent "
-                        + newNode.getDisplayName(), e);
-            }
-        }
-    }
-
-    private static void fireOnStarted(final Cloud cloud, final Label label,
-                                      final Collection<NodeProvisioner.PlannedNode> plannedNodes) {
-        for (CloudProvisioningListener cl : CloudProvisioningListener.all()) {
-            try {
-                cl.onStarted(cloud, label, plannedNodes);
-            } catch (Error e) {
-                throw e;
-            } catch (Throwable e) {
-                LOGGER.log(Level.SEVERE, "Unexpected uncaught exception encountered while "
-                        + "processing onStarted() listener call in " + cl + " for label "
-                        + label.toString(), e);
-            }
+            j.getLabels().forEach(l -> l.nodeProvisioner.update());
         }
     }
 }

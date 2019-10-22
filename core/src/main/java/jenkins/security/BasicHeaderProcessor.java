@@ -41,22 +41,25 @@ import static java.util.logging.Level.*;
  * @author Kohsuke Kawaguchi
  */
 public class BasicHeaderProcessor implements Filter {
-    // these fields are supposed to be injected by Spring
+    private static final Logger LOGGER = Logger.getLogger(BasicHeaderProcessor.class.getName());
+	// these fields are supposed to be injected by Spring
     private AuthenticationEntryPoint authenticationEntryPoint;
-    private RememberMeServices rememberMeServices = new NullRememberMeServices();
+	private RememberMeServices rememberMeServices = new NullRememberMeServices();
 
-    public void init(FilterConfig filterConfig) throws ServletException {
+	@Override
+	public void init(FilterConfig filterConfig) throws ServletException {
     }
 
-    public void setAuthenticationEntryPoint(AuthenticationEntryPoint authenticationEntryPoint) {
+	public void setAuthenticationEntryPoint(AuthenticationEntryPoint authenticationEntryPoint) {
         this.authenticationEntryPoint = authenticationEntryPoint;
     }
 
-    public void setRememberMeServices(RememberMeServices rememberMeServices) {
+	public void setRememberMeServices(RememberMeServices rememberMeServices) {
         this.rememberMeServices = rememberMeServices;
     }
 
-    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+	@Override
+	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
         HttpServletRequest req = (HttpServletRequest) request;
         HttpServletResponse rsp = (HttpServletResponse) response;
         String authorization = req.getHeader("Authorization");
@@ -94,7 +97,7 @@ public class BasicHeaderProcessor implements Filter {
         }
     }
 
-    /**
+	/**
      * If the request is already authenticated to the same user that the Authorization header claims,
      * for example through the HTTP session, then there's no need to re-authenticate the Authorization header,
      * so we skip that. This avoids stressing {@link SecurityRealm}.
@@ -132,7 +135,7 @@ public class BasicHeaderProcessor implements Filter {
         return false;
     }
 
-    protected void success(HttpServletRequest req, HttpServletResponse rsp, FilterChain chain, Authentication auth) throws IOException, ServletException {
+	protected void success(HttpServletRequest req, HttpServletResponse rsp, FilterChain chain, Authentication auth) throws IOException, ServletException {
         rememberMeServices.loginSuccess(req, rsp, auth);
 
         SecurityContext old = ACL.impersonate(auth);
@@ -143,7 +146,7 @@ public class BasicHeaderProcessor implements Filter {
         }
     }
 
-    protected void fail(HttpServletRequest req, HttpServletResponse rsp, BadCredentialsException failure) throws IOException, ServletException {
+	protected void fail(HttpServletRequest req, HttpServletResponse rsp, BadCredentialsException failure) throws IOException, ServletException {
         LOGGER.log(FINE, "Authentication of BASIC header failed");
 
         rememberMeServices.loginFail(req, rsp);
@@ -151,12 +154,11 @@ public class BasicHeaderProcessor implements Filter {
         authenticationEntryPoint.commence(req, rsp, failure);
     }
 
-    protected List<? extends BasicHeaderAuthenticator> all() {
+	protected List<? extends BasicHeaderAuthenticator> all() {
         return BasicHeaderAuthenticator.all();
     }
 
-    public void destroy() {
+	@Override
+	public void destroy() {
     }
-
-    private static final Logger LOGGER = Logger.getLogger(BasicHeaderProcessor.class.getName());
 }

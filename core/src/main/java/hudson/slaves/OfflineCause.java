@@ -74,7 +74,14 @@ public abstract class OfflineCause {
         return new Date(timestamp);
     }
 
-    /**
+    public static OfflineCause create(Localizable d) {
+        if (d==null) {
+			return null;
+		}
+        return new SimpleOfflineCause(d);
+    }
+
+	/**
      * {@link OfflineCause} that renders a static text,
      * but without any further UI.
      */
@@ -92,11 +99,6 @@ public abstract class OfflineCause {
         public String toString() {
             return description.toString();
         }
-    }
-
-    public static OfflineCause create(Localizable d) {
-        if (d==null)    return null;
-        return new SimpleOfflineCause(d);
     }
 
     /**

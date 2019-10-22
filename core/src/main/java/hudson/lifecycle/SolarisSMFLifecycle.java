@@ -36,7 +36,9 @@ import java.util.logging.Logger;
  * @author Kohsuke Kawaguchi
  */
 public class SolarisSMFLifecycle extends Lifecycle {
-    /**
+    private static final Logger LOGGER = Logger.getLogger(SolarisSMFLifecycle.class.getName());
+
+	/**
      * In SMF managed environment, just commit a suicide and the service will be restarted by SMF.
      */
     @Override
@@ -52,6 +54,4 @@ public class SolarisSMFLifecycle extends Lifecycle {
         }
         System.exit(0);
     }
-
-    private static final Logger LOGGER = Logger.getLogger(SolarisSMFLifecycle.class.getName());
 }

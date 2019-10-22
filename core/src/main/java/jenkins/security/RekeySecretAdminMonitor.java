@@ -33,7 +33,9 @@ import java.util.logging.Logger;
 @Extension @Symbol("rekeySecret")
 public class RekeySecretAdminMonitor extends AsynchronousAdministrativeMonitor {
 
-    /**
+    private static final Logger LOGGER = Logger.getLogger(RekeySecretAdminMonitor.class.getName());
+
+	/**
      * Whether we detected a need to run the rewrite program.
      * Once we set it to true, we'll never turn it off.
      *
@@ -43,17 +45,17 @@ public class RekeySecretAdminMonitor extends AsynchronousAdministrativeMonitor {
      */
     private final FileBoolean needed = state("needed");
 
-    /**
+	/**
      * If the scanning process has run to the completion, we set to this true.
      */
     private final FileBoolean done = state("done");
 
-    /**
+	/**
      * If the rewrite process is scheduled upon the next boot.
      */
     private final FileBoolean scanOnBoot = state("scanOnBoot");
 
-    @SuppressWarnings("OverridableMethodCallInConstructor") // should have been final
+	@SuppressWarnings("OverridableMethodCallInConstructor") // should have been final
     public RekeySecretAdminMonitor() throws IOException {
         // if JENKINS_HOME existed <1.497, we need to offer rewrite
         // this computation needs to be done and the value be captured,
@@ -61,32 +63,33 @@ public class RekeySecretAdminMonitor extends AsynchronousAdministrativeMonitor {
         // actually rewritten XML files.
         Jenkins j = Jenkins.get();
         if (j.isUpgradedFromBefore(new VersionNumber("1.496.*"))
-        &&  new FileBoolean(new File(j.getRootDir(),"secret.key.not-so-secret")).isOff())
-            needed.on();
+        &&  new FileBoolean(new File(j.getRootDir(),"secret.key.not-so-secret")).isOff()) {
+			needed.on();
+		}
         Util.deleteRecursive(new File(getBaseDir(), "backups")); // SECURITY-376: no longer used
     }
 
-    @Override
+	@Override
     public boolean isActivated() {
         return needed.isOn();
     }
 
-    /**
+	/**
      * Indicates that the re-keying has run to the completion.
      */
     public boolean isDone() {
         return done.isOn();
     }
 
-    public void setNeeded() {
+	public void setNeeded() {
         needed.on();
     }
 
-    public boolean isScanOnBoot() {
+	public boolean isScanOnBoot() {
         return scanOnBoot.isOn();
     }
 
-    @RequirePOST
+	@RequirePOST
     public HttpResponse doScan(StaplerRequest req) throws IOException, GeneralSecurityException {
         if(req.hasParameter("background")) {
             start(false);
@@ -96,35 +99,36 @@ public class RekeySecretAdminMonitor extends AsynchronousAdministrativeMonitor {
         } else
         if(req.hasParameter("dismiss")) {
             disable(true);
-        } else
-            throw HttpResponses.error(400,"Invalid request submission: " + req.getParameterMap());
+        } else {
+			throw HttpResponses.error(400,"Invalid request submission: " + req.getParameterMap());
+		}
 
         return HttpResponses.redirectViaContextPath("/manage");
     }
 
-
-    private FileBoolean state(String name) {
+	private FileBoolean state(String name) {
         return new FileBoolean(new File(getBaseDir(),name));
     }
 
-    @Initializer(fatal=false,after=InitMilestone.PLUGINS_STARTED,before=InitMilestone.EXTENSIONS_AUGMENTED)
+	@Initializer(fatal=false,after=InitMilestone.PLUGINS_STARTED,before=InitMilestone.EXTENSIONS_AUGMENTED)
     // as early as possible, but this needs to be late enough that the ConfidentialStore is available
     public void scanOnReboot() throws InterruptedException, IOException, GeneralSecurityException {
         FileBoolean flag = scanOnBoot;
-        if (flag.isOn()) {
-            flag.off();
-            start(false).join();
-            // block the boot until the rewrite process is complete
-            // don't let the failure in RekeyThread block Jenkins boot.
-        }
+        if (!flag.isOn()) {
+			return;
+		}
+		flag.off();
+		start(false).join();
+		// block the boot until the rewrite process is complete
+		// don't let the failure in RekeyThread block Jenkins boot.
     }
 
-    @Override
+	@Override
     public String getDisplayName() {
         return Messages.RekeySecretAdminMonitor_DisplayName();
     }
 
-    /**
+	/**
      * Rewrite log file.
      */
     @Override
@@ -132,7 +136,7 @@ public class RekeySecretAdminMonitor extends AsynchronousAdministrativeMonitor {
         return new File(getBaseDir(),"rekey.log");
     }
 
-    @Override
+	@Override
     protected void fix(TaskListener listener) throws Exception {
         LOGGER.info("Initiating a re-keying of secrets. See "+getLogFile());
 
@@ -150,7 +154,5 @@ public class RekeySecretAdminMonitor extends AsynchronousAdministrativeMonitor {
             Functions.printStackTrace(e, listener.error("Fatal failure in rewriting secrets"));
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(RekeySecretAdminMonitor.class.getName());
 
 }

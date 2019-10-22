@@ -55,8 +55,9 @@ class Latch {
 
     public synchronized void abort(Throwable cause) {
         interrupted = new AbortException();
-        if (cause!=null)
-            interrupted.initCause(cause);
+        if (cause!=null) {
+			interrupted.initCause(cause);
+		}
         notifyAll();
     }
 
@@ -100,8 +101,9 @@ class Latch {
         }
 
         // all of us either leave normally or get interrupted
-        if (interrupted!=null)
-            throw (InterruptedException)new InterruptedException().initCause(interrupted);
+        if (interrupted!=null) {
+			throw (InterruptedException)new InterruptedException().initCause(interrupted);
+		}
     }
 
     /**

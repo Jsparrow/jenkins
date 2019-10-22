@@ -38,38 +38,39 @@ import jenkins.model.Jenkins;
  * @author Kohsuke Kawaguchi
  */
 public class GroovyHookScript {
-    private final String hook;
-    private final Binding bindings = new Binding();
-    private final ServletContext servletContext;
-    private final File home;
-    private final ClassLoader loader;
+    private static final Logger LOGGER = Logger.getLogger(GroovyHookScript.class.getName());
+	private final String hook;
+	private final Binding bindings = new Binding();
+	private final ServletContext servletContext;
+	private final File home;
+	private final ClassLoader loader;
 
-    @Deprecated
+	@Deprecated
     public GroovyHookScript(String hook) {
         this(hook, Jenkins.getActiveInstance());
     }
 
-    private GroovyHookScript(String hook, Jenkins j) {
-        this(hook, j.servletContext, j.getRootDir(), j.getPluginManager().uberClassLoader);
-    }
-
-    public GroovyHookScript(String hook, @Nonnull ServletContext servletContext, @Nonnull File home, @Nonnull ClassLoader loader) {
+	public GroovyHookScript(String hook, @Nonnull ServletContext servletContext, @Nonnull File home, @Nonnull ClassLoader loader) {
         this.hook = hook;
         this.servletContext = servletContext;
         this.home = home;
         this.loader = loader;
     }
 
-    public GroovyHookScript bind(String name, Object o) {
+	private GroovyHookScript(String hook, Jenkins j) {
+        this(hook, j.servletContext, j.getRootDir(), j.getPluginManager().uberClassLoader);
+    }
+
+	public GroovyHookScript bind(String name, Object o) {
         bindings.setProperty(name,o);
         return this;
     }
 
-    public Binding getBindings() {
+	public Binding getBindings() {
         return bindings;
     }
 
-    public void run() {
+	public void run() {
         final String hookGroovy = hook+".groovy";
         final String hookGroovyD = hook+".groovy.d";
 
@@ -80,7 +81,7 @@ public class GroovyHookScript {
             LOGGER.log(WARNING, "Failed to execute /WEB-INF/"+hookGroovy,e);
         }
 
-        Set<String> resources = servletContext.getResourcePaths("/WEB-INF/"+ hookGroovyD +"/");
+        Set<String> resources = servletContext.getResourcePaths(new StringBuilder().append("/WEB-INF/").append(hookGroovyD).append("/").toString());
         if (resources!=null) {
             // sort to execute them in a deterministic order
             for (String res : new TreeSet<>(resources)) {
@@ -97,41 +98,40 @@ public class GroovyHookScript {
         execute(script);
 
         File scriptD = new File(home, hookGroovyD);
-        if (scriptD.isDirectory()) {
-            File[] scripts = scriptD.listFiles(new FileFilter() {
-                public boolean accept(File f) {
-                    return f.getName().endsWith(".groovy");
-                }
-            });
-            if (scripts!=null) {
-                // sort to run them in a deterministic order
-                Arrays.sort(scripts);
-                for (File f : scripts) {
-                    execute(f);
-                }
-            }
-        }
+        if (!scriptD.isDirectory()) {
+			return;
+		}
+		File[] scripts = scriptD.listFiles((File f) -> f.getName().endsWith(".groovy"));
+		if (scripts!=null) {
+		    // sort to run them in a deterministic order
+		    Arrays.sort(scripts);
+		    for (File f : scripts) {
+		        execute(f);
+		    }
+		}
     }
 
-    protected void execute(URL bundled) throws IOException {
-        if (bundled!=null) {
-            LOGGER.info("Executing bundled script: "+bundled);
-            execute(new GroovyCodeSource(bundled));
-        }
+	protected void execute(URL bundled) throws IOException {
+        if (bundled == null) {
+			return;
+		}
+		LOGGER.info("Executing bundled script: "+bundled);
+		execute(new GroovyCodeSource(bundled));
     }
 
-    protected void execute(File f) {
-        if (f.exists()) {
-            LOGGER.info("Executing "+f);
-            try {
-                execute(new GroovyCodeSource(f));
-            } catch (IOException e) {
-                LOGGER.log(WARNING, "Failed to execute " + f, e);
-            }
-        }
+	protected void execute(File f) {
+        if (!f.exists()) {
+			return;
+		}
+		LOGGER.info("Executing "+f);
+		try {
+		    execute(new GroovyCodeSource(f));
+		} catch (IOException e) {
+		    LOGGER.log(WARNING, "Failed to execute " + f, e);
+		}
     }
 
-    protected void execute(GroovyCodeSource s) {
+	protected void execute(GroovyCodeSource s) {
         try {
             createShell().evaluate(s);
         } catch (RuntimeException x) {
@@ -139,12 +139,10 @@ public class GroovyHookScript {
         }
     }
 
-    /**
+	/**
      * Can be used to customize the environment in which the script runs.
      */
     protected GroovyShell createShell() {
         return new GroovyShell(loader, bindings);
     }
-
-    private static final Logger LOGGER = Logger.getLogger(GroovyHookScript.class.getName());
 }

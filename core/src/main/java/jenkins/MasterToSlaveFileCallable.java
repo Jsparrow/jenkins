@@ -18,9 +18,9 @@ import java.io.File;
  * @param <T> the return type; note that this must either be defined in your plugin or included in the stock JEP-200 whitelist
  */
 public abstract class MasterToSlaveFileCallable<T> implements FileCallable<T> {
-    @Override
-    public void checkRoles(RoleChecker checker) throws SecurityException {
+    private static final long serialVersionUID = 1L;
+	@Override
+    public void checkRoles(RoleChecker checker) {
         checker.check(this, Roles.SLAVE);
     }
-    private static final long serialVersionUID = 1L;
 }

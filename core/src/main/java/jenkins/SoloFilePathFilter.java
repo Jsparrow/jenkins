@@ -24,13 +24,16 @@ public final class SoloFilePathFilter extends FilePathFilter {
      * Null-safe constructor.
      */
     public static @Nullable SoloFilePathFilter wrap(@Nullable FilePathFilter base) {
-        if (base==null)     return null;
+        if (base==null) {
+			return null;
+		}
         return new SoloFilePathFilter(base);
     }
 
     private boolean noFalse(String op, File f, boolean b) {
-        if (!b)
-            throw new SecurityException("agent may not " + op + " " + f+"\nSee https://jenkins.io/redirect/security-144 for more details");
+        if (!b) {
+			throw new SecurityException(new StringBuilder().append("agent may not ").append(op).append(" ").append(f).append("\nSee https://jenkins.io/redirect/security-144 for more details").toString());
+		}
         return true;
     }
     
@@ -39,37 +42,37 @@ public final class SoloFilePathFilter extends FilePathFilter {
     }
 
     @Override
-    public boolean read(File f) throws SecurityException {
+    public boolean read(File f) {
         return noFalse("read",f,base.read(normalize(f)));
     }
 
     @Override
-    public boolean write(File f) throws SecurityException {
+    public boolean write(File f) {
         return noFalse("write",f,base.write(normalize(f)));
     }
 
     @Override
-    public boolean symlink(File f) throws SecurityException {
+    public boolean symlink(File f) {
         return noFalse("symlink",f,base.write(normalize(f)));
     }
 
     @Override
-    public boolean mkdirs(File f) throws SecurityException {
+    public boolean mkdirs(File f) {
         return noFalse("mkdirs",f,base.mkdirs(normalize(f)));
     }
 
     @Override
-    public boolean create(File f) throws SecurityException {
+    public boolean create(File f) {
         return noFalse("create",f,base.create(normalize(f)));
     }
 
     @Override
-    public boolean delete(File f) throws SecurityException {
+    public boolean delete(File f) {
         return noFalse("delete",f,base.delete(normalize(f)));
     }
 
     @Override
-    public boolean stat(File f) throws SecurityException {
+    public boolean stat(File f) {
         return noFalse("stat",f,base.stat(normalize(f)));
     }
 }

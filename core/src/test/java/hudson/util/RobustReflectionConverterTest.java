@@ -53,7 +53,7 @@ public class RobustReflectionConverterTest {
 
     private Point read(XStream xs) {
         String clsName = Point.class.getName();
-        return (Point) xs.fromXML("<" + clsName + "><x>1</x><y>2</y><z>3</z></" + clsName + '>');
+        return (Point) xs.fromXML(new StringBuilder().append("<").append(clsName).append("><x>1</x><y>2</y><z>3</z></").append(clsName).append('>').toString());
     }
 
     @Test
@@ -69,12 +69,10 @@ public class RobustReflectionConverterTest {
 
     @Test
     public void classOwnership() throws Exception {
-        XStream xs = new XStream2(new XStream2.ClassOwnership() {
-            @Override public String ownerOf(Class<?> clazz) {
-                Owner o = clazz.getAnnotation(Owner.class);
-                return o != null ? o.value() : null;
-            }
-        });
+        XStream xs = new XStream2((Class<?> clazz) -> {
+		    Owner o = clazz.getAnnotation(Owner.class);
+		    return o != null ? o.value() : null;
+		});
         String prefix1 = RobustReflectionConverterTest.class.getName() + "_-";
         String prefix2 = RobustReflectionConverterTest.class.getName() + "$";
         Enchufla s1 = new Enchufla();
@@ -93,14 +91,11 @@ public class RobustReflectionConverterTest {
         b.steppes = new Steppe[] {s1, s2, s3};
         Projekt p = new Projekt();
         p.bildz = new Bild[] {b};
-        assertEquals("<Projekt><bildz><Bild><steppes>"
-                + "<Enchufla plugin='p1'><number>1</number><direction>North</direction></Enchufla>"
-                // note no plugin='p2' on <boot/> since that would be redundant; <jacket/> is quiet even though unowned
-                + "<Moonwalk plugin='p2'><number>2</number><boot/><lover class='Billy' plugin='p3'/></Moonwalk>"
-                + "<Moonwalk plugin='p2'><number>3</number><boot/><jacket/><lover class='Jean' plugin='p4'/></Moonwalk>"
-                + "</steppes></Bild></bildz></Projekt>",
+        // note no plugin='p2' on <boot/> since that would be redundant; <jacket/> is quiet even though unowned
+		assertEquals(new StringBuilder().append("<Projekt><bildz><Bild><steppes>").append("<Enchufla plugin='p1'><number>1</number><direction>North</direction></Enchufla>").append("<Moonwalk plugin='p2'><number>2</number><boot/><lover class='Billy' plugin='p3'/></Moonwalk>").append("<Moonwalk plugin='p2'><number>3</number><boot/><jacket/><lover class='Jean' plugin='p4'/></Moonwalk>").append("</steppes></Bild></bildz></Projekt>").toString(),
                 xs.toXML(p).replace(prefix1, "").replace(prefix2, "").replaceAll("\r?\n *", "").replace('"', '\''));
-        Moonwalk s = (Moonwalk) xs.fromXML("<" + prefix1 + "Moonwalk plugin='p2'><lover class='" + prefix2 + "Billy' plugin='p3'/></" + prefix1 + "Moonwalk>");
+        Moonwalk s = (Moonwalk) xs.fromXML(new StringBuilder().append("<").append(prefix1).append("Moonwalk plugin='p2'><lover class='").append(prefix2).append("Billy' plugin='p3'/></").append(prefix1).append("Moonwalk>")
+				.toString());
         assertEquals(Billy.class, s.lover.getClass());
     }
 
@@ -111,7 +106,7 @@ public class RobustReflectionConverterTest {
     public static class Bild {
         Steppe[] steppes;
     }
-    public static abstract class Steppe {
+    public abstract static class Steppe {
         int number;
     }
     @Owner("p1")
@@ -128,7 +123,7 @@ public class RobustReflectionConverterTest {
     public static class Boot {}
     public static class Jacket {}
     @Owner("p2")
-    public static abstract class Lover {}
+    public abstract static class Lover {}
     @Owner("p3")
     public static class Billy extends Lover {}
     @Owner("p4")

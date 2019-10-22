@@ -47,77 +47,90 @@ public final class WeakLogHandler extends Handler {
         this.target = new WeakReference<>(target);
     }
 
-    public void publish(LogRecord record) {
+    @Override
+	public void publish(LogRecord record) {
         Handler t = resolve();
-        if(t!=null)
-            t.publish(record);
+        if(t!=null) {
+			t.publish(record);
+		}
     }
 
-    public void flush() {
+    @Override
+	public void flush() {
         Handler t = resolve();
-        if(t!=null)
-            t.flush();
+        if(t!=null) {
+			t.flush();
+		}
     }
 
-    public void close() throws SecurityException {
+    @Override
+	public void close() {
         Handler t = resolve();
-        if(t!=null)
-            t.close();
+        if(t!=null) {
+			t.close();
+		}
     }
 
     private Handler resolve() {
         Handler r = target.get();
-        if(r==null)
-            logger.removeHandler(this);
+        if(r==null) {
+			logger.removeHandler(this);
+		}
         return r;
     }
 
     @Override
-    public void setFormatter(Formatter newFormatter) throws SecurityException {
+    public void setFormatter(Formatter newFormatter) {
         super.setFormatter(newFormatter);
         Handler t = resolve();
-        if(t!=null)
-            t.setFormatter(newFormatter);
+        if(t!=null) {
+			t.setFormatter(newFormatter);
+		}
     }
 
     @Override
-    public void setEncoding(String encoding) throws SecurityException, UnsupportedEncodingException {
+    public void setEncoding(String encoding) throws UnsupportedEncodingException {
         super.setEncoding(encoding);
         Handler t = resolve();
-        if(t!=null)
-            t.setEncoding(encoding);
+        if(t!=null) {
+			t.setEncoding(encoding);
+		}
     }
 
     @Override
-    public void setFilter(Filter newFilter) throws SecurityException {
+    public void setFilter(Filter newFilter) {
         super.setFilter(newFilter);
         Handler t = resolve();
-        if(t!=null)
-            t.setFilter(newFilter);
+        if(t!=null) {
+			t.setFilter(newFilter);
+		}
     }
 
     @Override
     public void setErrorManager(ErrorManager em) {
         super.setErrorManager(em);
         Handler t = resolve();
-        if(t!=null)
-            t.setErrorManager(em);
+        if(t!=null) {
+			t.setErrorManager(em);
+		}
     }
 
     @Override
-    public void setLevel(Level newLevel) throws SecurityException {
+    public void setLevel(Level newLevel) {
         super.setLevel(newLevel);
         Handler t = resolve();
-        if(t!=null)
-            t.setLevel(newLevel);
+        if(t!=null) {
+			t.setLevel(newLevel);
+		}
     }
 
     @Override
     public boolean isLoggable(LogRecord record) {
         Handler t = resolve();
-        if(t!=null)
-            return t.isLoggable(record);
-        else
-            return super.isLoggable(record);
+        if(t!=null) {
+			return t.isLoggable(record);
+		} else {
+			return super.isLoggable(record);
+		}
     }
 }

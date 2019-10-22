@@ -46,13 +46,15 @@ public class ByteBuffer extends OutputStream {
     private int size = 0;
 
 
-    public synchronized void write(byte[] b, int off, int len) throws IOException {
+    @Override
+	public synchronized void write(byte[] b, int off, int len) throws IOException {
         ensureCapacity(len);
         System.arraycopy(b,off,buf,size,len);
         size+=len;
     }
 
-    public synchronized void write(int b) throws IOException {
+    @Override
+	public synchronized void write(int b) throws IOException {
         ensureCapacity(1);
         buf[size++] = (byte)b;
     }
@@ -62,15 +64,17 @@ public class ByteBuffer extends OutputStream {
     }
 
     private void ensureCapacity(int len) {
-        if(buf.length-size>len)
-            return;
+        if(buf.length-size>len) {
+			return;
+		}
 
         byte[] n = new byte[Math.max(buf.length*2, size+len)];
         System.arraycopy(buf,0,n,0,size);
         this.buf = n;
     }
 
-    public synchronized String toString() {
+    @Override
+	public synchronized String toString() {
         return new String(buf,0,size);
     }
 
@@ -87,17 +91,22 @@ public class ByteBuffer extends OutputStream {
     public InputStream newInputStream() {
         return new InputStream() {
             private int pos = 0;
-            public int read() throws IOException {
+            @Override
+			public int read() throws IOException {
                 synchronized(ByteBuffer.this) {
-                    if(pos>=size)   return -1;
+                    if(pos>=size) {
+						return -1;
+					}
                     return buf[pos++];
                 }
             }
 
-            public int read(byte[] b, int off, int len) throws IOException {
+            @Override
+			public int read(byte[] b, int off, int len) throws IOException {
                 synchronized(ByteBuffer.this) {
-                    if(size==pos)
-                        return -1;
+                    if(size==pos) {
+						return -1;
+					}
 
                     int sz = Math.min(len,size-pos);
                     System.arraycopy(buf,pos,b,off,sz);
@@ -107,13 +116,15 @@ public class ByteBuffer extends OutputStream {
             }
 
 
-            public int available() throws IOException {
+            @Override
+			public int available() throws IOException {
                 synchronized(ByteBuffer.this) {
                     return size-pos;
                 }
             }
 
-            public long skip(long n) throws IOException {
+            @Override
+			public long skip(long n) throws IOException {
                 synchronized(ByteBuffer.this) {
                     int diff = (int) Math.min(n,size-pos);
                     pos+=diff;

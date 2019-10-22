@@ -73,13 +73,11 @@ public abstract class ExtensionFilter implements ExtensionPoint {
 
     public static <T> boolean isAllowed(Class<T> type, ExtensionComponent<T> component) {
         // to avoid infinite recursion, those extension points are handled differently.
-        if (type==ExtensionFilter.class || type==ExtensionFinder.class)
-            return true;
+        if (type==ExtensionFilter.class || type==ExtensionFinder.class) {
+			return true;
+		}
 
-        for (ExtensionFilter f : all())
-            if (!f.allows(type, component))
-                return false;
-        return true;
+        return all().stream().allMatch(f -> f.allows(type, component));
     }
 
     /**

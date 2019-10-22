@@ -24,21 +24,29 @@ import java.util.logging.Logger;
  */
 @Extension
 public class StandardOutputSwapper extends ComputerListener {
-    @Override
+    private static final Logger LOGGER = Logger.getLogger(StandardOutputSwapper.class.getName());
+	public static boolean disabled = SystemProperties.getBoolean(StandardOutputSwapper.class.getName()+".disabled");
+	@Override
     public void preOnline(Computer c, Channel channel, FilePath root, TaskListener listener)  {
-        if (disabled)   return;
+        if (disabled) {
+			return;
+		}
 
         try {
-            if (channel.call(new ChannelSwapper()))
-                listener.getLogger().println("Evacuated stdout");
+            if (channel.call(new ChannelSwapper())) {
+				listener.getLogger().println("Evacuated stdout");
+			}
         } catch (Throwable e) {
             LOGGER.fine("Fatal problem swapping file descriptors " + c.getName());
         }
     }
-
-    private static final class ChannelSwapper extends MasterToSlaveCallable<Boolean,Exception> {
-        public Boolean call() throws Exception {
-            if (File.pathSeparatorChar==';')    return false;   // Windows
+	private static final class ChannelSwapper extends MasterToSlaveCallable<Boolean,Exception> {
+        @Override
+		public Boolean call() throws Exception {
+            if (File.pathSeparatorChar==';')
+			 {
+				return false;   // Windows
+			}
             Channel c = getOpenChannelOrFail();
             StandardOutputStream sos = (StandardOutputStream) c.getProperty(StandardOutputStream.class);
             if (sos!=null) {
@@ -47,18 +55,19 @@ public class StandardOutputSwapper extends ComputerListener {
             }
 
             OutputStream o = c.getUnderlyingOutput();
-            if (o instanceof StandardOutputStream) {
-                swap((StandardOutputStream) o);
-                return true;
-            }
-
-            return false;
+            if (!(o instanceof StandardOutputStream)) {
+				return false;
+			}
+			swap((StandardOutputStream) o);
+			return true;
         }
 
         private void swap(StandardOutputStream stdout) throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, java.lang.reflect.InvocationTargetException {
             // duplicate the OS file descriptor and create FileOutputStream around it
             int out = GNUCLibrary.LIBC.dup(1);
-            if (out<0)      throw new IOException("Failed to dup(1)");
+            if (out<0) {
+				throw new IOException("Failed to dup(1)");
+			}
             Constructor<FileDescriptor> c = FileDescriptor.class.getDeclaredConstructor(int.class);
             c.setAccessible(true);
             FileOutputStream fos = new FileOutputStream(c.newInstance(out));
@@ -71,7 +80,4 @@ public class StandardOutputSwapper extends ComputerListener {
             GNUCLibrary.LIBC.dup2(2,1);
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(StandardOutputSwapper.class.getName());
-    public static boolean disabled = SystemProperties.getBoolean(StandardOutputSwapper.class.getName()+".disabled");
 }

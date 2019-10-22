@@ -51,26 +51,21 @@ import org.jvnet.hudson.test.Issue;
  */
 public class PluginManagerTest {
 
-    @Rule public TemporaryFolder tmp = new TemporaryFolder();
+    private static final String SAMPLE_MANIFEST_FILE = new StringBuilder().append("Manifest-Version: 1.0\n").append("Archiver-Version: Plexus Archiver\n").append("Created-By: Apache Maven\n").append("Built-By: jglick\n").append("Build-Jdk: 1.8.0_92\n").append("Extension-Name: matrix-auth\n").append("Specification-Title: \n").append(" Offers matrix-based security \n")
+			.append(" authorization strate\n").append(" gies (global and per-project).\n").append("Implementation-Title: matrix-auth\n").append("Implementation-Version: 1.4\n").append("Group-Id: org.jenkins-ci.plugins\n").append("Short-Name: matrix-auth\n").append("Long-Name: Matrix Authorization Strategy Plugin\n").append("Url: http://wiki.jenkins-ci.org/display/JENKINS/Matrix+Authorization+S\n").append(" trategy+Plugin\n")
+			.append("Plugin-Version: 1.4\n").append("Hudson-Version: 1.609.1\n").append("Jenkins-Version: 1.609.1\n").append("Plugin-Dependencies: icon-shim:2.0.3,cloudbees-folder:5.2.2;resolution\n").append(" :=optional\n").append("Plugin-Developers: ").toString();
+	@Rule public TemporaryFolder tmp = new TemporaryFolder();
 
-    @Test public void parseRequestedPlugins() throws Exception {
+	@Test public void parseRequestedPlugins() throws Exception {
         assertEquals("{other=2.0, stuff=1.2}", new LocalPluginManager(tmp.getRoot())
                 .parseRequestedPlugins(new StringInputStream("<root><stuff plugin='stuff@1.0'><more plugin='other@2.0'><things plugin='stuff@1.2'/></more></stuff></root>")).toString());
     }
 
-    @Issue("SECURITY-167")
+	@Issue("SECURITY-167")
     @Test
     public void parseInvalidRequestedPlugins() throws Exception {
-        String evilXML = "<?xml version='1.0' encoding='UTF-8'?>\n" +
-                "<!DOCTYPE project[<!ENTITY foo SYSTEM \"file:///\">]>\n" +
-                "<root>\n" +
-                "  <stuff plugin='stuff@1.0'>\n" +
-                "&foo;" +
-                "    <more plugin='other@2.0'>\n" +
-                "      <things plugin='stuff@1.2'/>\n" +
-                "    </more>\n" +
-                "  </stuff>\n" +
-                "</root>\n";
+        String evilXML = new StringBuilder().append("<?xml version='1.0' encoding='UTF-8'?>\n").append("<!DOCTYPE project[<!ENTITY foo SYSTEM \"file:///\">]>\n").append("<root>\n").append("  <stuff plugin='stuff@1.0'>\n").append("&foo;").append("    <more plugin='other@2.0'>\n").append("      <things plugin='stuff@1.2'/>\n").append("    </more>\n")
+				.append("  </stuff>\n").append("</root>\n").toString();
 
         PluginManager pluginManager = new LocalPluginManager(Util.createTempDir());
         try {
@@ -82,8 +77,8 @@ public class PluginManagerTest {
             assertThat(ex.getCause().getMessage(), containsString("Refusing to resolve entity with publicId(null) and systemId (file:///)"));
         }
     }
-    
-    @Test
+
+	@Test
     public void shouldProperlyParseManifestFromJar() throws IOException {
         File jar = createHpiWithManifest();
         final Manifest manifest = PluginManager.parsePluginManifest(jar.toURI().toURL());
@@ -99,8 +94,8 @@ public class PluginManagerTest {
         // Empty field
         assertAttribute(manifest, "Plugin-Developers", null);
     }
-    
-    @Test
+
+	@Test
     public void shouldProperlyRetrieveModificationDate() throws IOException {
         File jar = createHpiWithManifest();
         URL url = toManifestUrl(jar);
@@ -108,41 +103,17 @@ public class PluginManagerTest {
                 PluginManager.getModificationDate(url), 
                 equalTo(jar.lastModified()));
     }
-    
-    private static void assertAttribute(Manifest manifest, String attributeName, String value) throws AssertionError {
+
+	private static void assertAttribute(Manifest manifest, String attributeName, String value) throws AssertionError {
         Attributes attributes = manifest.getMainAttributes();
         assertThat("Main attributes must not be empty", attributes, notNullValue());
-        assertThat("Attribute '" + attributeName + "' does not match the sample", 
+        assertThat(new StringBuilder().append("Attribute '").append(attributeName).append("' does not match the sample").toString(), 
                 attributes.getValue(attributeName), 
                 equalTo(value));
         
     }
-    
-    private static final String SAMPLE_MANIFEST_FILE = "Manifest-Version: 1.0\n" +
-                "Archiver-Version: Plexus Archiver\n" +
-                "Created-By: Apache Maven\n" +
-                "Built-By: jglick\n" +
-                "Build-Jdk: 1.8.0_92\n" +
-                "Extension-Name: matrix-auth\n" +
-                "Specification-Title: \n" +
-                " Offers matrix-based security \n" +
-                " authorization strate\n" +
-                " gies (global and per-project).\n" +
-                "Implementation-Title: matrix-auth\n" +
-                "Implementation-Version: 1.4\n" +
-                "Group-Id: org.jenkins-ci.plugins\n" +
-                "Short-Name: matrix-auth\n" +
-                "Long-Name: Matrix Authorization Strategy Plugin\n" +
-                "Url: http://wiki.jenkins-ci.org/display/JENKINS/Matrix+Authorization+S\n" +
-                " trategy+Plugin\n" +
-                "Plugin-Version: 1.4\n" +
-                "Hudson-Version: 1.609.1\n" +
-                "Jenkins-Version: 1.609.1\n" +
-                "Plugin-Dependencies: icon-shim:2.0.3,cloudbees-folder:5.2.2;resolution\n" +
-                " :=optional\n" +
-                "Plugin-Developers: ";
-    
-    private File createHpiWithManifest() throws IOException {
+
+	private File createHpiWithManifest() throws IOException {
         File newFolder = tmp.newFolder("myJar");
         String manifestPath = "META-INF/MANIFEST.MF";
         new File("META-INF").mkdir();
@@ -158,10 +129,9 @@ public class PluginManagerTest {
         }
         return f;
     }
-        
-    
-    private URL toManifestUrl(File jarFile) throws MalformedURLException {
+
+	private URL toManifestUrl(File jarFile) throws MalformedURLException {
         final String manifestPath = "META-INF/MANIFEST.MF";
-        return new URL("jar:" + jarFile.toURI().toURL() + "!/" + manifestPath);
+        return new URL(new StringBuilder().append("jar:").append(jarFile.toURI().toURL()).append("!/").append(manifestPath).toString());
     }  
 }

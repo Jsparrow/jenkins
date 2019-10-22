@@ -22,7 +22,16 @@ import org.kohsuke.stapler.StaplerRequest;
  * @author Kohsuke Kawaguchi
 */
 final class ExpressionFactory2 implements ExpressionFactory {
-    public Expression createExpression(String text) throws JellyException {
+    /**
+     * When called from within the JEXL expression evaluation,
+     * retains the current {@link JellyContext}.
+     *
+     * @see Functions#getCurrentJellyContext()
+     */
+    protected static final ThreadLocal<JellyContext> CURRENT_CONTEXT = new ThreadLocal<>();
+
+	@Override
+	public Expression createExpression(String text) throws JellyException {
         try {
             return new JexlExpression(
                 org.apache.commons.jexl.ExpressionFactory.createExpression(text)
@@ -32,7 +41,7 @@ final class ExpressionFactory2 implements ExpressionFactory {
         }
     }
 
-    /*
+	/*
      * Copyright 2002,2004 The Apache Software Foundation.
      *
      * Licensed under the Apache License, Version 2.0 (the "License");
@@ -49,25 +58,28 @@ final class ExpressionFactory2 implements ExpressionFactory {
      */
     static final class JexlExpression extends ExpressionSupport {
 
-        /** The Jexl expression object */
+        private static final Logger LOGGER = Logger.getLogger(JexlExpression.class.getName());
+		/** The Jexl expression object */
         private org.apache.commons.jexl.Expression expression;
 
-        public JexlExpression(org.apache.commons.jexl.Expression expression) {
+		public JexlExpression(org.apache.commons.jexl.Expression expression) {
             this.expression = expression;
         }
 
-        @Override
+		@Override
         public String toString() {
-            return super.toString() + "[" + expression.getExpression() + "]";
+            return new StringBuilder().append(super.toString()).append("[").append(expression.getExpression()).append("]").toString();
         }
 
-        // Expression interface
+		// Expression interface
         //-------------------------------------------------------------------------
-        public String getExpressionText() {
-            return "${" + expression.getExpression() + "}";
+        @Override
+		public String getExpressionText() {
+            return new StringBuilder().append("${").append(expression.getExpression()).append("}").toString();
         }
 
-        public Object evaluate(JellyContext context) {
+		@Override
+		public Object evaluate(JellyContext context) {
             try {
                 CURRENT_CONTEXT.set(context);
                 JexlContext jexlContext = new JellyJexlContext( context );
@@ -77,14 +89,13 @@ final class ExpressionFactory2 implements ExpressionFactory {
                 throw e;
             } catch (Exception e) {
                 StaplerRequest currentRequest = Stapler.getCurrentRequest();
-                LOGGER.log(Level.WARNING,"Caught exception evaluating: " + expression + " in " + (currentRequest != null ? currentRequest.getOriginalRequestURI() : "?") + ". Reason: " + e, e);
+                LOGGER.log(Level.WARNING,new StringBuilder().append("Caught exception evaluating: ").append(expression).append(" in ").append(currentRequest != null ? currentRequest.getOriginalRequestURI() : "?").append(". Reason: ")
+						.append(e).toString(), e);
                 return null;
             } finally {
                 CURRENT_CONTEXT.set(null);
             }
         }
-
-        private static final Logger LOGGER = Logger.getLogger(JexlExpression.class.getName());
     }
 
     static final class JellyJexlContext implements JexlContext {
@@ -94,12 +105,14 @@ final class ExpressionFactory2 implements ExpressionFactory {
             this.vars = new JellyMap( context );
         }
 
-        public void setVars(Map vars) {
+        @Override
+		public void setVars(Map vars) {
             this.vars.clear();
             this.vars.putAll( vars );
         }
 
-        public Map getVars() {
+        @Override
+		public Map getVars() {
             return this.vars;
         }
     }
@@ -113,60 +126,64 @@ final class ExpressionFactory2 implements ExpressionFactory {
             this.context = context;
         }
 
-        public Object get(Object key) {
+        @Override
+		public Object get(Object key) {
             return context.getVariable( (String) key );
         }
 
-        public void clear() {
+        @Override
+		public void clear() {
             // not implemented
         }
 
-        public boolean containsKey(Object key) {
+        @Override
+		public boolean containsKey(Object key) {
             return ( get( key ) != null );
         }
 
-        public boolean containsValue(Object value) {
+        @Override
+		public boolean containsValue(Object value) {
             return false;
         }
 
-        public Set entrySet() {
+        @Override
+		public Set entrySet() {
             return null;
         }
 
-        public boolean isEmpty() {
+        @Override
+		public boolean isEmpty() {
             return false;
         }
 
-        public Set keySet() {
+        @Override
+		public Set keySet() {
             return null;
         }
 
-        public Object put(Object key, Object value) {
+        @Override
+		public Object put(Object key, Object value) {
             return null;
         }
 
-        public void putAll(Map t) {
+        @Override
+		public void putAll(Map t) {
             // not implemented
         }
 
-        public Object remove(Object key) {
+        @Override
+		public Object remove(Object key) {
             return null;
         }
 
-        public int size() {
+        @Override
+		public int size() {
             return -1;
         }
 
-        public Collection values() {
+        @Override
+		public Collection values() {
             return null;
         }
     }
-
-    /**
-     * When called from within the JEXL expression evaluation,
-     * retains the current {@link JellyContext}.
-     *
-     * @see Functions#getCurrentJellyContext()
-     */
-    protected static final ThreadLocal<JellyContext> CURRENT_CONTEXT = new ThreadLocal<>();
 }

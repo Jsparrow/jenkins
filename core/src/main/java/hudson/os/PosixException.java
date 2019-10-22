@@ -23,6 +23,6 @@ public class PosixException extends RuntimeException {
 
     @Override
     public String toString() {
-        return super.toString()+" "+errors;
+        return new StringBuilder().append(super.toString()).append(" ").append(errors).toString();
     }
 }

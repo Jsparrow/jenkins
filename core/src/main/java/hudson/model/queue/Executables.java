@@ -43,7 +43,7 @@ public class Executables {
      * @return Discovered subtask
      */
     public static @Nonnull SubTask getParentOf(@Nonnull Executable e) 
-            throws Error, RuntimeException {
+            throws Error {
         try {
             return e.getParent();
         } catch (AbstractMethodError ignored) { // will fallback to a private implementation
@@ -57,8 +57,12 @@ public class Executables {
                 throw (Error)new NoSuchMethodError().initCause(x);
             } catch (InvocationTargetException x) {
                 Throwable y = x.getTargetException();
-                if (y instanceof Error)     throw (Error)y;
-                if (y instanceof RuntimeException)     throw (RuntimeException)y;
+                if (y instanceof Error) {
+					throw (Error)y;
+				}
+                if (y instanceof RuntimeException) {
+					throw (RuntimeException)y;
+				}
                 throw new Error(x);
             }
         }

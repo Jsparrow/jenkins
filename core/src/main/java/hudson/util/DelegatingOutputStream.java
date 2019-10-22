@@ -42,7 +42,8 @@ public abstract class DelegatingOutputStream extends OutputStream {
         this.out = out;
     }
 
-    public void write(int b) throws IOException {
+    @Override
+	public void write(int b) throws IOException {
         out.write(b);
     }
 

@@ -79,7 +79,7 @@ public class ChannelPinger extends ComputerListener {
         if (interval == null) {
             interval = SystemProperties.getInteger(INTERVAL_MINUTES_PROPERTY_DEPRECATED,null, Level.WARNING);
             if (interval != null) {
-                LOGGER.warning(INTERVAL_MINUTES_PROPERTY_DEPRECATED + " property is deprecated, " + INTERVAL_SECONDS_PROPERTY + " should be used");
+                LOGGER.warning(new StringBuilder().append(INTERVAL_MINUTES_PROPERTY_DEPRECATED).append(" property is deprecated, ").append(INTERVAL_SECONDS_PROPERTY).append(" should be used").toString());
                 interval *= 60; //to seconds       
             }
         }
@@ -122,6 +122,60 @@ public class ChannelPinger extends ComputerListener {
     }
 
     @VisibleForTesting
+    @Restricted(NoExternalUse.class)
+    public static void setUpPingForChannel(final Channel channel, final SlaveComputer computer, int timeoutSeconds, int intervalSeconds, final boolean analysis) {
+        LOGGER.log(Level.FINE, "setting up ping on {0} with a {1} seconds interval and {2} seconds timeout", new Object[] {channel.getName(), intervalSeconds, timeoutSeconds});
+        final AtomicBoolean isInClosed = new AtomicBoolean(false);
+        final PingThread t = new PingThread(channel, TimeUnit.SECONDS.toMillis(timeoutSeconds), TimeUnit.SECONDS.toMillis(intervalSeconds)) {
+            @Override
+            protected void onDead(Throwable cause) {
+                    if (analysis) {
+                        analyze(cause);
+                    }
+                    boolean inClosed = isInClosed.get();
+                    // Disassociate computer channel before closing it
+                    if (computer != null) {
+                        Exception exception = cause instanceof Exception ? (Exception) cause: new IOException(cause);
+                        computer.disconnect(new OfflineCause.ChannelTermination(exception));
+                    }
+                    if (inClosed) {
+                        LOGGER.log(Level.FINE,new StringBuilder().append("Ping failed after the channel ").append(channel.getName()).append(" is already partially closed.").toString(),cause);
+                    } else {
+                        LOGGER.log(Level.INFO,new StringBuilder().append("Ping failed. Terminating the channel ").append(channel.getName()).append(".").toString(),cause);
+                    }
+            }
+            /** Keep in a separate method so we do not even try to do class loading on {@link PingFailureAnalyzer} from an agent JVM. */
+            private void analyze(Throwable cause) {
+                PingFailureAnalyzer.all().forEach(pfa -> {
+                    try {
+                        pfa.onPingFailure(channel, cause);
+                    } catch (IOException ex) {
+                        LOGGER.log(Level.WARNING, new StringBuilder().append("Ping failure analyzer ").append(pfa.getClass().getName()).append(" failed for ").append(channel.getName()).toString(), ex);
+                    }
+                });
+            }
+            @Deprecated
+            @Override
+            protected void onDead() {
+                onDead(null);
+            }
+        };
+
+        channel.addListener(new Channel.Listener() {
+            @Override
+            public void onClosed(Channel channel, IOException cause) {
+                LOGGER.fine("Terminating ping thread for " + channel.getName());
+                isInClosed.set(true);
+                t.interrupt();  // make sure the ping thread is terminated
+            }
+        });
+
+        t.start();
+        LOGGER.log(Level.FINE, "Ping thread started for {0} with a {1} seconds interval and a {2} seconds timeout",
+                   new Object[] { channel, intervalSeconds, timeoutSeconds });
+    }
+
+	@VisibleForTesting
     @Restricted(NoExternalUse.class)
     public static class SetUpRemotePing extends MasterToSlaveCallable<Void, IOException> {
         private static final long serialVersionUID = -2702219700841759872L;
@@ -178,59 +232,5 @@ public class ChannelPinger extends ComputerListener {
             }
             return this;
         }
-    }
-
-    @VisibleForTesting
-    @Restricted(NoExternalUse.class)
-    public static void setUpPingForChannel(final Channel channel, final SlaveComputer computer, int timeoutSeconds, int intervalSeconds, final boolean analysis) {
-        LOGGER.log(Level.FINE, "setting up ping on {0} with a {1} seconds interval and {2} seconds timeout", new Object[] {channel.getName(), intervalSeconds, timeoutSeconds});
-        final AtomicBoolean isInClosed = new AtomicBoolean(false);
-        final PingThread t = new PingThread(channel, TimeUnit.SECONDS.toMillis(timeoutSeconds), TimeUnit.SECONDS.toMillis(intervalSeconds)) {
-            @Override
-            protected void onDead(Throwable cause) {
-                    if (analysis) {
-                        analyze(cause);
-                    }
-                    boolean inClosed = isInClosed.get();
-                    // Disassociate computer channel before closing it
-                    if (computer != null) {
-                        Exception exception = cause instanceof Exception ? (Exception) cause: new IOException(cause);
-                        computer.disconnect(new OfflineCause.ChannelTermination(exception));
-                    }
-                    if (inClosed) {
-                        LOGGER.log(Level.FINE,"Ping failed after the channel "+channel.getName()+" is already partially closed.",cause);
-                    } else {
-                        LOGGER.log(Level.INFO,"Ping failed. Terminating the channel "+channel.getName()+".",cause);
-                    }
-            }
-            /** Keep in a separate method so we do not even try to do class loading on {@link PingFailureAnalyzer} from an agent JVM. */
-            private void analyze(Throwable cause) {
-                for (PingFailureAnalyzer pfa : PingFailureAnalyzer.all()) {
-                    try {
-                        pfa.onPingFailure(channel, cause);
-                    } catch (IOException ex) {
-                        LOGGER.log(Level.WARNING, "Ping failure analyzer " + pfa.getClass().getName() + " failed for " + channel.getName(), ex);
-                    }
-                }
-            }
-            @Deprecated
-            @Override
-            protected void onDead() {
-                onDead(null);
-            }
-        };
-
-        channel.addListener(new Channel.Listener() {
-            @Override
-            public void onClosed(Channel channel, IOException cause) {
-                LOGGER.fine("Terminating ping thread for " + channel.getName());
-                isInClosed.set(true);
-                t.interrupt();  // make sure the ping thread is terminated
-            }
-        });
-
-        t.start();
-        LOGGER.log(Level.FINE, "Ping thread started for {0} with a {1} seconds interval and a {2} seconds timeout",
-                   new Object[] { channel, intervalSeconds, timeoutSeconds });
     }
 }

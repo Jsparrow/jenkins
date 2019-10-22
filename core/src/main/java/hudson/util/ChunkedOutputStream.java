@@ -96,13 +96,14 @@ public class ChunkedOutputStream extends OutputStream {
      * @since 3.0
      */
     protected void flushCache() throws IOException {
-        if (cachePosition > 0) {
-            byte[] chunkHeader = (Integer.toHexString(cachePosition) + "\r\n").getBytes(StandardCharsets.US_ASCII);
-            stream.write(chunkHeader, 0, chunkHeader.length);
-            stream.write(cache, 0, cachePosition);
-            stream.write(ENDCHUNK, 0, ENDCHUNK.length);
-            cachePosition = 0;
-        }
+        if (cachePosition <= 0) {
+			return;
+		}
+		byte[] chunkHeader = (Integer.toHexString(cachePosition) + "\r\n").getBytes(StandardCharsets.US_ASCII);
+		stream.write(chunkHeader, 0, chunkHeader.length);
+		stream.write(cache, 0, cachePosition);
+		stream.write(ENDCHUNK, 0, ENDCHUNK.length);
+		cachePosition = 0;
     }
 
     /**
@@ -140,11 +141,12 @@ public class ChunkedOutputStream extends OutputStream {
      * @since 3.0
      */
     public void finish() throws IOException {
-        if (!wroteLastChunk) {
-            flushCache();
-            writeClosingChunk();
-            wroteLastChunk = true;
-        }
+        if (wroteLastChunk) {
+			return;
+		}
+		flushCache();
+		writeClosingChunk();
+		wroteLastChunk = true;
     }
 
     // -------------------------------------------- OutputStream Methods
@@ -157,10 +159,13 @@ public class ChunkedOutputStream extends OutputStream {
      * @param b The byte to be written
      * @throws IOException if an input/output error occurs
      */
-    public void write(int b) throws IOException {
+    @Override
+	public void write(int b) throws IOException {
         cache[cachePosition] = (byte) b;
         cachePosition++;
-        if (cachePosition == cache.length) flushCache();
+        if (cachePosition == cache.length) {
+			flushCache();
+		}
     }
 
     /**

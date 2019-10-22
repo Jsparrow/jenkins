@@ -58,29 +58,35 @@ import java.util.logging.Logger;
 @Extension
 public class StaticRoutingDecisionProvider extends RoutingDecisionProvider implements Saveable {
     private static final Logger LOGGER = Logger.getLogger(StaticRoutingDecisionProvider.class.getName());
-    
-    private Set<String> whitelistSignaturesFromFixedList;
-    private Set<String> whitelistSignaturesFromUserControlledList;
-    
-    private Set<String> blacklistSignaturesFromFixedList;
-    private Set<String> blacklistSignaturesFromUserControlledList;
 
-    public StaticRoutingDecisionProvider() {
+	/** Allow script console access */
+    public static String WHITELIST_PATH = SystemProperties.getString(StaticRoutingDecisionProvider.class.getName() + ".whitelist");
+
+	private Set<String> whitelistSignaturesFromFixedList;
+
+	private Set<String> whitelistSignaturesFromUserControlledList;
+
+	private Set<String> blacklistSignaturesFromFixedList;
+
+	private Set<String> blacklistSignaturesFromUserControlledList;
+
+	public StaticRoutingDecisionProvider() {
         reload();
     }
 
-    /**
+	/**
      * Return the singleton instance of this class, typically for script console use
      */
     public static StaticRoutingDecisionProvider get() {
         return ExtensionList.lookupSingleton(StaticRoutingDecisionProvider.class);
     }
 
-    /**
+	/**
      * @see Function#getSignature()
      * @see FieldRef#getSignature()
      */
-    @Nonnull
+    @Override
+	@Nonnull
     public synchronized Decision decide(@Nonnull String signature) {
         if (whitelistSignaturesFromFixedList == null || whitelistSignaturesFromUserControlledList == null ||
                 blacklistSignaturesFromFixedList == null || blacklistSignaturesFromUserControlledList == null) {
@@ -100,15 +106,15 @@ public class StaticRoutingDecisionProvider extends RoutingDecisionProvider imple
 
         return Decision.UNKNOWN;
     }
-    
-    public synchronized void reload() {
+
+	public synchronized void reload() {
         reloadFromDefault();
         reloadFromUserControlledList();
         
         resetMetaClassCache();
     }
-    
-    @VisibleForTesting
+
+	@VisibleForTesting
     synchronized void resetAndSave(){
         this.whitelistSignaturesFromFixedList = new HashSet<>();
         this.whitelistSignaturesFromUserControlledList = new HashSet<>();
@@ -117,13 +123,13 @@ public class StaticRoutingDecisionProvider extends RoutingDecisionProvider imple
         
         this.save();
     }
-    
-    private void resetMetaClassCache() {
+
+	private void resetMetaClassCache() {
         // to allow the change to be effective, i.e. rebuild the MetaClass using the new whitelist
         WebApp.get(Jenkins.get().servletContext).clearMetaClassCache();
     }
-    
-    private synchronized void reloadFromDefault() {
+
+	private synchronized void reloadFromDefault() {
         try (InputStream is = StaticRoutingDecisionProvider.class.getResourceAsStream("default-whitelist.txt")) {
             whitelistSignaturesFromFixedList = new HashSet<>();
             blacklistSignaturesFromFixedList = new HashSet<>();
@@ -139,8 +145,8 @@ public class StaticRoutingDecisionProvider extends RoutingDecisionProvider imple
         
         LOGGER.log(Level.FINE, "Found {0} getter in the standard whitelist", whitelistSignaturesFromFixedList.size());
     }
-    
-    public synchronized StaticRoutingDecisionProvider add(@Nonnull String signature) {
+
+	public synchronized StaticRoutingDecisionProvider add(@Nonnull String signature) {
         if (this.whitelistSignaturesFromUserControlledList.add(signature)) {
             LOGGER.log(Level.INFO, "Signature [{0}] added to the whitelist", signature);
             save();
@@ -150,8 +156,8 @@ public class StaticRoutingDecisionProvider extends RoutingDecisionProvider imple
         }
         return this;
     }
-    
-    public synchronized StaticRoutingDecisionProvider addBlacklistSignature(@Nonnull String signature) {
+
+	public synchronized StaticRoutingDecisionProvider addBlacklistSignature(@Nonnull String signature) {
         if (this.blacklistSignaturesFromUserControlledList.add(signature)) {
             LOGGER.log(Level.INFO, "Signature [{0}] added to the blacklist", signature);
             save();
@@ -161,8 +167,8 @@ public class StaticRoutingDecisionProvider extends RoutingDecisionProvider imple
         }
         return this;
     }
-    
-    public synchronized StaticRoutingDecisionProvider remove(@Nonnull String signature) {
+
+	public synchronized StaticRoutingDecisionProvider remove(@Nonnull String signature) {
         if (this.whitelistSignaturesFromUserControlledList.remove(signature)) {
             LOGGER.log(Level.INFO, "Signature [{0}] removed from the whitelist", signature);
             save();
@@ -172,8 +178,8 @@ public class StaticRoutingDecisionProvider extends RoutingDecisionProvider imple
         }
         return this;
     }
-    
-    public synchronized StaticRoutingDecisionProvider removeBlacklistSignature(@Nonnull String signature) {
+
+	public synchronized StaticRoutingDecisionProvider removeBlacklistSignature(@Nonnull String signature) {
         if (this.blacklistSignaturesFromUserControlledList.remove(signature)) {
             LOGGER.log(Level.INFO, "Signature [{0}] removed from the blacklist", signature);
             save();
@@ -183,11 +189,12 @@ public class StaticRoutingDecisionProvider extends RoutingDecisionProvider imple
         }
         return this;
     }
-    
-    /**
+
+	/**
      * Saves the configuration info to the disk.
      */
-    public synchronized void save() {
+    @Override
+	public synchronized void save() {
         if (BulkChange.contains(this)) {
             return;
         }
@@ -204,8 +211,8 @@ public class StaticRoutingDecisionProvider extends RoutingDecisionProvider imple
             LOGGER.log(Level.WARNING, "Failed to save " + file.getAbsolutePath(), e);
         }
     }
-    
-    /**
+
+	/**
      * Loads the data from the disk into this object.
      *
      * <p>
@@ -218,7 +225,7 @@ public class StaticRoutingDecisionProvider extends RoutingDecisionProvider imple
         if (!file.exists()) {
             if ((whitelistSignaturesFromUserControlledList != null && whitelistSignaturesFromUserControlledList.isEmpty()) ||
                     (blacklistSignaturesFromUserControlledList != null && blacklistSignaturesFromUserControlledList.isEmpty())) {
-                LOGGER.log(Level.INFO, "No whitelist source file found at " + file + " so resetting user-controlled whitelist");
+                LOGGER.log(Level.INFO, new StringBuilder().append("No whitelist source file found at ").append(file).append(" so resetting user-controlled whitelist").toString());
             }
             whitelistSignaturesFromUserControlledList = new HashSet<>();
             blacklistSignaturesFromUserControlledList = new HashSet<>();
@@ -240,12 +247,12 @@ public class StaticRoutingDecisionProvider extends RoutingDecisionProvider imple
             LOGGER.log(Level.WARNING, "Failed to load " + file.getAbsolutePath(), e);
         }
     }
-    
-    private File getConfigFile() {
+
+	private File getConfigFile() {
         return new File(WHITELIST_PATH == null ? new File(Jenkins.get().getRootDir(), "stapler-whitelist.txt").toString() : WHITELIST_PATH);
     }
 
-    private void parseFileIntoList(List<String> lines, Set<String> whitelist, Set<String> blacklist){
+	private void parseFileIntoList(List<String> lines, Set<String> whitelist, Set<String> blacklist){
         lines.stream()
                 .filter(line -> !line.matches("#.*|\\s*"))
                 .forEach(line -> {
@@ -259,8 +266,5 @@ public class StaticRoutingDecisionProvider extends RoutingDecisionProvider imple
                     }
                 });
     }
-    
-    /** Allow script console access */
-    public static String WHITELIST_PATH = SystemProperties.getString(StaticRoutingDecisionProvider.class.getName() + ".whitelist");
 
 }

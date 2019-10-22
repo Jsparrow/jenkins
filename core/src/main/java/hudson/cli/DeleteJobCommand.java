@@ -65,7 +65,7 @@ public class DeleteJobCommand extends CLICommand {
                 job = (AbstractItem) jenkins.getItemByFullName(job_s);
 
                 if(job == null) {
-                    throw new IllegalArgumentException("No such job '" + job_s + "'");
+                    throw new IllegalArgumentException(new StringBuilder().append("No such job '").append(job_s).append("'").toString());
                 }
 
                 job.checkPermission(AbstractItem.DELETE);
@@ -75,7 +75,7 @@ public class DeleteJobCommand extends CLICommand {
                     throw e;
                 }
 
-                final String errorMsg = job_s + ": " + e.getMessage();
+                final String errorMsg = new StringBuilder().append(job_s).append(": ").append(e.getMessage()).toString();
                 stderr.println(errorMsg);
                 errorOccurred = true;
                 continue;

@@ -63,17 +63,21 @@ import org.xml.sax.SAXException;
  */
 public abstract class ItemGroupMixIn {
     /**
+     * {@link Item} → name function.
+     */
+    public static final Function1<String,Item> KEYED_BY_NAME = Item::getName;
+	/**
      * {@link ItemGroup} for which we are working.
      */
     private final ItemGroup parent;
-    private final AccessControlled acl;
+	private final AccessControlled acl;
 
-    protected ItemGroupMixIn(ItemGroup parent, AccessControlled acl) {
+	protected ItemGroupMixIn(ItemGroup parent, AccessControlled acl) {
         this.parent = parent;
         this.acl = acl;
     }
 
-    /*
+	/*
     * Callback methods to be implemented by the ItemGroup implementation.
     */
 
@@ -82,65 +86,51 @@ public abstract class ItemGroupMixIn {
      */
     protected abstract void add(TopLevelItem item);
 
-    /**
+	/**
      * Assigns the root directory for a prospective item.
      */
     protected abstract File getRootDirFor(String name);
 
+	/*
+	 * The rest is the methods that provide meat.
+	 */
+	
+	    /**
+	     * Loads all the child {@link Item}s.
+	     *
+	     * @param modulesDir
+	     *      Directory that contains sub-directories for each child item.
+	     */
+	    public static <K,V extends Item> Map<K,V> loadChildren(ItemGroup parent, File modulesDir, Function1<? extends K,? super V> key) {
+	        modulesDir.mkdirs(); // make sure it exists
+	
+	        File[] subdirs = modulesDir.listFiles(File::isDirectory);
+	        CopyOnWriteMap.Tree<K,V> configurations = new CopyOnWriteMap.Tree<>();
+	        for (File subdir : subdirs) {
+	            try {
+	                // Try to retain the identity of an existing child object if we can.
+	                V item = (V) parent.getItem(subdir.getName());
+	                if (item == null) {
+	                    XmlFile xmlFile = Items.getConfigFile(subdir);
+	                    if (xmlFile.exists()) {
+	                        item = (V) Items.load(parent, subdir);
+	                    } else {
+	                        Logger.getLogger(ItemGroupMixIn.class.getName()).log(Level.WARNING, "could not find file " + xmlFile.getFile());
+	                        continue;
+	                    }
+	                } else {
+	                    item.onLoad(parent, subdir.getName());
+	                }
+	                configurations.put(key.call(item), item);
+	            } catch (Exception e) {
+	                Logger.getLogger(ItemGroupMixIn.class.getName()).log(Level.WARNING, "could not load " + subdir, e);
+	            }
+	        }
+	
+	        return configurations;
+	    }
 
-/*
- * The rest is the methods that provide meat.
- */
-
-    /**
-     * Loads all the child {@link Item}s.
-     *
-     * @param modulesDir
-     *      Directory that contains sub-directories for each child item.
-     */
-    public static <K,V extends Item> Map<K,V> loadChildren(ItemGroup parent, File modulesDir, Function1<? extends K,? super V> key) {
-        modulesDir.mkdirs(); // make sure it exists
-
-        File[] subdirs = modulesDir.listFiles(new FileFilter() {
-            public boolean accept(File child) {
-                return child.isDirectory();
-            }
-        });
-        CopyOnWriteMap.Tree<K,V> configurations = new CopyOnWriteMap.Tree<>();
-        for (File subdir : subdirs) {
-            try {
-                // Try to retain the identity of an existing child object if we can.
-                V item = (V) parent.getItem(subdir.getName());
-                if (item == null) {
-                    XmlFile xmlFile = Items.getConfigFile(subdir);
-                    if (xmlFile.exists()) {
-                        item = (V) Items.load(parent, subdir);
-                    } else {
-                        Logger.getLogger(ItemGroupMixIn.class.getName()).log(Level.WARNING, "could not find file " + xmlFile.getFile());
-                        continue;
-                    }
-                } else {
-                    item.onLoad(parent, subdir.getName());
-                }
-                configurations.put(key.call(item), item);
-            } catch (Exception e) {
-                Logger.getLogger(ItemGroupMixIn.class.getName()).log(Level.WARNING, "could not load " + subdir, e);
-            }
-        }
-
-        return configurations;
-    }
-
-    /**
-     * {@link Item} → name function.
-     */
-    public static final Function1<String,Item> KEYED_BY_NAME = new Function1<String, Item>() {
-        public String call(Item item) {
-            return item.getName();
-        }
-    };
-
-    /**
+	/**
      * Creates a {@link TopLevelItem} for example from the submission of the {@code /lib/hudson/newFromList/form} tag
      * or throws an exception if it fails.
      */
@@ -152,37 +142,42 @@ public abstract class ItemGroupMixIn {
         String requestContentType = req.getContentType();
         String mode = req.getParameter("mode");
         if (requestContentType == null
-                && !(mode != null && mode.equals("copy")))
-            throw new Failure("No Content-Type header set");
+                && !(mode != null && "copy".equals(mode))) {
+			throw new Failure("No Content-Type header set");
+		}
 
         boolean isXmlSubmission = requestContentType != null
             && (requestContentType.startsWith("application/xml")
                     || requestContentType.startsWith("text/xml"));
 
         String name = req.getParameter("name");
-        if(name==null)
-            throw new Failure("Query parameter 'name' is required");
+        if(name==null) {
+			throw new Failure("Query parameter 'name' is required");
+		}
 
         {// check if the name looks good
             Jenkins.checkGoodName(name);
             name = name.trim();
-            if(parent.getItem(name)!=null)
-                throw new Failure(Messages.Hudson_JobAlreadyExists(name));
+            if(parent.getItem(name)!=null) {
+				throw new Failure(Messages.Hudson_JobAlreadyExists(name));
+			}
         }
 
-        if(mode!=null && mode.equals("copy")) {
+        if(mode!=null && "copy".equals(mode)) {
             String from = req.getParameter("from");
 
             // resolve a name to Item
             Item src = Jenkins.get().getItem(from, parent);
             if(src==null) {
-                if(Util.fixEmpty(from)==null)
-                    throw new Failure("Specify which job to copy");
-                else
-                    throw new Failure("No such job: "+from);
+                if(Util.fixEmpty(from)==null) {
+					throw new Failure("Specify which job to copy");
+				} else {
+					throw new Failure("No such job: "+from);
+				}
             }
-            if (!(src instanceof TopLevelItem))
-                throw new Failure(from+" cannot be copied");
+            if (!(src instanceof TopLevelItem)) {
+				throw new Failure(from+" cannot be copied");
+			}
 
             result = copy((TopLevelItem) src,name);
         } else {
@@ -191,11 +186,12 @@ public abstract class ItemGroupMixIn {
                 rsp.setStatus(HttpServletResponse.SC_OK);
                 return result;
             } else {
-                if(mode==null)
-                    throw new Failure("No mode given");
+                if(mode==null) {
+					throw new Failure("No mode given");
+				}
                 TopLevelItemDescriptor descriptor = Items.all().findByName(mode);
                 if (descriptor == null) {
-                    throw new Failure("No item type ‘" + mode + "’ is known");
+                    throw new Failure(new StringBuilder().append("No item type ‘").append(mode).append("’ is known").toString());
                 }
                 descriptor.checkApplicableIn(parent);
                 acl.getACL().checkCreatePermission(parent, descriptor);
@@ -209,14 +205,14 @@ public abstract class ItemGroupMixIn {
         return result;
     }
 
-    /**
+	/**
      * Computes the redirection target URL for the newly created {@link TopLevelItem}.
      */
     protected String redirectAfterCreateItem(StaplerRequest req, TopLevelItem result) throws IOException {
-        return req.getContextPath()+'/'+result.getUrl()+"configure";
+        return new StringBuilder().append(req.getContextPath()).append('/').append(result.getUrl()).append("configure").toString();
     }
 
-    /**
+	/**
      * Copies an existing {@link TopLevelItem} to a new name.
      */
     @SuppressWarnings({"unchecked"})
@@ -259,7 +255,7 @@ public abstract class ItemGroupMixIn {
         return result;
     }
 
-    public synchronized TopLevelItem createProjectFromXML(String name, InputStream xml) throws IOException {
+	public synchronized TopLevelItem createProjectFromXML(String name, InputStream xml) throws IOException {
         acl.checkPermission(Item.CREATE);
 
         Jenkins.get().getProjectNamingStrategy().checkName(name);
@@ -303,7 +299,7 @@ public abstract class ItemGroupMixIn {
         }
     }
 
-    public synchronized TopLevelItem createProject( TopLevelItemDescriptor type, String name, boolean notify )
+	public synchronized TopLevelItem createProject( TopLevelItemDescriptor type, String name, boolean notify )
             throws IOException {
         acl.checkPermission(Item.CREATE);
         type.checkApplicableIn(parent);
@@ -318,8 +314,9 @@ public abstract class ItemGroupMixIn {
         add(item);
         Jenkins.get().rebuildDependencyGraphAsync();
 
-        if (notify)
-            ItemListener.fireOnCreated(item);
+        if (notify) {
+			ItemListener.fireOnCreated(item);
+		}
 
         return item;
     }

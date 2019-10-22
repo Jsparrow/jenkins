@@ -55,17 +55,13 @@ public class CompositeIOException extends IOException {
     @Override
     public void printStackTrace(PrintStream s) {
         super.printStackTrace(s);
-        for (IOException exception : exceptions) {
-            exception.printStackTrace(s);
-        }
+        exceptions.forEach(exception -> exception.printStackTrace(s));
     }
 
     @Override
     public void printStackTrace(PrintWriter s) {
         super.printStackTrace(s);
-        for (IOException exception : exceptions) {
-            exception.printStackTrace(s);
-        }
+        exceptions.forEach(exception -> exception.printStackTrace(s));
     }
 
     public UncheckedIOException asUncheckedIOException() {

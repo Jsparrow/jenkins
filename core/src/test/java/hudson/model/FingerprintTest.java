@@ -40,9 +40,10 @@ import org.junit.rules.TemporaryFolder;
  */
 public class FingerprintTest {
 
-    @Rule public TemporaryFolder tmp = new TemporaryFolder();
-    
-    @Test public void rangeSet() {
+    private static final byte[] SOME_MD5 = toByteArray(Util.getDigestOf("whatever"));
+	@Rule public TemporaryFolder tmp = new TemporaryFolder();
+
+	@Test public void rangeSet() {
         RangeSet rs = new RangeSet();
         assertFalse(rs.includes(0));
         assertFalse(rs.includes(3));
@@ -74,7 +75,7 @@ public class FingerprintTest {
         assertEquals("[3,7),[9,11)",rs.toString());
     }
 
-    @Test public void merge() {
+	@Test public void merge() {
         RangeSet x = new RangeSet();
         x.add(1);
         x.add(2);
@@ -93,7 +94,7 @@ public class FingerprintTest {
         assertEquals("[1,7)",x.toString());
     }
 
-    @Test public void merge2() {
+	@Test public void merge2() {
         RangeSet x = new RangeSet();
         x.add(1);
         x.add(2);
@@ -110,7 +111,7 @@ public class FingerprintTest {
         assertEquals("[1,7)",x.toString());
     }
 
-    @Test public void merge3() {
+	@Test public void merge3() {
         RangeSet x = new RangeSet();
         x.add(1);
         x.add(5);
@@ -126,7 +127,7 @@ public class FingerprintTest {
         assertEquals("[1,2),[3,4),[5,6),[7,8)",x.toString());
     }
 
-    @Test
+	@Test
     public void retainAll1() {
         RangeSet x = new RangeSet();
         RangeSet y = new RangeSet();
@@ -142,7 +143,7 @@ public class FingerprintTest {
         assertEquals(x,z);
     }
 
-    @Test
+	@Test
     public void retainAll2() {
         RangeSet x = new RangeSet();
         RangeSet y = new RangeSet();
@@ -158,7 +159,7 @@ public class FingerprintTest {
         assertEquals(x,z);
     }
 
-    @Test
+	@Test
     public void retainAll3() {
         RangeSet x = new RangeSet();
         RangeSet y = new RangeSet();
@@ -169,7 +170,7 @@ public class FingerprintTest {
         assertTrue(x.isEmpty());
     }
 
-    @Test
+	@Test
     public void removeAll1() {
         RangeSet x = new RangeSet();
         RangeSet y = new RangeSet();
@@ -185,7 +186,7 @@ public class FingerprintTest {
         assertEquals(x,z);
     }
 
-    @Test
+	@Test
     public void removeAll2() {
         RangeSet x = new RangeSet();
         RangeSet y = new RangeSet();
@@ -201,7 +202,7 @@ public class FingerprintTest {
         assertEquals(x,z);
     }
 
-    @Test
+	@Test
     public void removeAll3() {
         RangeSet x = new RangeSet();
         RangeSet y = new RangeSet();
@@ -211,25 +212,19 @@ public class FingerprintTest {
         assertFalse(x.removeAll(y));
     }
 
-    @Test public void deserialize() throws Exception {
-        assertEquals("Fingerprint["
-                + "original=stapler/org.kohsuke.stapler:stapler-jelly #123,"
-                + "hash=069484c9e963cc615c51278327da8eab,"
-                + "fileName=org.kohsuke.stapler:stapler-jelly-1.207.jar,"
-                + "timestamp=2013-05-21 19:20:03.534 UTC,"
-                + "usages={stuff=[304,306),[307,324),[328,330), stuff/test:stuff=[2,67),[72,77),[84,223),[228,229),[232,268)},"
-                + "facets=[]]",
+	@Test public void deserialize() throws Exception {
+        assertEquals(new StringBuilder().append("Fingerprint[").append("original=stapler/org.kohsuke.stapler:stapler-jelly #123,").append("hash=069484c9e963cc615c51278327da8eab,").append("fileName=org.kohsuke.stapler:stapler-jelly-1.207.jar,").append("timestamp=2013-05-21 19:20:03.534 UTC,").append("usages={stuff=[304,306),[307,324),[328,330), stuff/test:stuff=[2,67),[72,77),[84,223),[228,229),[232,268)},").append("facets=[]]").toString(),
                 Fingerprint.load(new File(FingerprintTest.class.getResource("fingerprint.xml").toURI())).toString());
     }
 
-    @Test public void loadFingerprintWithoutUsages() throws Exception {
+	@Test public void loadFingerprintWithoutUsages() throws Exception {
         Fingerprint fp = Fingerprint.load(new File(FingerprintTest.class.getResource("fingerprintWithoutUsages.xml").toURI()));
         assertNotNull(fp);
         assertEquals("test:jenkinsfile-example-1.0-SNAPSHOT.jar", fp.getFileName());
         assertNotNull(fp.getUsages());
     }
 
-    @Test public void roundTrip() throws Exception {
+	@Test public void roundTrip() throws Exception {
         Fingerprint f = new Fingerprint(new Fingerprint.BuildPtr("foo", 13), "stuff&more.jar", SOME_MD5);
         f.addWithoutSaving("some", 1);
         f.addWithoutSaving("some", 2);
@@ -251,25 +246,16 @@ public class FingerprintTest {
         TestFacet facet = (TestFacet) f2.facets.get(0);
         assertEquals(f2, facet.getFingerprint());
     }
-    private static byte[] toByteArray(String md5sum) {
+
+	private static byte[] toByteArray(String md5sum) {
         byte[] data = new byte[16];
-        for( int i=0; i<md5sum.length(); i+=2 )
-            data[i/2] = (byte)Integer.parseInt(md5sum.substring(i,i+2),16);
+        for( int i=0; i<md5sum.length(); i+=2 ) {
+			data[i/2] = (byte)Integer.parseInt(md5sum.substring(i,i+2),16);
+		}
         return data;
     }
-    private static final byte[] SOME_MD5 = toByteArray(Util.getDigestOf("whatever"));
-    public static final class TestFacet extends FingerprintFacet {
-        final String property;
-        public TestFacet(Fingerprint fingerprint, long timestamp, String property) {
-            super(fingerprint, timestamp);
-            this.property = property;
-        }
-        @Override public String toString() {
-            return "TestFacet[" + property + "@" + getTimestamp() + "]";
-        }
-    }
 
-    @Test public void fromString() throws Exception {
+	@Test public void fromString() throws Exception {
         //
         // Single
         //
@@ -522,7 +508,8 @@ public class FingerprintTest {
         assertThat(RangeSet.fromString("1-3,2-3", true).toString(), equalTo("[1,4),[2,4)"));
         assertThat(RangeSet.fromString("1-5,2-3", true).toString(), equalTo("[1,6),[2,4)"));
     }
-    private boolean expectIAE(final String expr, final String msg) {
+
+	private boolean expectIAE(final String expr, final String msg) {
         try {
             RangeSet.fromString(expr, false);
         } catch (Throwable e) {
@@ -538,5 +525,15 @@ public class FingerprintTest {
         // Exception wasn't throws or thrown Exception wasn't an instance of IllegalArgumentException
         fail("Should never be here");
         return false;
+    }
+	public static final class TestFacet extends FingerprintFacet {
+        final String property;
+        public TestFacet(Fingerprint fingerprint, long timestamp, String property) {
+            super(fingerprint, timestamp);
+            this.property = property;
+        }
+        @Override public String toString() {
+            return new StringBuilder().append("TestFacet[").append(property).append("@").append(getTimestamp()).append("]").toString();
+        }
     }
 }

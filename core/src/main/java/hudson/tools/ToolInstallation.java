@@ -76,17 +76,17 @@ import jenkins.model.Jenkins;
  * @since 1.286
  */
 public abstract class ToolInstallation extends AbstractDescribableImpl<ToolInstallation> implements Serializable, ExtensionPoint {
-    private final String name;
-    private /*almost final*/ String home;
-
-    /**
+    private static final long serialVersionUID = 1L;
+	private final String name;
+	private /*almost final*/ String home;
+	/**
      * {@link ToolProperty}s that are associated with this tool.
      */
     @XStreamSerializable
     private transient /*almost final*/ DescribableList<ToolProperty<?>,ToolPropertyDescriptor> properties
             = new DescribableList<>(Saveable.NOOP);
 
-    /**
+	/**
      * @deprecated
      *      as of 1.302. Use {@link #ToolInstallation(String, String, List)} 
      */
@@ -96,33 +96,34 @@ public abstract class ToolInstallation extends AbstractDescribableImpl<ToolInsta
         this.home = home;
     }
 
-    public ToolInstallation(String name, String home, List<? extends ToolProperty<?>> properties) {
+	public ToolInstallation(String name, String home, List<? extends ToolProperty<?>> properties) {
         this.name = name;
         this.home = home;
         if(properties!=null) {
             try {
                 this.properties.replaceBy(properties);
-                for (ToolProperty<?> p : properties)
-                    _setTool(p,this);
+                for (ToolProperty<?> p : properties) {
+					_setTool(p,this);
+				}
             } catch (IOException e) {
                 throw new AssertionError(e); // no Saveable, so can't happen
             }
         }
     }
 
-    // helper function necessary to avoid a warning
+	// helper function necessary to avoid a warning
     private <T extends ToolInstallation> void _setTool(ToolProperty<T> prop, ToolInstallation t) {
         prop.setTool(prop.type().cast(t));
     }
 
-    /**
+	/**
      * Gets the human readable name that identifies this tool among other {@link ToolInstallation}s of the same kind.
      */
     public String getName() {
         return name;
     }
 
-    /**
+	/**
      * Gets the home directory of this tool.
      * 
      * The path can be in Unix format as well as in Windows format.
@@ -133,7 +134,7 @@ public abstract class ToolInstallation extends AbstractDescribableImpl<ToolInsta
         return home;
     }
 
-    /**
+	/**
      * Expose any environment variables that this tool installation wants the build to see.
      *
      * <p>
@@ -145,12 +146,12 @@ public abstract class ToolInstallation extends AbstractDescribableImpl<ToolInsta
     public void buildEnvVars(EnvVars env) {
     }
 
-    public DescribableList<ToolProperty<?>,ToolPropertyDescriptor> getProperties() {
+	public DescribableList<ToolProperty<?>,ToolPropertyDescriptor> getProperties() {
         assert properties!=null;
         return properties;
     }
 
-    /**
+	/**
      * Performs a necessary variable/environment/context expansion.
      *
      * @param node
@@ -178,7 +179,7 @@ public abstract class ToolInstallation extends AbstractDescribableImpl<ToolInsta
         return t;
     }
 
-    /**
+	/**
      * Convenient version of {@link #translate(Node, EnvVars, TaskListener)} that just takes a build object in progress.
      * @since 1.460
      */
@@ -187,7 +188,7 @@ public abstract class ToolInstallation extends AbstractDescribableImpl<ToolInsta
         return translate(buildInProgress.getBuiltOn(),buildInProgress.getEnvironment(listener),listener);
     }
 
-    /**
+	/**
      * Finds a tool on a node.
      * Checks if the location of the tool is overridden for the given node, and if so,
      * return the node-specific home directory.
@@ -206,37 +207,24 @@ public abstract class ToolInstallation extends AbstractDescribableImpl<ToolInsta
         return ToolLocationNodeProperty.getToolHome(node, this, log);
     }
 
-    /**
+	/**
      * Invoked by XStream when this object is read into memory.
      */
     protected Object readResolve() {
-        if(properties==null)
-            properties = new DescribableList<>(Saveable.NOOP);
-        for (ToolProperty<?> p : properties)
-            _setTool(p, this);
+        if(properties==null) {
+			properties = new DescribableList<>(Saveable.NOOP);
+		}
+        for (ToolProperty<?> p : properties) {
+			_setTool(p, this);
+		}
         return this;
     }
 
-    @Override public String toString() {
-        return getClass().getSimpleName() + "[" + name + "]";
+	@Override public String toString() {
+        return new StringBuilder().append(getClass().getSimpleName()).append("[").append(name).append("]").toString();
     }
 
-    /**
-     * Subclasses can extend this for data migration from old field storing home directory.
-     */
-    protected static abstract class ToolConverter extends XStream2.PassthruConverter<ToolInstallation> {
-        public ToolConverter(XStream2 xstream) { super(xstream); }
-        protected void callback(ToolInstallation obj, UnmarshallingContext context) {
-            String s;
-            if (obj.home == null && (s = oldHomeField(obj)) != null) {
-                obj.home = s;
-                OldDataMonitor.report(context, "1.286");
-            }
-        }
-        protected abstract String oldHomeField(ToolInstallation obj);
-    }
-
-    /**
+	/**
      * Returns all the registered {@link ToolDescriptor}s.
      */
     public static DescriptorExtensionList<ToolInstallation,ToolDescriptor<?>> all() {
@@ -244,5 +232,20 @@ public abstract class ToolInstallation extends AbstractDescribableImpl<ToolInsta
         return Jenkins.get().getDescriptorList(ToolInstallation.class);
     }
 
-    private static final long serialVersionUID = 1L;
+	/**
+     * Subclasses can extend this for data migration from old field storing home directory.
+     */
+    protected abstract static class ToolConverter extends XStream2.PassthruConverter<ToolInstallation> {
+        public ToolConverter(XStream2 xstream) { super(xstream); }
+        @Override
+		protected void callback(ToolInstallation obj, UnmarshallingContext context) {
+            String s;
+            if (!(obj.home == null && (s = oldHomeField(obj)) != null)) {
+				return;
+			}
+			obj.home = s;
+			OldDataMonitor.report(context, "1.286");
+        }
+        protected abstract String oldHomeField(ToolInstallation obj);
+    }
 }

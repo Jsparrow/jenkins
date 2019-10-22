@@ -68,23 +68,61 @@ public final class Secret implements Serializable {
     private static final Logger LOGGER = Logger.getLogger(Secret.class.getName());
 
     private static final byte PAYLOAD_V1 = 1;
-    /**
+
+	/**
+     * Pattern matching a possible output of {@link #getEncryptedValue}
+     * Basically, any Base64-encoded value optionally wrapped by {@code {}}.
+     * You must then call {@link #decrypt(String)} to eliminate false positives.
+     * @see #ENCRYPTED_VALUE_PATTERN
+     */
+    @Restricted(NoExternalUse.class)
+    public static final Pattern ENCRYPTED_VALUE_PATTERN = Pattern.compile("\\{?[A-Za-z0-9+/]+={0,2}}?");
+
+	/**
+     * Workaround for JENKINS-6459 / http://java.net/jira/browse/GLASSFISH-11862
+     * @see #getCipher(String)
+     */
+    private static final String PROVIDER = SystemProperties.getString(Secret.class.getName()+".provider");
+
+	/**
+     * For testing only. Override the secret key so that we can test this class without {@link Jenkins}.
+     */
+    /*package*/ static String SECRET = null;
+
+	/**
+     * The key that encrypts the data on disk.
+     */
+    private static final CryptoConfidentialKey KEY = new CryptoConfidentialKey(Secret.class.getName());
+
+	private static final long serialVersionUID = 1L;
+
+	static {
+        Stapler.CONVERT_UTILS.register(new org.apache.commons.beanutils.Converter() {
+            @Override
+			public Secret convert(Class type, Object value) {
+                return Secret.fromString(value.toString());
+            }
+        }, Secret.class);
+    }
+
+	/**
      * Unencrypted secret text.
      */
     @Nonnull
     private final String value;
-    private byte[] iv;
 
-    /*package*/ Secret(String value) {
+	private byte[] iv;
+
+	/*package*/ Secret(String value) {
         this.value = value;
     }
 
-    /*package*/ Secret(String value, byte[] iv) {
+	/*package*/ Secret(String value, byte[] iv) {
         this.value = value;
         this.iv = iv;
     }
 
-    /**
+	/**
      * Obtains the secret in a plain text.
      *
      * @see #getEncryptedValue()
@@ -96,11 +134,11 @@ public final class Secret implements Serializable {
     @Deprecated
     public String toString() {
         final String from = new Throwable().getStackTrace()[1].toString();
-        LOGGER.warning("Use of toString() on hudson.util.Secret from "+from+". Prefer getPlainText() or getEncryptedValue() depending your needs. see https://jenkins.io/redirect/hudson.util.Secret/");
+        LOGGER.warning(new StringBuilder().append("Use of toString() on hudson.util.Secret from ").append(from).append(". Prefer getPlainText() or getEncryptedValue() depending your needs. see https://jenkins.io/redirect/hudson.util.Secret/").toString());
         return value;
     }
 
-    /**
+	/**
      * Obtains the plain text password.
      * Before using this method, ask yourself if you'd be better off using {@link Secret#toString(Secret)}
      * to avoid NPE.
@@ -110,17 +148,17 @@ public final class Secret implements Serializable {
         return value;
     }
 
-    @Override
+	@Override
     public boolean equals(Object that) {
         return that instanceof Secret && value.equals(((Secret)that).value);
     }
 
-    @Override
+	@Override
     public int hashCode() {
         return value.hashCode();
     }
 
-    /**
+	/**
      * Encrypts {@link #value} and returns it in an encoded printable form.
      *
      * @see #toString() 
@@ -149,28 +187,21 @@ public final class Secret implements Serializable {
             System.arraycopy(iv, 0, payload, pos, iv.length);
             pos+=iv.length;
             System.arraycopy(encrypted, 0, payload, pos, encrypted.length);
-            return "{"+new String(Base64.getEncoder().encode(payload))+"}";
+            return new StringBuilder().append("{").append(new String(Base64.getEncoder().encode(payload))).append("}").toString();
         } catch (GeneralSecurityException e) {
             throw new Error(e); // impossible
         }
     }
 
-    /**
-     * Pattern matching a possible output of {@link #getEncryptedValue}
-     * Basically, any Base64-encoded value optionally wrapped by {@code {}}.
-     * You must then call {@link #decrypt(String)} to eliminate false positives.
-     * @see #ENCRYPTED_VALUE_PATTERN
-     */
-    @Restricted(NoExternalUse.class)
-    public static final Pattern ENCRYPTED_VALUE_PATTERN = Pattern.compile("\\{?[A-Za-z0-9+/]+={0,2}}?");
-
-    /**
+	/**
      * Reverse operation of {@link #getEncryptedValue()}. Returns null
      * if the given cipher text was invalid.
      */
     @CheckForNull
     public static Secret decrypt(@CheckForNull String data) {
-        if(!isValidData(data))      return null;
+        if(!isValidData(data)) {
+			return null;
+		}
 
         if (data.startsWith("{") && data.endsWith("}")) { //likely CBC encrypted/containing metadata but could be plain text
             byte[] payload;
@@ -218,8 +249,10 @@ public final class Secret implements Serializable {
         }
     }
 
-    private static boolean isValidData(String data) {
-        if (data == null || "{}".equals(data) || "".equals(data.trim())) return false;
+	private static boolean isValidData(String data) {
+        if (data == null || "{}".equals(data) || "".equals(data.trim())) {
+			return false;
+		}
 
         if (data.startsWith("{") && data.endsWith("}")) {
             return !"".equals(data.substring(1, data.length()-1).trim());
@@ -228,7 +261,7 @@ public final class Secret implements Serializable {
         return true;
     }
 
-    /**
+	/**
      * Workaround for JENKINS-6459 / http://java.net/jira/browse/GLASSFISH-11862
      * This method uses specific provider selected via hudson.util.Secret.provider system property
      * to provide a workaround for the above bug where default provide gives an unusable instance.
@@ -239,7 +272,7 @@ public final class Secret implements Serializable {
                                 : Cipher.getInstance(algorithm);
     }
 
-    /**
+	/**
      * Attempts to treat the given string first as a cipher text, and if it doesn't work,
      * treat the given string as the unencrypted secret value.
      *
@@ -250,11 +283,13 @@ public final class Secret implements Serializable {
     public static Secret fromString(@CheckForNull String data) {
         data = Util.fixNull(data);
         Secret s = decrypt(data);
-        if(s==null) s=new Secret(data);
+        if(s==null) {
+			s=new Secret(data);
+		}
         return s;
     }
 
-    /**
+	/**
      * Works just like {@link Secret#toString()} but avoids NPE when the secret is null.
      * To be consistent with {@link #fromString(String)}, this method doesn't distinguish
      * empty password and null password.
@@ -263,48 +298,24 @@ public final class Secret implements Serializable {
     public static String toString(@CheckForNull Secret s) {
         return s==null ? "" : s.value;
     }
-
     public static final class ConverterImpl implements Converter {
         public ConverterImpl() {
         }
 
-        public boolean canConvert(Class type) {
+        @Override
+		public boolean canConvert(Class type) {
             return type==Secret.class;
         }
 
-        public void marshal(Object source, HierarchicalStreamWriter writer, MarshallingContext context) {
+        @Override
+		public void marshal(Object source, HierarchicalStreamWriter writer, MarshallingContext context) {
             Secret src = (Secret) source;
             writer.setValue(src.getEncryptedValue());
         }
 
-        public Object unmarshal(HierarchicalStreamReader reader, final UnmarshallingContext context) {
+        @Override
+		public Object unmarshal(HierarchicalStreamReader reader, final UnmarshallingContext context) {
             return fromString(reader.getValue());
         }
-    }
-
-    /**
-     * Workaround for JENKINS-6459 / http://java.net/jira/browse/GLASSFISH-11862
-     * @see #getCipher(String)
-     */
-    private static final String PROVIDER = SystemProperties.getString(Secret.class.getName()+".provider");
-
-    /**
-     * For testing only. Override the secret key so that we can test this class without {@link Jenkins}.
-     */
-    /*package*/ static String SECRET = null;
-
-    /**
-     * The key that encrypts the data on disk.
-     */
-    private static final CryptoConfidentialKey KEY = new CryptoConfidentialKey(Secret.class.getName());
-
-    private static final long serialVersionUID = 1L;
-
-    static {
-        Stapler.CONVERT_UTILS.register(new org.apache.commons.beanutils.Converter() {
-            public Secret convert(Class type, Object value) {
-                return Secret.fromString(value.toString());
-            }
-        }, Secret.class);
     }
 }

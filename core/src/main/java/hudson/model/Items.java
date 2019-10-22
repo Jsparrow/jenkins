@@ -54,6 +54,7 @@ import jenkins.model.Jenkins;
 import org.acegisecurity.Authentication;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
+import java.util.stream.Collectors;
 
 /**
  * Convenience methods related to {@link Item}.
@@ -119,7 +120,24 @@ public class Items {
         }
     };
 
-    /**
+	/**
+     * Used to load/save job configuration.
+     *
+     * When you extend {@link Job} in a plugin, try to put the alias so
+     * that it produces a reasonable XML.
+     */
+    public static final XStream XSTREAM = new XStream2();
+
+	/**
+     * Alias to {@link #XSTREAM} so that one can access additional methods on {@link XStream2} more easily.
+     */
+    public static final XStream2 XSTREAM2 = (XStream2)XSTREAM;
+
+	static {
+        XSTREAM.alias("project",FreeStyleProject.class);
+    }
+
+	/**
      * Runs a block while making {@link #currentlyUpdatingByXml} be temporarily true.
      * Use this when you are creating or changing an item.
      * @param <V> a return value type (may be {@link Void})
@@ -138,7 +156,7 @@ public class Items {
         }
     }
 
-    /**
+	/**
      * Checks whether we are in the middle of creating or configuring an item via XML.
      * Used to determine the {@code newInstance} parameter for {@link Trigger#start}.
      * @return true if {@link #whileUpdatingByXml} is currently being called, false for example when merely starting Jenkins or reloading from disk
@@ -148,14 +166,14 @@ public class Items {
         return updatingByXml.get();
     }
 
-    /**
+	/**
      * Returns all the registered {@link TopLevelItemDescriptor}s.
      */
     public static DescriptorExtensionList<TopLevelItem,TopLevelItemDescriptor> all() {
         return Jenkins.get().getDescriptorList(TopLevelItem.class);
     }
 
-    /**
+	/**
      * Returns all the registered {@link TopLevelItemDescriptor}s that the current security principal is allowed to
      * create within the specified item group.
      *
@@ -165,7 +183,7 @@ public class Items {
         return all(Jenkins.getAuthentication(), c);
     }
 
-    /**
+	/**
      * Returns all the registered {@link TopLevelItemDescriptor}s that the specified security principal is allowed to
      * create within the specified item group.
      *
@@ -180,35 +198,32 @@ public class Items {
             // fall back to root
             acl = Jenkins.get().getACL();
         }
-        for (TopLevelItemDescriptor d: all()) {
-            if (acl.hasCreatePermission(a, c, d) && d.isApplicableIn(c)) {
-                result.add(d);
-            }
-        }
+        result.addAll(all().stream().filter(d -> acl.hasCreatePermission(a, c, d) && d.isApplicableIn(c)).collect(Collectors.toList()));
         return result;
     }
 
-    /**
+	/**
      * @deprecated Underspecified what the parameter is. {@link Descriptor#getId}? A {@link Describable} class name?
      */
     public static TopLevelItemDescriptor getDescriptor(String fqcn) {
         return Descriptor.find(all(), fqcn);
     }
 
-    /**
+	/**
      * Converts a list of items into a comma-separated list of full names.
      */
     public static String toNameList(Collection<? extends Item> items) {
         StringBuilder buf = new StringBuilder();
-        for (Item item : items) {
-            if(buf.length()>0)
-                buf.append(", ");
+        items.forEach(item -> {
+            if(buf.length()>0) {
+				buf.append(", ");
+			}
             buf.append(item.getFullName());
-        }
+        });
         return buf.toString();
     }
 
-    /**
+	/**
      * @deprecated as of 1.406
      *      Use {@link #fromNameList(ItemGroup, String, Class)}
      */
@@ -217,7 +232,7 @@ public class Items {
         return fromNameList(null,list,type);
     }
 
-    /**
+	/**
      * Does the opposite of {@link #toNameList(Collection)}.
      */
     public static <T extends Item> List<T> fromNameList(ItemGroup context, @Nonnull String list, @Nonnull Class<T> type) {
@@ -233,14 +248,15 @@ public class Items {
             String fullName = tokens.nextToken().trim();
             if (StringUtils.isNotEmpty(fullName)) {
                 T item = jenkins.getItem(fullName, context, type);
-                if(item!=null)
-                    r.add(item);
+                if(item!=null) {
+					r.add(item);
+				}
             }
         }
         return r;
     }
 
-    /**
+	/**
      * Computes the canonical full name of a relative path in an {@link ItemGroup} context, handling relative
      * positions ".." and "." as absolute path starting with "/". The resulting name is the item fullName from Jenkins
      * root.
@@ -251,16 +267,18 @@ public class Items {
 
         Stack<String> name = new Stack<>();
         for (int i=0; i<c.length;i++) {
-            if (i==0 && c[i].equals("")) continue;
+            if (i==0 && "".equals(c[i])) {
+				continue;
+			}
             name.push(c[i]);
         }
         for (int i=0; i<p.length;i++) {
-            if (i==0 && p[i].equals("")) {
+            if (i==0 && "".equals(p[i])) {
                 // Absolute path starting with a "/"
                 name.clear();
                 continue;
             }
-            if (p[i].equals("..")) {
+            if ("..".equals(p[i])) {
                 if (name.size() == 0) {
                     throw new IllegalArgumentException(String.format(
                             "Illegal relative path '%s' within context '%s'", path, context.getFullName()
@@ -269,7 +287,7 @@ public class Items {
                 name.pop();
                 continue;
             }
-            if (p[i].equals(".")) {
+            if (".".equals(p[i])) {
                 continue;
             }
             name.push(p[i]);
@@ -277,7 +295,7 @@ public class Items {
         return StringUtils.join(name, '/');
     }
 
-    /**
+	/**
      * Computes the relative name of list of items after a rename or move occurred.
      * Used to manage job references as names in plugins to support {@link hudson.model.listeners.ItemListener#onLocationChanged}.
      * <p>
@@ -311,7 +329,7 @@ public class Items {
         return StringUtils.join(newValue, ",");
     }
 
-    // Had difficulty adapting the version in Functions to use no live items, so rewrote it:
+	// Had difficulty adapting the version in Functions to use no live items, so rewrote it:
     static String getRelativeNameFrom(String itemFullName, String groupFullName) {
         String[] itemFullNameA = itemFullName.isEmpty() ? MemoryReductionUtil.EMPTY_STRING_ARRAY : itemFullName.split("/");
         String[] groupFullNameA = groupFullName.isEmpty() ? MemoryReductionUtil.EMPTY_STRING_ARRAY : groupFullName.split("/");
@@ -361,7 +379,7 @@ public class Items {
         }
     }
 
-    /**
+	/**
      * Loads a {@link Item} from a config file.
      *
      * @param dir
@@ -373,21 +391,21 @@ public class Items {
         return item;
     }
 
-    /**
+	/**
      * The file we save our configuration.
      */
     public static XmlFile getConfigFile(File dir) {
         return new XmlFile(XSTREAM,new File(dir,"config.xml"));
     }
 
-    /**
+	/**
      * The file we save our configuration.
      */
     public static XmlFile getConfigFile(Item item) {
         return getConfigFile(item.getRootDir());
     }
-    
-    /**
+
+	/**
      * Gets all the {@link Item}s recursively in the {@link ItemGroup} tree
      * and filter them by the given type. The returned list will represent a snapshot view of the items present at some
      * time during the call. If items are moved during the call, depending on the move, it may be possible for some
@@ -403,23 +421,22 @@ public class Items {
         getAllItems(root, type, r);
         return r;
     }
-    private static <T extends Item> void getAllItems(final ItemGroup root, Class<T> type, List<T> r) {
+
+	private static <T extends Item> void getAllItems(final ItemGroup root, Class<T> type, List<T> r) {
         List<Item> items = new ArrayList<>(((ItemGroup<?>) root).getItems());
         // because we add items depth first, we can use the quicker BY_NAME comparison
         items.sort(BY_NAME);
-        for (Item i : items) {
-            if (type.isInstance(i)) {
-                if (i.hasPermission(Item.READ)) {
-                    r.add(type.cast(i));
-                }
-            }
+        items.forEach(i -> {
+            if (type.isInstance(i) && i.hasPermission(Item.READ)) {
+			    r.add(type.cast(i));
+			}
             if (i instanceof ItemGroup) {
                 getAllItems((ItemGroup) i, type, r);
             }
-        }
+        });
     }
 
-    /**
+	/**
      * Gets a read-only view of all the {@link Item}s recursively in the {@link ItemGroup} tree visible to
      * {@link Jenkins#getAuthentication()} without concern for the order in which items are returned. Each iteration
      * of the view will be "live" reflecting the items available between the time the iteration was started and the
@@ -436,8 +453,7 @@ public class Items {
         return allItems(Jenkins.getAuthentication(), root, type);
     }
 
-
-    /**
+	/**
      * Gets a read-only view all the {@link Item}s recursively in the {@link ItemGroup} tree visible to the supplied
      * authentication without concern for the order in which items are returned. Each iteration
      * of the view will be "live" reflecting the items available between the time the iteration was started and the
@@ -454,7 +470,7 @@ public class Items {
         return new AllItemsIterable<>(root, authentication, type);
     }
 
-    /**
+	/**
      * Finds an item whose name (when referenced from the specified context) is closest to the given name.
      * @param <T> the type of item being considered
      * @param type same as {@code T}
@@ -472,7 +488,7 @@ public class Items {
         return Jenkins.get().getItem(nearest, context, type);
     }
 
-    /**
+	/**
      * Moves an item between folders (or top level).
      * Fires all relevant events but does not verify that the item’s directory is not currently being used in some way (for example by a running build).
      * Does not check any permissions.
@@ -483,7 +499,7 @@ public class Items {
      * @throws IllegalArgumentException if the move would really be a rename, or the destination cannot accept the item, or the destination already has an item of that name
      * @since 1.548
      */
-    public static <I extends AbstractItem & TopLevelItem> I move(I item, DirectlyModifiableTopLevelItemGroup destination) throws IOException, IllegalArgumentException {
+    public static <I extends AbstractItem & TopLevelItem> I move(I item, DirectlyModifiableTopLevelItemGroup destination) throws IOException {
         DirectlyModifiableTopLevelItemGroup oldParent = (DirectlyModifiableTopLevelItemGroup) item.getParent();
         if (oldParent == destination) {
             throw new IllegalArgumentException();
@@ -504,6 +520,30 @@ public class Items {
         item.movedTo(destination, newItem, destDir);
         ItemListener.fireLocationChange(newItem, oldFullName);
         return newItem;
+    }
+
+	/**
+     * Securely check for the existence of an item before trying to create one with the same name.
+     * @param parent the folder where we are about to create/rename/move an item
+     * @param newName the proposed new name
+     * @param variant if not null, an existing item which we accept could be there
+     * @throws IllegalArgumentException if there is already something there, which you were supposed to know about
+     * @throws Failure if there is already something there but you should not be told details
+     */
+    static void verifyItemDoesNotAlreadyExist(@Nonnull ItemGroup<?> parent, @Nonnull String newName, @CheckForNull Item variant) {
+        Item existing;
+        try (ACLContext ctxt = ACL.as(ACL.SYSTEM)) {
+            existing = parent.getItem(newName);
+        }
+        if (existing != null && existing != variant) {
+            if (existing.hasPermission(Item.DISCOVER)) {
+                String prefix = parent.getFullName();
+                throw new IllegalArgumentException(new StringBuilder().append(prefix.isEmpty() ? "" : prefix + "/").append(newName).append(" already exists").toString());
+            } else {
+                // Cannot hide its existence, so at least be as vague as possible.
+                throw new Failure("");
+            }
+        }
     }
 
     private static class AllItemsIterable<T extends Item> implements Iterable<T> {
@@ -619,46 +659,5 @@ public class Items {
             }
 
         }
-    }
-
-    /**
-     * Securely check for the existence of an item before trying to create one with the same name.
-     * @param parent the folder where we are about to create/rename/move an item
-     * @param newName the proposed new name
-     * @param variant if not null, an existing item which we accept could be there
-     * @throws IllegalArgumentException if there is already something there, which you were supposed to know about
-     * @throws Failure if there is already something there but you should not be told details
-     */
-    static void verifyItemDoesNotAlreadyExist(@Nonnull ItemGroup<?> parent, @Nonnull String newName, @CheckForNull Item variant) throws IllegalArgumentException, Failure {
-        Item existing;
-        try (ACLContext ctxt = ACL.as(ACL.SYSTEM)) {
-            existing = parent.getItem(newName);
-        }
-        if (existing != null && existing != variant) {
-            if (existing.hasPermission(Item.DISCOVER)) {
-                String prefix = parent.getFullName();
-                throw new IllegalArgumentException((prefix.isEmpty() ? "" : prefix + "/") + newName + " already exists");
-            } else {
-                // Cannot hide its existence, so at least be as vague as possible.
-                throw new Failure("");
-            }
-        }
-    }
-
-    /**
-     * Used to load/save job configuration.
-     *
-     * When you extend {@link Job} in a plugin, try to put the alias so
-     * that it produces a reasonable XML.
-     */
-    public static final XStream XSTREAM = new XStream2();
-
-    /**
-     * Alias to {@link #XSTREAM} so that one can access additional methods on {@link XStream2} more easily.
-     */
-    public static final XStream2 XSTREAM2 = (XStream2)XSTREAM;
-
-    static {
-        XSTREAM.alias("project",FreeStyleProject.class);
     }
 }

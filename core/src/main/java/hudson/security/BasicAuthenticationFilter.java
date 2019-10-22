@@ -90,11 +90,13 @@ import java.net.URLEncoder;
 public class BasicAuthenticationFilter implements Filter {
     private ServletContext servletContext;
 
-    public void init(FilterConfig filterConfig) throws ServletException {
+    @Override
+	public void init(FilterConfig filterConfig) throws ServletException {
         servletContext = filterConfig.getServletContext();
     }
 
-    @SuppressWarnings("ACL.impersonate")
+    @Override
+	@SuppressWarnings("ACL.impersonate")
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
         HttpServletRequest req = (HttpServletRequest) request;
         HttpServletResponse rsp = (HttpServletResponse) response;
@@ -154,18 +156,18 @@ public class BasicAuthenticationFilter implements Filter {
         }
 
 
-        path = req.getContextPath()+"/secured"+path;
+        path = new StringBuilder().append(req.getContextPath()).append("/secured").append(path).toString();
         String q = req.getQueryString();
-        if(q!=null)
-            path += '?'+q;
+        if(q!=null) {
+			path += '?'+q;
+		}
 
         // prepare a redirect
         rsp.setStatus(HttpServletResponse.SC_MOVED_TEMPORARILY);
         rsp.setHeader("Location",path);
 
         // ... but first let the container authenticate this request
-        RequestDispatcher d = servletContext.getRequestDispatcher("/j_security_check?j_username="+
-            URLEncoder.encode(username,"UTF-8")+"&j_password="+URLEncoder.encode(password,"UTF-8"));
+        RequestDispatcher d = servletContext.getRequestDispatcher(new StringBuilder().append("/j_security_check?j_username=").append(URLEncoder.encode(username,"UTF-8")).append("&j_password=").append(URLEncoder.encode(password,"UTF-8")).toString());
         d.include(req,rsp);
     }
 
@@ -183,6 +185,7 @@ public class BasicAuthenticationFilter implements Filter {
     //    }
     //}
 
-    public void destroy() {
+    @Override
+	public void destroy() {
     }
 }

@@ -44,17 +44,20 @@ import java.io.IOException;
 @Extension @Symbol("tooManyJobsButNoView")
 public class TooManyJobsButNoView extends AdministrativeMonitor {
 
-    @Override
+    public static final int THRESHOLD = 16;
+
+	@Override
     public String getDisplayName() {
         return Messages.TooManyJobsButNoView_DisplayName();
     }
 
-    public boolean isActivated() {
+	@Override
+	public boolean isActivated() {
         Jenkins h = Jenkins.get();
         return h.getViews().size()==1 && h.getItemMap().size()> THRESHOLD;
     }
 
-    /**
+	/**
      * Depending on whether the user said "yes" or "no", send him to the right place.
      */
     @RequirePOST
@@ -66,6 +69,4 @@ public class TooManyJobsButNoView extends AdministrativeMonitor {
             rsp.sendRedirect(req.getContextPath()+"/newView");
         }
     }
-
-    public static final int THRESHOLD = 16;
 }

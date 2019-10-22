@@ -35,26 +35,24 @@ import com.sun.jna.WString;
  */
 public interface Kernel32 extends StdCallLibrary {
     Kernel32 INSTANCE = Kernel32Utils.load();
+	int MOVEFILE_COPY_ALLOWED = 2;
+	int MOVEFILE_CREATE_HARDLINK = 16;
+	int MOVEFILE_DELAY_UNTIL_REBOOT = 4;
+	int MOVEFILE_FAIL_IF_NOT_TRACKABLE = 32;
+	int MOVEFILE_REPLACE_EXISTING = 1;
+	int MOVEFILE_WRITE_THROUGH = 8;
+	int FILE_ATTRIBUTE_REPARSE_POINT = 0x400;
+	int SYMBOLIC_LINK_FLAG_DIRECTORY = 1;
+	int STILL_ACTIVE = 259;
 
-    /**
+	/**
      * See http://msdn.microsoft.com/en-us/library/aa365240(VS.85).aspx
      */
     boolean MoveFileExA(String existingFileName, String newFileName, int flags );
-
-    int MOVEFILE_COPY_ALLOWED = 2;
-    int MOVEFILE_CREATE_HARDLINK = 16;
-    int MOVEFILE_DELAY_UNTIL_REBOOT = 4;
-    int MOVEFILE_FAIL_IF_NOT_TRACKABLE = 32;
-    int MOVEFILE_REPLACE_EXISTING = 1;
-    int MOVEFILE_WRITE_THROUGH = 8;
-    
-    int FILE_ATTRIBUTE_REPARSE_POINT = 0x400;
-
-    int WaitForSingleObject(Pointer handle, int milliseconds);
-    int GetFileAttributesW(WString lpFileName);
-    boolean GetExitCodeProcess(Pointer handle, IntByReference r);
-
-    /**
+	int WaitForSingleObject(Pointer handle, int milliseconds);
+	int GetFileAttributesW(WString lpFileName);
+	boolean GetExitCodeProcess(Pointer handle, IntByReference r);
+	/**
      * Creates a symbolic link.
      *
      * Windows Vista+, Windows Server 2008+
@@ -68,10 +66,6 @@ public interface Kernel32 extends StdCallLibrary {
      * @see <a href="http://msdn.microsoft.com/en-us/library/windows/desktop/aa363866(v=vs.85).aspx">MSDN</a>
      */
     boolean CreateSymbolicLinkW(WString lpSymlinkFileName, WString lpTargetFileName, int dwFlags);
-    int SYMBOLIC_LINK_FLAG_DIRECTORY = 1;
-
-    int STILL_ACTIVE = 259;
-
-    int GetTempPathW(int nBuffer, Pointer lpBuffer);
+	int GetTempPathW(int nBuffer, Pointer lpBuffer);
     // DWORD == int
 }

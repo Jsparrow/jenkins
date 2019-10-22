@@ -101,49 +101,37 @@ public abstract class SecurityListener implements ExtensionPoint {
             }
             LOGGER.log(Level.FINE, "authenticated: {0} {1}", new Object[] {details.getUsername(), groups});
         }
-        for (SecurityListener l : all()) {
-            l.authenticated(details);
-        }
+        all().forEach(l -> l.authenticated(details));
     }
 
     /** @since 2.161 */
     public static void fireUserCreated(@Nonnull String username) {
         LOGGER.log(Level.FINE, "new user created: {0}", username);
-        for (SecurityListener l : all()) {
-            l.userCreated(username);
-        }
+        all().forEach(l -> l.userCreated(username));
     }
 
     /** @since 1.569 */
     public static void fireFailedToAuthenticate(@Nonnull String username) {
         LOGGER.log(Level.FINE, "failed to authenticate: {0}", username);
-        for (SecurityListener l : all()) {
-            l.failedToAuthenticate(username);
-        }
+        all().forEach(l -> l.failedToAuthenticate(username));
     }
 
     /** @since 1.569 */
     public static void fireLoggedIn(@Nonnull String username) {
         LOGGER.log(Level.FINE, "logged in: {0}", username);
-        for (SecurityListener l : all()) {
-            l.loggedIn(username);
-        }
+        all().forEach(l -> l.loggedIn(username));
     }
 
     /** @since 1.569 */
     public static void fireFailedToLogIn(@Nonnull String username) {
         LOGGER.log(Level.FINE, "failed to log in: {0}", username);
-        for (SecurityListener l : all()) {
-            l.failedToLogIn(username);
-        }
+        all().forEach(l -> l.failedToLogIn(username));
     }
 
     /** @since 1.569 */
     public static void fireLoggedOut(@Nonnull String username) {
         LOGGER.log(Level.FINE, "logged out: {0}", username);
-        for (SecurityListener l : all()) {
-            l.loggedOut(username);
-        }
+        all().forEach(l -> l.loggedOut(username));
     }
 
     private static List<SecurityListener> all() {

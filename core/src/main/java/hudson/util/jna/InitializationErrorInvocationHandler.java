@@ -20,9 +20,11 @@ public class InitializationErrorInvocationHandler implements InvocationHandler {
         this.cause = cause;
     }
 
-    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-        if (method.getDeclaringClass()==Object.class)
-            return method.invoke(this,args);
+    @Override
+	public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+        if (method.getDeclaringClass()==Object.class) {
+			return method.invoke(this,args);
+		}
 
         throw new UnsupportedOperationException("Failed to link the library: "+method.getDeclaringClass(), cause);
     }

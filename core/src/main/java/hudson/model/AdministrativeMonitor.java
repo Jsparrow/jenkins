@@ -104,11 +104,13 @@ public abstract class AdministrativeMonitor extends AbstractModelObject implemen
         return "administrativeMonitor/"+id;
     }
 
-    public String getDisplayName() {
+    @Override
+	public String getDisplayName() {
         return id;
     }
 
-    public final String getSearchUrl() {
+    @Override
+	public final String getSearchUrl() {
         return getUrl();
     }
 
@@ -118,8 +120,11 @@ public abstract class AdministrativeMonitor extends AbstractModelObject implemen
     public void disable(boolean value) throws IOException {
         AbstractCIBase jenkins = Jenkins.get();
         Set<String> set = jenkins.getDisabledAdministrativeMonitors();
-        if(value)   set.add(id);
-        else        set.remove(id);
+        if(value) {
+			set.add(id);
+		} else {
+			set.remove(id);
+		}
         jenkins.save();
     }
 
@@ -156,7 +161,8 @@ public abstract class AdministrativeMonitor extends AbstractModelObject implemen
     /**
      * Requires ADMINISTER permission for any operation in here.
      */
-    @Restricted(NoExternalUse.class)
+    @Override
+	@Restricted(NoExternalUse.class)
     public Object getTarget() {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
         return this;

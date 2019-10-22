@@ -43,5 +43,6 @@ public interface TopLevelItem extends Item, ExtensionPoint, Describable<TopLevel
      *
      * @see Describable#getDescriptor()
      */
-    TopLevelItemDescriptor getDescriptor();
+    @Override
+	TopLevelItemDescriptor getDescriptor();
 }

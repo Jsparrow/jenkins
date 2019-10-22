@@ -44,6 +44,7 @@ import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
 
 import javax.servlet.ServletException;
+import java.util.stream.Collectors;
 
 /**
  * {@link Descriptor} for {@link Slave}.
@@ -58,14 +59,22 @@ import javax.servlet.ServletException;
  * @author Kohsuke Kawaguchi
  */
 public abstract class NodeDescriptor extends Descriptor<Node> {
-    protected NodeDescriptor(Class<? extends Node> clazz) {
+    /**
+     * All the registered instances.
+     * @deprecated as of 1.286
+     *      Use {@link #all()} for read access, and {@link Extension} for registration.
+     */
+    @Deprecated
+    public static final DescriptorList<Node> ALL = new DescriptorList<>(Node.class);
+
+	protected NodeDescriptor(Class<? extends Node> clazz) {
         super(clazz);
     }
 
-    protected NodeDescriptor() {
+	protected NodeDescriptor() {
     }
 
-    /**
+	/**
      * Can the administrator create this type of nodes from UI?
      *
      * Return false if it only makes sense for programs to create it, not through the "new node" UI.
@@ -74,11 +83,11 @@ public abstract class NodeDescriptor extends Descriptor<Node> {
         return true;
     }
 
-    public final String newInstanceDetailPage() {
-        return '/'+clazz.getName().replace('.','/').replace('$','/')+"/newInstanceDetail.jelly";
+	public final String newInstanceDetailPage() {
+        return new StringBuilder().append('/').append(clazz.getName().replace('.','/').replace('$','/')).append("/newInstanceDetail.jelly").toString();
     }
 
-    /**
+	/**
      * Handles the form submission from the "/computer/new" page, which is the first form for creating a new node.
      * By default, it shows the configuration page for entering details, but subtypes can override this differently.
      *
@@ -91,15 +100,16 @@ public abstract class NodeDescriptor extends Descriptor<Node> {
         req.getView(computerSet,"_new.jelly").forward(req,rsp);
     }
 
-    @Override
+	@Override
     public String getConfigPage() {
         return getViewPage(clazz, "configure-entries.jelly");
     }
 
-    public FormValidation doCheckName(@QueryParameter String value ) {
+	public FormValidation doCheckName(@QueryParameter String value ) {
         String name = Util.fixEmptyAndTrim(value);
-        if(name==null)
-            return FormValidation.error(Messages.NodeDescriptor_CheckName_Mandatory());
+        if(name==null) {
+			return FormValidation.error(Messages.NodeDescriptor_CheckName_Mandatory());
+		}
         try {
             Jenkins.checkGoodName(name);
         } catch (Failure f) {
@@ -108,26 +118,16 @@ public abstract class NodeDescriptor extends Descriptor<Node> {
         return FormValidation.ok();
     }
 
-    /**
+	/**
      * Returns all the registered {@link NodeDescriptor} descriptors.
      */
     public static DescriptorExtensionList<Node,NodeDescriptor> all() {
         return Jenkins.get().getDescriptorList(Node.class);
     }
 
-    /**
-     * All the registered instances.
-     * @deprecated as of 1.286
-     *      Use {@link #all()} for read access, and {@link Extension} for registration.
-     */
-    @Deprecated
-    public static final DescriptorList<Node> ALL = new DescriptorList<>(Node.class);
-
-    public static List<NodeDescriptor> allInstantiable() {
+	public static List<NodeDescriptor> allInstantiable() {
         List<NodeDescriptor> r = new ArrayList<>();
-        for (NodeDescriptor d : all())
-            if(d.isInstantiable())
-                r.add(d);
+        r.addAll(all().stream().filter(NodeDescriptor::isInstantiable).collect(Collectors.toList()));
         return r;
     }
 }

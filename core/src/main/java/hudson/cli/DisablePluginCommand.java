@@ -41,39 +41,40 @@ import java.util.List;
 @Extension
 public class DisablePluginCommand extends CLICommand {
 
-    @Argument(metaVar = "plugin1 plugin2 plugin3", required = true, usage = "Plugins to be disabled.")
+    private static final int INDENT_SPACE = 3;
+
+	// package-private access to be able to use it in the tests
+    static final int RETURN_CODE_NOT_DISABLED_DEPENDANTS = 16;
+
+	static final int RETURN_CODE_NO_SUCH_PLUGIN = 17;
+
+	@Argument(metaVar = "plugin1 plugin2 plugin3", required = true, usage = "Plugins to be disabled.")
     private List<String> pluginNames;
 
-    @Option(name = "-restart", aliases = "-r", usage = "Restart Jenkins after disabling plugins.")
+	@Option(name = "-restart", aliases = "-r", usage = "Restart Jenkins after disabling plugins.")
     private boolean restart;
 
-    @Option(name = "-strategy", aliases = "-s", metaVar = "strategy", usage = "How to process the dependent plugins. \n" +
+	@Option(name = "-strategy", aliases = "-s", metaVar = "strategy", usage = "How to process the dependent plugins. \n" +
             "- none: if a mandatory dependent plugin exists and it is enabled, the plugin cannot be disabled (default value).\n" +
             "- mandatory: all mandatory dependent plugins are also disabled, optional dependent plugins remain enabled.\n" +
             "- all: all dependent plugins are also disabled, no matter if its dependency is optional or mandatory.")
     private String strategy = PluginWrapper.PluginDisableStrategy.NONE.toString();
 
-    @Option(name = "-quiet", aliases = "-q", usage = "Be quiet, print only the error messages")
+	@Option(name = "-quiet", aliases = "-q", usage = "Be quiet, print only the error messages")
     private boolean quiet;
 
-    private static final int INDENT_SPACE = 3;
-
-    @Override
+	@Override
     public String getShortDescription() {
         return Messages.DisablePluginCommand_ShortDescription();
     }
 
-    // package-private access to be able to use it in the tests
-    static final int RETURN_CODE_NOT_DISABLED_DEPENDANTS = 16;
-    static final int RETURN_CODE_NO_SUCH_PLUGIN = 17;
-
-    @Override
+	@Override
     protected void printUsageSummary(PrintStream stderr) {
         super.printUsageSummary(stderr);
         stderr.println(Messages.DisablePluginCommand_PrintUsageSummary());
     }
 
-    @Override
+	@Override
     protected int run() throws Exception {
         Jenkins jenkins = Jenkins.get();
         jenkins.checkPermission(Jenkins.ADMINISTER);
@@ -99,17 +100,15 @@ public class DisablePluginCommand extends CLICommand {
         return getResultCode(results);
     }
 
-    /**
+	/**
      * Print the result of all the process
      * @param results the list of results for the disablement of each plugin
      */
     private void printResults(List<PluginWrapper.PluginDisableResult> results) {
-        for (PluginWrapper.PluginDisableResult oneResult : results) {
-            printResult(oneResult, 0);
-        }
+        results.forEach(oneResult -> printResult(oneResult, 0));
     }
 
-    /**
+	/**
      * Print indented the arguments with the format passed beginning with the indent passed.
      * @param indent number of spaces at the beginning.
      * @param format format as in {@link String#format(String, Object...)}
@@ -123,32 +122,33 @@ public class DisablePluginCommand extends CLICommand {
             newArgs[0] = " ";
             System.arraycopy(arguments, 0, newArgs, 1, arguments.length);
 
-            String f = "%" + indent + "s" + format + "%n";
+            String f = new StringBuilder().append("%").append(indent).append("s").append(format).append("%n").toString();
             stdout.format(f, newArgs);
         }
     }
 
-    /**
+	/**
      * Print the result of a plugin disablement with the indent passed.
      * @param oneResult the result of the disablement of a plugin.
      * @param indent the initial indent.
      */
     private void printResult(PluginWrapper.PluginDisableResult oneResult, int indent) {
         PluginWrapper.PluginDisableStatus status = oneResult.getStatus();
-        if (quiet && (PluginWrapper.PluginDisableStatus.DISABLED.equals(status) || PluginWrapper.PluginDisableStatus.ALREADY_DISABLED.equals(status))) {
+        if (quiet && (PluginWrapper.PluginDisableStatus.DISABLED == status || PluginWrapper.PluginDisableStatus.ALREADY_DISABLED == status)) {
             return;
         }
 
         printIndented(indent, Messages.DisablePluginCommand_StatusMessage(oneResult.getPlugin(), oneResult.getStatus(), oneResult.getMessage()));
-        if (oneResult.getDependentsDisableStatus().size() > 0) {
-            indent += INDENT_SPACE;
-            for (PluginWrapper.PluginDisableResult oneDependentResult : oneResult.getDependentsDisableStatus()) {
-                printResult(oneDependentResult, indent);
-            }
-        }
+        if (oneResult.getDependentsDisableStatus().size() <= 0) {
+			return;
+		}
+		indent += INDENT_SPACE;
+		for (PluginWrapper.PluginDisableResult oneDependentResult : oneResult.getDependentsDisableStatus()) {
+		    printResult(oneDependentResult, indent);
+		}
     }
 
-    /**
+	/**
      * Restart if at least one plugin was disabled in this process.
      * @param results the list of results after the disablement of the plugins.
      */
@@ -162,7 +162,7 @@ public class DisablePluginCommand extends CLICommand {
         }
     }
 
-    /**
+	/**
      * Restart if this particular result of the disablement of a plugin and its dependent plugins (depending on the
      * strategy used) has a plugin disablexd.
      * @param oneResult the result of a plugin (and its dependents).
@@ -170,7 +170,7 @@ public class DisablePluginCommand extends CLICommand {
      */
     private boolean restartIfNecessary(PluginWrapper.PluginDisableResult oneResult) throws RestartNotSupportedException {
         PluginWrapper.PluginDisableStatus status = oneResult.getStatus();
-        if (PluginWrapper.PluginDisableStatus.DISABLED.equals(status)) {
+        if (PluginWrapper.PluginDisableStatus.DISABLED == status) {
             Jenkins.get().safeRestart();
             return true;
         }
@@ -186,8 +186,7 @@ public class DisablePluginCommand extends CLICommand {
         return false;
     }
 
-
-    /**
+	/**
      * Calculate the result code of the full process based in what went on during the process
      * @param results he list of results for the disablement of each plugin
      * @return the status code. 0 if all plugins disabled. {@link #RETURN_CODE_NOT_DISABLED_DEPENDANTS} if some
@@ -206,7 +205,7 @@ public class DisablePluginCommand extends CLICommand {
         return result;
     }
 
-    /**
+	/**
      * Calculate the result code of the disablement of one plugin based in what went on during the process of this one
      * and its dependent plugins.
      * @param result the result of the disablement of this plugin

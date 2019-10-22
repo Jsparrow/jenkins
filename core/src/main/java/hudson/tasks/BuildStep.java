@@ -79,6 +79,35 @@ import jenkins.model.Jenkins;
 public interface BuildStep {
 
     /**
+     * List of all installed builders.
+     *
+     * Builders are invoked to perform the build itself.
+     *
+     * @deprecated as of 1.286.
+     *      Use {@link Builder#all()} for read access, and use
+     *      {@link Extension} for registration.
+     */
+    @Deprecated
+    List<Descriptor<Builder>> BUILDERS = new DescriptorList<>(Builder.class);
+
+	/**
+     * List of all installed publishers.
+     *
+     * Publishers are invoked after the build is completed, normally to perform
+     * some post-actions on build results, such as sending notifications, collecting
+     * results, etc.
+     *
+     * @see PublisherList#addNotifier(Descriptor)
+     * @see PublisherList#addRecorder(Descriptor)
+     *
+     * @deprecated as of 1.286.
+     *      Use {@link Publisher#all()} for read access, and use
+     *      {@link Extension} for registration.
+     */
+    @Deprecated
+    PublisherList PUBLISHERS = new PublisherList();
+
+	/**
      * Runs before the build begins.
      *
      * @return
@@ -91,7 +120,7 @@ public interface BuildStep {
      */
     boolean prebuild( AbstractBuild<?,?> build, BuildListener listener );
 
-    /**
+	/**
      * Runs the step over the given build and reports the progress to the listener.
      *
      * <p>
@@ -129,14 +158,14 @@ public interface BuildStep {
      */
     boolean perform(AbstractBuild<?,?> build, Launcher launcher, BuildListener listener) throws InterruptedException, IOException;
 
-    /**
+	/**
      * @deprecated as of 1.341.
      *      Use {@link #getProjectActions(AbstractProject)} instead.
      */
     @Deprecated
     Action getProjectAction(AbstractProject<?,?> project);
 
-    /**
+	/**
      * Returns action objects if this {@link BuildStep} has actions
      * to contribute to a {@link Project}.
      *
@@ -160,8 +189,7 @@ public interface BuildStep {
     @Nonnull
     Collection<? extends Action> getProjectActions(AbstractProject<?,?> project);
 
-
-    /**
+	/**
      * Declares the scope of the synchronization monitor this {@link BuildStep} expects from outside.
      *
      * <p>
@@ -222,45 +250,10 @@ public interface BuildStep {
         return BuildStepMonitor.BUILD;
     }
 
-    /**
-     * List of all installed builders.
-     *
-     * Builders are invoked to perform the build itself.
-     *
-     * @deprecated as of 1.286.
-     *      Use {@link Builder#all()} for read access, and use
-     *      {@link Extension} for registration.
-     */
-    @Deprecated
-    List<Descriptor<Builder>> BUILDERS = new DescriptorList<>(Builder.class);
-
-    /**
-     * List of all installed publishers.
-     *
-     * Publishers are invoked after the build is completed, normally to perform
-     * some post-actions on build results, such as sending notifications, collecting
-     * results, etc.
-     *
-     * @see PublisherList#addNotifier(Descriptor)
-     * @see PublisherList#addRecorder(Descriptor)
-     *
-     * @deprecated as of 1.286.
-     *      Use {@link Publisher#all()} for read access, and use
-     *      {@link Extension} for registration.
-     */
-    @Deprecated
-    PublisherList PUBLISHERS = new PublisherList();
-
-    /**
+	/**
      * List of publisher descriptor.
      */
     final class PublisherList extends AbstractList<Descriptor<Publisher>> {
-        /**
-         * {@link Descriptor}s are actually stored in here.
-         * Since {@link PublisherList} lives longer than {@link jenkins.model.Jenkins} we cannot directly use {@link ExtensionList}.
-         */
-        private final DescriptorList<Publisher> core = new DescriptorList<>(Publisher.class);
-
         /**
          * For descriptors that are manually registered, remember what kind it was since
          * older plugins don't extend from neither {@link Recorder} nor {@link Notifier}.
@@ -268,10 +261,16 @@ public interface BuildStep {
         /*package*/ static final WeakHashMap<Descriptor<Publisher>,Class<? extends Publisher>/*either Recorder.class or Notifier.class*/>
                 KIND = new WeakHashMap<>();
 
-        private PublisherList() {
+		/**
+         * {@link Descriptor}s are actually stored in here.
+         * Since {@link PublisherList} lives longer than {@link jenkins.model.Jenkins} we cannot directly use {@link ExtensionList}.
+         */
+        private final DescriptorList<Publisher> core = new DescriptorList<>(Publisher.class);
+
+		private PublisherList() {
         }
 
-        /**
+		/**
          * Adds a new publisher descriptor, which (generally speaking)
          * shouldn't alter the build result, but just report the build result
          * by some means, such as e-mail, IRC, etc.
@@ -285,8 +284,8 @@ public interface BuildStep {
             KIND.put(d,Notifier.class);
             core.add(d);
         }
-        
-        /**
+
+		/**
          * Adds a new publisher descriptor, which (generally speaking)
          * alter the build result based on some artifacts of the build.
          *
@@ -300,30 +299,34 @@ public interface BuildStep {
             core.add(d);
         }
 
-        @Override
+		@Override
         public boolean add(Descriptor<Publisher> d) {
             return !contains(d) && core.add(d);
         }
 
-        @Override
+		@Override
         public void add(int index, Descriptor<Publisher> d) {
-            if(!contains(d)) core.add(d);
+            if(!contains(d)) {
+				core.add(d);
+			}
         }
 
-        public Descriptor<Publisher> get(int index) {
+		@Override
+		public Descriptor<Publisher> get(int index) {
             return core.get(index);
         }
 
-        public int size() {
+		@Override
+		public int size() {
             return core.size();
         }
 
-        @Override
+		@Override
         public Iterator<Descriptor<Publisher>> iterator() {
             return core.iterator();
         }
 
-        @Override
+		@Override
         public boolean remove(Object o) {
             return core.remove(o);
         }

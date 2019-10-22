@@ -47,17 +47,20 @@ public final class LegacyAuthorizationStrategy extends AuthorizationStrategy {
     public LegacyAuthorizationStrategy() {
     }
 
-    public ACL getRootACL() {
+    @Override
+	public ACL getRootACL() {
         return LEGACY_ACL;
     }
 
-    public Collection<String> getGroups() {
+    @Override
+	public Collection<String> getGroups() {
         return Collections.singleton("admin");
     }
 
     @Extension @Symbol("legacy")
     public static final class DescriptorImpl extends Descriptor<AuthorizationStrategy> {
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.LegacyAuthorizationStrategy_DisplayName();
         }
     }

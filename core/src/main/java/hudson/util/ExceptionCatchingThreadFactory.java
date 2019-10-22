@@ -36,25 +36,26 @@ import java.util.logging.Level;
  * @since 1.226
  */
 public class ExceptionCatchingThreadFactory implements ThreadFactory, Thread.UncaughtExceptionHandler {
-    private final ThreadFactory core;
+    private static final Logger LOGGER = Logger.getLogger(ExceptionCatchingThreadFactory.class.getName());
+	private final ThreadFactory core;
 
-    public ExceptionCatchingThreadFactory() {
+	public ExceptionCatchingThreadFactory() {
         this(Executors.defaultThreadFactory());
     }
 
-    public ExceptionCatchingThreadFactory(ThreadFactory core) {
+	public ExceptionCatchingThreadFactory(ThreadFactory core) {
         this.core = core;
     }
 
-    public Thread newThread(Runnable r) {
+	@Override
+	public Thread newThread(Runnable r) {
         Thread t = core.newThread(r);
         t.setUncaughtExceptionHandler(this);
         return t;
     }
 
-    public void uncaughtException(Thread t, Throwable e) {
-        LOGGER.log(Level.WARNING, "Thread "+t.getName()+" terminated unexpectedly",e);
+	@Override
+	public void uncaughtException(Thread t, Throwable e) {
+        LOGGER.log(Level.WARNING, new StringBuilder().append("Thread ").append(t.getName()).append(" terminated unexpectedly").toString(),e);
     }
-
-    private static final Logger LOGGER = Logger.getLogger(ExceptionCatchingThreadFactory.class.getName());
 }

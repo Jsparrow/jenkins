@@ -21,40 +21,48 @@ import java.util.logging.Logger;
  * @since 1.498
  */
 public class FileBoolean {
-    private final File file;
-    private volatile Boolean state;
+    private static final Logger LOGGER = Logger.getLogger(FileBoolean.class.getName());
+	private final File file;
+	private volatile Boolean state;
 
-    public FileBoolean(File file) {
+	public FileBoolean(File file) {
         this.file = file;
     }
 
-    public FileBoolean(Class owner, String name) {
-        this(new File(Jenkins.get().getRootDir(),owner.getName().replace('$','.')+'/'+name));
+	public FileBoolean(Class owner, String name) {
+        this(new File(Jenkins.get().getRootDir(),new StringBuilder().append(owner.getName().replace('$','.')).append('/').append(name).toString()));
     }
 
-    /**
+	/**
      * Gets the current state. True if the file exists, false if it doesn't.
      */
     public boolean get() {
         return state=file.exists();
     }
 
-    /**
+	/**
      * Like {@link #get()} except instead of checking the actual file, use the result from the last {@link #get()} call.
      */
     public boolean fastGet() {
-        if (state==null)    return get();
+        if (state==null) {
+			return get();
+		}
         return state;
     }
 
-    public boolean isOn() { return get(); }
-    public boolean isOff() { return !get(); }
+	public boolean isOn() { return get(); }
 
-    public void set(boolean b) {
-        if (b) on(); else off();
+	public boolean isOff() { return !get(); }
+
+	public void set(boolean b) {
+        if (b) {
+			on();
+		} else {
+			off();
+		}
     }
 
-    public void on() {
+	public void on() {
         try {
             file.getParentFile().mkdirs();
             Files.newOutputStream(file.toPath()).close();
@@ -64,10 +72,8 @@ public class FileBoolean {
         }
     }
 
-    public void off() {
+	public void off() {
         file.delete();
         get();  // update state
     }
-
-    private static final Logger LOGGER = Logger.getLogger(FileBoolean.class.getName());
 }

@@ -27,12 +27,13 @@ import java.util.Arrays;
  */
 public class HMACConfidentialKey extends ConfidentialKey {
 
-    private ConfidentialStore lastCS;
-    private SecretKey key;
-    private Mac mac;
-    private final int length;
+    private static final String ALGORITHM = "HmacSHA256";
+	private ConfidentialStore lastCS;
+	private SecretKey key;
+	private Mac mac;
+	private final int length;
 
-    /**
+	/**
      * @param length
      *      Byte length of the HMAC code.
      *      By default we use HMAC-SHA256, which produces 256bit (=32bytes) HMAC,
@@ -45,26 +46,26 @@ public class HMACConfidentialKey extends ConfidentialKey {
         this.length = length;
     }
 
-    /**
+	/**
      * Calls into {@link #HMACConfidentialKey(String, int)} with the longest possible HMAC length.
      */
     public HMACConfidentialKey(String id) {
         this(id,Integer.MAX_VALUE);
     }
 
-    /**
+	/**
      * Calls into {@link #HMACConfidentialKey(String, int)} by combining the class name and the shortName
      * as the ID.
      */
     public HMACConfidentialKey(Class owner, String shortName, int length) {
-        this(owner.getName()+'.'+shortName,length);
+        this(new StringBuilder().append(owner.getName()).append('.').append(shortName).toString(),length);
     }
 
-    public HMACConfidentialKey(Class owner, String shortName) {
+	public HMACConfidentialKey(Class owner, String shortName) {
         this(owner,shortName,Integer.MAX_VALUE);
     }
 
-    /**
+	/**
      * Computes the message authentication code for the specified byte sequence.
      */
     public synchronized byte[] mac(byte[] message) {
@@ -76,14 +77,14 @@ public class HMACConfidentialKey extends ConfidentialKey {
         return chop(mac.doFinal(message));
     }
 
-    /**
+	/**
      * Convenience method for verifying the MAC code.
      */
     public boolean checkMac(byte[] message, byte[] mac) {
         return Arrays.equals(mac(message),mac);
     }
 
-    /**
+	/**
      * Computes the message authentication code and return it as a string.
      * While redundant, often convenient.
      */
@@ -91,22 +92,25 @@ public class HMACConfidentialKey extends ConfidentialKey {
         return Util.toHexString(mac(message.getBytes(StandardCharsets.UTF_8)));
     }
 
-    /**
+	/**
      * Verifies MAC constructed from {@link #mac(String)}
      */
     public boolean checkMac(String message, String mac) {
         return mac(message).equals(mac);
     }
 
-    private byte[] chop(byte[] mac) {
-        if (mac.length<=length)  return mac; // already too short
+	private byte[] chop(byte[] mac) {
+        if (mac.length<=length)
+		 {
+			return mac; // already too short
+		}
 
         byte[] b = new byte[length];
         System.arraycopy(mac,0,b,0,b.length);
         return b;
     }
 
-    /**
+	/**
      * Creates a new {@link Mac} object.
      */
     public Mac createMac() {
@@ -120,7 +124,7 @@ public class HMACConfidentialKey extends ConfidentialKey {
         }
     }
 
-    private synchronized SecretKey getKey() {
+	private synchronized SecretKey getKey() {
         ConfidentialStore cs = ConfidentialStore.get();
         if (key == null || cs != lastCS) {
             lastCS = cs;
@@ -138,6 +142,4 @@ public class HMACConfidentialKey extends ConfidentialKey {
         }
         return key;
     }
-
-    private static final String ALGORITHM = "HmacSHA256";
 }

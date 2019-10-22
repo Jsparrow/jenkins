@@ -117,7 +117,8 @@ interface RuntimeSpringConfiguration extends ServletContextAware {
      *
      * @param context The servlet Context
      */
-    void setServletContext(ServletContext context);
+    @Override
+	void setServletContext(ServletContext context);
 
     /**
      * Creates a new prototype bean configuration. Differs from addPrototypeBean in that

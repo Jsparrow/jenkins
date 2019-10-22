@@ -55,18 +55,6 @@ import org.acegisecurity.userdetails.UserDetailsService;
  */
 public class HudsonFilter implements Filter {
     /**
-     * The SecurityRealm specific filter.
-     */
-    private volatile Filter filter;
-    
-    /**
-     * The {@link #init(FilterConfig)} may be called before the Jenkins instance is up (which is
-     * required for initialization of the filter).  So we store the
-     * filterConfig for later lazy-initialization of the filter.
-     */
-    private FilterConfig filterConfig;
-
-    /**
      * {@link AuthenticationManager} proxy so that the acegi filter chain can stay the same
      * even when security setting is reconfigured.
      *
@@ -77,7 +65,7 @@ public class HudsonFilter implements Filter {
     @Deprecated
     public static final AuthenticationManagerProxy AUTHENTICATION_MANAGER = new AuthenticationManagerProxy();
 
-    /**
+	/**
      * {@link UserDetailsService} proxy so that the acegi filter chain can stay the same
      * even when security setting is reconfigured.
      *
@@ -87,8 +75,8 @@ public class HudsonFilter implements Filter {
      */
     @Deprecated
     public static final UserDetailsServiceProxy USER_DETAILS_SERVICE_PROXY = new UserDetailsServiceProxy();
-    
-    /**
+
+	/**
      * {@link RememberMeServices} proxy so that the acegi filter chain can stay the same
      * even when security setting is reconfigured.
      *
@@ -99,7 +87,22 @@ public class HudsonFilter implements Filter {
     @Deprecated
     public static final RememberMeServicesProxy REMEMBER_ME_SERVICES_PROXY = new RememberMeServicesProxy();
 
-    public void init(FilterConfig filterConfig) throws ServletException {
+	private static final Logger LOGGER = Logger.getLogger(HudsonFilter.class.getName());
+
+	/**
+     * The SecurityRealm specific filter.
+     */
+    private volatile Filter filter;
+
+	/**
+     * The {@link #init(FilterConfig)} may be called before the Jenkins instance is up (which is
+     * required for initialization of the filter).  So we store the
+     * filterConfig for later lazy-initialization of the filter.
+     */
+    private FilterConfig filterConfig;
+
+	@Override
+	public void init(FilterConfig filterConfig) throws ServletException {
         this.filterConfig = filterConfig;
         // this is how we make us available to the rest of Hudson.
         filterConfig.getServletContext().setAttribute(HudsonFilter.class.getName(),this);
@@ -123,14 +126,14 @@ public class HudsonFilter implements Filter {
         }
     }
 
-    /**
+	/**
      * Gets the {@link HudsonFilter} created for the given {@link ServletContext}.
      */
     public static HudsonFilter get(ServletContext context) {
         return (HudsonFilter)context.getAttribute(HudsonFilter.class.getName());
     }
 
-    /**
+	/**
      * Reset the proxies and filter for a change in {@link SecurityRealm}.
      */
     public void reset(SecurityRealm securityRealm) throws ServletException {
@@ -144,8 +147,9 @@ public class HudsonFilter implements Filter {
             Filter newf = securityRealm.createFilter(this.filterConfig);
             newf.init(this.filterConfig);
             this.filter = newf;
-            if(oldf!=null)
-                oldf.destroy();
+            if(oldf!=null) {
+				oldf.destroy();
+			}
         } else {
             // no security related filter needed.
             AUTHENTICATION_MANAGER.setDelegate(null);
@@ -155,7 +159,8 @@ public class HudsonFilter implements Filter {
         }
     }
 
-    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+	@Override
+	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
         LOGGER.entering(HudsonFilter.class.getName(), "doFilter");
 
         // this is not the best place to do it, but doing it here makes the patch smaller.
@@ -172,11 +177,11 @@ public class HudsonFilter implements Filter {
         }
     }
 
-    public void destroy() {
+	@Override
+	public void destroy() {
         // the filter can be null if the filter is not initialized yet.
-        if(filter != null)
-            filter.destroy();
+        if(filter != null) {
+			filter.destroy();
+		}
     }
-
-    private static final Logger LOGGER = Logger.getLogger(HudsonFilter.class.getName());
 }

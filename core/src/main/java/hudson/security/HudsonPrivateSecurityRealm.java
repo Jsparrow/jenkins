@@ -90,6 +90,7 @@ import java.util.regex.Pattern;
 
 import org.kohsuke.accmod.Restricted;
 import org.kohsuke.accmod.restrictions.NoExternalUse;
+import java.util.stream.Collectors;
 
 /**
  * {@link SecurityRealm} that performs authentication by looking up {@link User}.
@@ -109,25 +110,124 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
      * in Java {@code \w} is equivalent to {@code [A-Za-z0-9_]} (take care of "_")
      */
     private static final String DEFAULT_ID_REGEX = "^[\\w-]+$";
-    
-    /**
+
+	private static final String FEDERATED_IDENTITY_SESSION_KEY = HudsonPrivateSecurityRealm.class.getName()+".federatedIdentity";
+
+	// TODO
+    private static final GrantedAuthority[] TEST_AUTHORITY = {AUTHENTICATED_AUTHORITY};
+
+	/**
+     * {@link PasswordEncoder} based on SHA-256 and random salt generation.
+     *
+     * <p>
+     * The salt is prepended to the hashed password and returned. So the encoded password is of the form
+     * {@code SALT ':' hash(PASSWORD,SALT)}.
+     *
+     * <p>
+     * This abbreviates the need to store the salt separately, which in turn allows us to hide the salt handling
+     * in this little class. The rest of the Acegi thinks that we are not using salt.
+     */
+    /*package*/ static final PasswordEncoder CLASSIC = new PasswordEncoder() {
+        private final PasswordEncoder passwordEncoder = new ShaPasswordEncoder(256);
+
+        @Override
+		public String encodePassword(String rawPass, Object obj) {
+            return hash(rawPass);
+        }
+
+        @Override
+		public boolean isPasswordValid(String encPass, String rawPass, Object obj) {
+            // pull out the sale from the encoded password
+            int i = encPass.indexOf(':');
+            if(i<0) {
+				return false;
+			}
+            String salt = encPass.substring(0,i);
+            return encPass.substring(i+1).equals(passwordEncoder.encodePassword(rawPass,salt));
+        }
+
+        /**
+         * Creates a hashed password by generating a random salt.
+         */
+        private String hash(String password) {
+            String salt = generateSalt();
+            return new StringBuilder().append(salt).append(':').append(passwordEncoder.encodePassword(password,salt)).toString();
+        }
+
+        /**
+         * Generates random salt.
+         */
+        private String generateSalt() {
+            StringBuilder buf = new StringBuilder();
+            SecureRandom sr = new SecureRandom();
+            for( int i=0; i<6; i++ ) {// log2(52^6)=34.20... so, this is about 32bit strong.
+                boolean upper = sr.nextBoolean();
+                char ch = (char)(sr.nextInt(26) + 'a');
+                if(upper) {
+					ch=Character.toUpperCase(ch);
+				}
+                buf.append(ch);
+            }
+            return buf.toString();
+        }
+    };
+
+	/* package */ static final JBCryptEncoder JBCRYPT_ENCODER = new JBCryptEncoder();
+
+	public static final MultiPasswordEncoder PASSWORD_ENCODER = new MultiPasswordEncoder();
+
+	private static final Filter CREATE_FIRST_USER_FILTER = new Filter() {
+        @Override
+		public void init(FilterConfig config) throws ServletException {
+        }
+
+        @Override
+		public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+            HttpServletRequest req = (HttpServletRequest) request;
+
+            /* allow signup from the Jenkins home page, or /manage, which is where a /configureSecurity form redirects to */
+            if(req.getRequestURI().equals(req.getContextPath()+"/") || req.getRequestURI().equals(req.getContextPath() + "/manage")) {
+                if (needsToCreateFirstUser()) {
+                    ((HttpServletResponse)response).sendRedirect("securityRealm/firstUser");
+                } else {// the first user already created. the role of this filter is over.
+                    PluginServletFilter.removeFilter(this);
+                    chain.doFilter(request,response);
+                }
+            } else {
+				chain.doFilter(request,response);
+			}
+        }
+
+        private boolean needsToCreateFirstUser() {
+            return !hasSomeUser()
+                && Jenkins.get().getSecurityRealm() instanceof HudsonPrivateSecurityRealm;
+        }
+
+        @Override
+		public void destroy() {
+        }
+    };
+
+	private static final Logger LOGGER = Logger.getLogger(HudsonPrivateSecurityRealm.class.getName());
+
+	/**
      * If true, sign up is not allowed.
      * <p>
      * This is a negative switch so that the default value 'false' remains compatible with older installations.
      */
     private final boolean disableSignup;
 
-    /**
+	/**
      * If true, captcha will be enabled.
      */
     private final boolean enableCaptcha;
 
-    @Deprecated
+	@Deprecated
     public HudsonPrivateSecurityRealm(boolean allowsSignup) {
         this(allowsSignup, false, (CaptchaSupport) null);
     }
 
-    @DataBoundConstructor
+	@DataBoundConstructor
     public HudsonPrivateSecurityRealm(boolean allowsSignup, boolean enableCaptcha, CaptchaSupport captchaSupport) {
         this.disableSignup = !allowsSignup;
         this.enableCaptcha = enableCaptcha;
@@ -143,17 +243,17 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
         }
     }
 
-    @Override
+	@Override
     public boolean allowsSignup() {
         return !disableSignup;
     }
 
-    @Restricted(NoExternalUse.class) // Jelly
+	@Restricted(NoExternalUse.class) // Jelly
     public boolean getAllowsSignup() {
         return allowsSignup();
     }
 
-    /**
+	/**
      * Checks if captcha is enabled on user signup.
      *
      * @return true if captcha is enabled on signup.
@@ -162,40 +262,39 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
         return enableCaptcha;
     }
 
-    /**
+	/**
      * Computes if this Hudson has some user accounts configured.
      *
      * <p>
      * This is used to check for the initial
      */
     private static boolean hasSomeUser() {
-        for (User u : User.getAll())
-            if(u.getProperty(Details.class)!=null)
-                return true;
-        return false;
+        return User.getAll().stream().anyMatch(u -> u.getProperty(Details.class)!=null);
     }
 
-    /**
+	/**
      * This implementation doesn't support groups.
      */
     @Override
-    public GroupDetails loadGroupByGroupname(String groupname) throws UsernameNotFoundException, DataAccessException {
+    public GroupDetails loadGroupByGroupname(String groupname) {
         throw new UsernameNotFoundException(groupname);
     }
 
-    @Override
-    public Details loadUserByUsername(String username) throws UsernameNotFoundException, DataAccessException {
+	@Override
+    public Details loadUserByUsername(String username) {
         User u = User.getById(username, false);
         Details p = u!=null ? u.getProperty(Details.class) : null;
-        if(p==null)
-            throw new UsernameNotFoundException("Password is not set: "+username);
-        if(p.getUser()==null)
-            throw new AssertionError();
+        if(p==null) {
+			throw new UsernameNotFoundException("Password is not set: "+username);
+		}
+        if(p.getUser()==null) {
+			throw new AssertionError();
+		}
         return p;
     }
 
-    @Override
-    protected Details authenticate(String username, String password) throws AuthenticationException {
+	@Override
+    protected Details authenticate(String username, String password) {
         Details u = loadUserByUsername(username);
         if (!u.isPasswordCorrect(password)) {
             String message;
@@ -209,7 +308,7 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
         return u;
     }
 
-    /**
+	/**
      * Show the sign up page with the data from the identity.
      */
     @Override
@@ -227,21 +326,20 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
         };
     }
 
-    /**
+	/**
      * Creates an account and associates that with the given identity. Used in conjunction
      * with {@link #commenceSignup}.
      */
     @RequirePOST
     public User doCreateAccountWithFederatedIdentity(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
         User u = _doCreateAccount(req,rsp,"signupWithFederatedIdentity.jelly");
-        if (u!=null)
-            ((FederatedIdentity)req.getSession().getAttribute(FEDERATED_IDENTITY_SESSION_KEY)).addTo(u);
+        if (u!=null) {
+			((FederatedIdentity)req.getSession().getAttribute(FEDERATED_IDENTITY_SESSION_KEY)).addTo(u);
+		}
         return u;
     }
 
-    private static final String FEDERATED_IDENTITY_SESSION_KEY = HudsonPrivateSecurityRealm.class.getName()+".federatedIdentity";
-
-    /**
+	/**
      * Creates an user account. Used for self-registration.
      */
     @RequirePOST
@@ -249,21 +347,24 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
         return _doCreateAccount(req, rsp, "signup.jelly");
     }
 
-    private User _doCreateAccount(StaplerRequest req, StaplerResponse rsp, String formView) throws ServletException, IOException {
-        if(!allowsSignup())
-            throw HttpResponses.error(SC_UNAUTHORIZED,new Exception("User sign up is prohibited"));
+	private User _doCreateAccount(StaplerRequest req, StaplerResponse rsp, String formView) throws ServletException, IOException {
+        if(!allowsSignup()) {
+			throw HttpResponses.error(SC_UNAUTHORIZED,new Exception("User sign up is prohibited"));
+		}
 
         boolean firstUser = !hasSomeUser();
         User u = createAccount(req, rsp, enableCaptcha, formView);
         if(u!=null) {
             if(firstUser)
-                tryToMakeAdmin(u);  // the first user should be admin, or else there's a risk of lock out
+			 {
+				tryToMakeAdmin(u);  // the first user should be admin, or else there's a risk of lock out
+			}
             loginAndTakeBack(req, rsp, u);
         }
         return u;
     }
 
-    /**
+	/**
      * Lets the current user silently login as the given user and report back accordingly.
      */
     @SuppressWarnings("ACL.impersonate")
@@ -286,7 +387,7 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
         req.getView(this,"success.jelly").forward(req,rsp);
     }
 
-    /**
+	/**
      * Creates a user account. Used by admins.
      *
      * This version behaves differently from {@link #doCreateAccount(StaplerRequest, StaplerResponse)} in that
@@ -297,7 +398,7 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
         createAccountByAdmin(req, rsp, "addUser.jelly", "."); // send the user back to the listing page on success
     }
 
-    /**
+	/**
      * Creates a user account. Requires {@link Jenkins#ADMINISTER}
      */
     @Restricted(NoExternalUse.class)
@@ -310,7 +411,7 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
         return u;
     }
 
-    /**
+	/**
      * Creates a user account. Intended to be called from the setup wizard.
      * Note that this method does not check whether it is actually called from
      * the setup wizard. This requires the {@link Jenkins#ADMINISTER} permission.
@@ -331,15 +432,13 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
         }
     }
 
-    private String getErrorMessages(SignupInfo si) {
+	private String getErrorMessages(SignupInfo si) {
         StringBuilder messages = new StringBuilder();
-        for (String message : si.errors.values()) {
-            messages.append(message).append(" | ");
-        }
+        si.errors.values().forEach(message -> messages.append(message).append(" | "));
         return messages.toString();
     }
 
-    /**
+	/**
      * Creates a first admin user account.
      *
      * <p>
@@ -352,13 +451,14 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
             return;
         }
         User u = createAccount(req, rsp, false, "firstUser.jelly");
-        if (u!=null) {
-            tryToMakeAdmin(u);
-            loginAndTakeBack(req, rsp, u);
-        }
+        if (u == null) {
+			return;
+		}
+		tryToMakeAdmin(u);
+		loginAndTakeBack(req, rsp, u);
     }
 
-    /**
+	/**
      * Try to make this user a super-user
      */
     private void tryToMakeAdmin(User u) {
@@ -370,7 +470,7 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
         }
     }
 
-    /**
+	/**
      * @param req the request to get the form data from (is also used for redirection)
      * @param rsp the response to use for forwarding if the creation fails
      * @param validateCaptcha whether to attempt to validate a captcha in the request
@@ -383,16 +483,15 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
     private User createAccount(StaplerRequest req, StaplerResponse rsp, boolean validateCaptcha, String formView) throws ServletException, IOException {
         SignupInfo si = validateAccountCreationForm(req, validateCaptcha);
 
-        if (!si.errors.isEmpty()) {
-            // failed. ask the user to try again.
-            req.getView(this, formView).forward(req, rsp);
-            return null;
-        }
-
-        return createAccount(si);
+        if (si.errors.isEmpty()) {
+			return createAccount(si);
+		}
+		// failed. ask the user to try again.
+		req.getView(this, formView).forward(req, rsp);
+		return null;
     }
 
-    /**
+	/**
      * @param req              the request to process
      * @param validateCaptcha  whether to attempt to validate a captcha in the request
      *
@@ -408,7 +507,7 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
             si.errors.put("captcha", Messages.HudsonPrivateSecurityRealm_CreateAccount_TextNotMatchWordInImage());
         }
 
-        if (si.username == null || si.username.length() == 0) {
+        if (si.username == null || si.username.isEmpty()) {
             si.errors.put("username", Messages.HudsonPrivateSecurityRealm_CreateAccount_UserNameRequired());
         } else if(!containsOnlyAcceptableCharacters(si.username)) {
             if (ID_REGEX == null) {
@@ -419,10 +518,11 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
         } else {
             // do not create the user - we just want to check if the user already exists but is not a "login" user.
             User user = User.getById(si.username, false);
-            if (null != user)
-                // Allow sign up. SCM people has no such property.
-                if (user.getProperty(Details.class) != null)
-                    si.errors.put("username", Messages.HudsonPrivateSecurityRealm_CreateAccount_UserNameAlreadyTaken());
+            boolean condition = null != user && user.getProperty(Details.class) != null;
+			// Allow sign up. SCM people has no such property.
+			if (condition) {
+				si.errors.put("username", Messages.HudsonPrivateSecurityRealm_CreateAccount_UserNameAlreadyTaken());
+			}
         }
 
         if (si.password1 != null && !si.password1.equals(si.password2)) {
@@ -433,7 +533,7 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
             si.errors.put("password1", Messages.HudsonPrivateSecurityRealm_CreateAccount_PasswordRequired());
         }
 
-        if (si.fullname == null || si.fullname.length() == 0) {
+        if (si.fullname == null || si.fullname.isEmpty()) {
             si.fullname = si.username;
         }
 
@@ -452,7 +552,7 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
         return si;
     }
 
-    /**
+	/**
      * Creates a new account from a valid signup info. A signup info is valid if its {@link SignupInfo#errors}
      * field is empty.
      *
@@ -482,7 +582,7 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
         return user;
     }
 
-    private boolean containsOnlyAcceptableCharacters(@Nonnull String value){
+	private boolean containsOnlyAcceptableCharacters(@Nonnull String value){
         if(ID_REGEX == null){
             return value.matches(DEFAULT_ID_REGEX);
         }else{
@@ -490,7 +590,7 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
         }
     }
 
-    @Restricted(NoExternalUse.class)
+	@Restricted(NoExternalUse.class)
     public boolean isMailerPluginPresent() {
         try {
             // mail support has moved to a separate plugin
@@ -501,7 +601,7 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
         return false;
     }
 
-    /**
+	/**
      * Creates a new user account by registering a password to the user.
      */
     public User createAccount(String userName, String password) throws IOException {
@@ -511,7 +611,7 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
         return user;
     }
 
-    /**
+	/**
      * Creates a new user account by registering a JBCrypt Hashed password with the user.
      *
      * @param userName The user's name
@@ -527,41 +627,40 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
         return user;
     }
 
-
-    /**
+	/**
      * This is used primarily when the object is listed in the breadcrumb, in the user management screen.
      */
-    public String getDisplayName() {
+    @Override
+	public String getDisplayName() {
         return Messages.HudsonPrivateSecurityRealm_DisplayName();
     }
 
-    public ACL getACL() {
+	@Override
+	public ACL getACL() {
         return Jenkins.get().getACL();
     }
 
-    public void checkPermission(Permission permission) {
+	@Override
+	public void checkPermission(Permission permission) {
         Jenkins.get().checkPermission(permission);
     }
 
-    public boolean hasPermission(Permission permission) {
+	@Override
+	public boolean hasPermission(Permission permission) {
         return Jenkins.get().hasPermission(permission);
     }
 
-
-    /**
+	/**
      * All users who can login to the system.
      */
     public List<User> getAllUsers() {
         List<User> r = new ArrayList<>();
-        for (User u : User.getAll()) {
-            if(u.getProperty(Details.class)!=null)
-                r.add(u);
-        }
+        r.addAll(User.getAll().stream().filter(u -> u.getProperty(Details.class)!=null).collect(Collectors.toList()));
         Collections.sort(r);
         return r;
     }
 
-    /**
+	/**
      * This is to map users under the security realm URL.
      * This in turn helps us set up the right navigation breadcrumb.
      */
@@ -569,12 +668,19 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
     public User getUser(String id) {
         return User.getById(id, User.ALLOW_USER_CREATION_VIA_URL && hasPermission(Jenkins.ADMINISTER));
     }
-
-    // TODO
-    private static final GrantedAuthority[] TEST_AUTHORITY = {AUTHENTICATED_AUTHORITY};
-
+    
     public static final class SignupInfo {
-        public String username,password1,password2,fullname,email,captcha;
+        public String username;
+
+		public String password1;
+
+		public String password2;
+
+		public String fullname;
+
+		public String email;
+
+		public String captcha;
 
         /**
          * To display a general error message, set it here.
@@ -641,12 +747,14 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
             return new Details(PASSWORD_ENCODER.encodePassword(rawPassword,null));
         }
 
-        public GrantedAuthority[] getAuthorities() {
+        @Override
+		public GrantedAuthority[] getAuthorities() {
             // TODO
             return TEST_AUTHORITY;
         }
 
-        public String getPassword() {
+        @Override
+		public String getPassword() {
             return passwordHash;
         }
 
@@ -656,10 +764,11 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
 
         public String getProtectedPassword() {
             // put session Id in it to prevent a replay attack.
-            return Protector.protect(Stapler.getCurrentRequest().getSession().getId()+':'+getPassword());
+            return Protector.protect(new StringBuilder().append(Stapler.getCurrentRequest().getSession().getId()).append(':').append(getPassword()).toString());
         }
 
-        public String getUsername() {
+        @Override
+		public String getUsername() {
             return user.getId();
         }
 
@@ -667,23 +776,28 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
             return user;
         }
 
-        public boolean isAccountNonExpired() {
+        @Override
+		public boolean isAccountNonExpired() {
             return true;
         }
 
-        public boolean isAccountNonLocked() {
+        @Override
+		public boolean isAccountNonLocked() {
             return true;
         }
 
-        public boolean isCredentialsNonExpired() {
+        @Override
+		public boolean isCredentialsNonExpired() {
             return true;
         }
 
-        public boolean isEnabled() {
+        @Override
+		public boolean isEnabled() {
             return true;
         }
 
-        public boolean isInvalid() {
+        @Override
+		public boolean isInvalid() {
             return user==null;
         }
 
@@ -691,10 +805,11 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
             public ConverterImpl(XStream2 xstream) { super(xstream); }
             @Override protected void callback(Details d, UnmarshallingContext context) {
                 // Convert to hashed password and report to monitor if we load old data
-                if (d.password!=null && d.passwordHash==null) {
-                    d.passwordHash = PASSWORD_ENCODER.encodePassword(Scrambler.descramble(d.password),null);
-                    OldDataMonitor.report(context, "1.283");
-                }
+				if (!(d.password!=null && d.passwordHash==null)) {
+					return;
+				}
+				d.passwordHash = PASSWORD_ENCODER.encodePassword(Scrambler.descramble(d.password),null);
+				OldDataMonitor.report(context, "1.283");
             }
         }
 
@@ -714,14 +829,16 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
                 String pwd = Util.fixEmpty(req.getParameter("user.password"));
                 String pwd2= Util.fixEmpty(req.getParameter("user.password2"));
 
-                if(!Util.fixNull(pwd).equals(Util.fixNull(pwd2)))
-                    throw new FormException("Please confirm the password by typing it twice","user.password2");
+                if(!Util.fixNull(pwd).equals(Util.fixNull(pwd2))) {
+					throw new FormException("Please confirm the password by typing it twice","user.password2");
+				}
 
                 String data = Protector.unprotect(pwd);
                 if(data!=null) {
                     String prefix = Stapler.getCurrentRequest().getSession().getId() + ':';
-                    if(data.startsWith(prefix))
-                        return Details.fromHashedPassword(data.substring(prefix.length()));
+                    if(data.startsWith(prefix)) {
+						return Details.fromHashedPassword(data.substring(prefix.length()));
+					}
                 }
 
                 User user = Util.getNearestAncestorOfTypeOrThrow(req, User.class);
@@ -740,7 +857,8 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
                 return Jenkins.get().getSecurityRealm() instanceof HudsonPrivateSecurityRealm;
             }
 
-            public UserProperty newInstance(User user) {
+            @Override
+			public UserProperty newInstance(User user) {
                 return null;
             }
         }
@@ -752,18 +870,23 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
      */
     @Extension @Symbol("localUsers")
     public static final class ManageUserLinks extends ManagementLink {
-        public String getIconFileName() {
-            if(Jenkins.get().getSecurityRealm() instanceof HudsonPrivateSecurityRealm)
-                return "user.png";
-            else
-                return null;    // not applicable now
+        @Override
+		public String getIconFileName() {
+            if(Jenkins.get().getSecurityRealm() instanceof HudsonPrivateSecurityRealm) {
+				return "user.png";
+			}
+			else {
+				return null;    // not applicable now
+			}
         }
 
-        public String getUrlName() {
+        @Override
+		public String getUrlName() {
             return "securityRealm/";
         }
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.HudsonPrivateSecurityRealm_ManageUserLinks_DisplayName();
         }
 
@@ -772,56 +895,6 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
             return Messages.HudsonPrivateSecurityRealm_ManageUserLinks_Description();
         }
     }
-
-    /**
-     * {@link PasswordEncoder} based on SHA-256 and random salt generation.
-     *
-     * <p>
-     * The salt is prepended to the hashed password and returned. So the encoded password is of the form
-     * {@code SALT ':' hash(PASSWORD,SALT)}.
-     *
-     * <p>
-     * This abbreviates the need to store the salt separately, which in turn allows us to hide the salt handling
-     * in this little class. The rest of the Acegi thinks that we are not using salt.
-     */
-    /*package*/ static final PasswordEncoder CLASSIC = new PasswordEncoder() {
-        private final PasswordEncoder passwordEncoder = new ShaPasswordEncoder(256);
-
-        public String encodePassword(String rawPass, Object obj) throws DataAccessException {
-            return hash(rawPass);
-        }
-
-        public boolean isPasswordValid(String encPass, String rawPass, Object obj) throws DataAccessException {
-            // pull out the sale from the encoded password
-            int i = encPass.indexOf(':');
-            if(i<0) return false;
-            String salt = encPass.substring(0,i);
-            return encPass.substring(i+1).equals(passwordEncoder.encodePassword(rawPass,salt));
-        }
-
-        /**
-         * Creates a hashed password by generating a random salt.
-         */
-        private String hash(String password) {
-            String salt = generateSalt();
-            return salt+':'+passwordEncoder.encodePassword(password,salt);
-        }
-
-        /**
-         * Generates random salt.
-         */
-        private String generateSalt() {
-            StringBuilder buf = new StringBuilder();
-            SecureRandom sr = new SecureRandom();
-            for( int i=0; i<6; i++ ) {// log2(52^6)=34.20... so, this is about 32bit strong.
-                boolean upper = sr.nextBoolean();
-                char ch = (char)(sr.nextInt(26) + 'a');
-                if(upper)   ch=Character.toUpperCase(ch);
-                buf.append(ch);
-            }
-            return buf.toString();
-        }
-    };
 
     /**
      * {@link PasswordEncoder} that uses jBCrypt.
@@ -835,11 +908,13 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
 
         private static final Pattern BCRYPT_PATTERN = Pattern.compile("^\\$2a\\$([0-9]{2})\\$.{53}$");
 
-        public String encodePassword(String rawPass, Object obj) throws DataAccessException {
+        @Override
+		public String encodePassword(String rawPass, Object obj) {
             return BCrypt.hashpw(rawPass,BCrypt.gensalt());
         }
 
-        public boolean isPasswordValid(String encPass, String rawPass, Object obj) throws DataAccessException {
+        @Override
+		public boolean isPasswordValid(String encPass, String rawPass, Object obj) {
             return BCrypt.checkpw(rawPass,encPass);
         }
 
@@ -862,8 +937,6 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
         }
     }
 
-    /* package */ static final JBCryptEncoder JBCRYPT_ENCODER = new JBCryptEncoder();
-
     /**
      * Combines {@link #JBCRYPT_ENCODER} and {@link #CLASSIC} into one so that we can continue
      * to accept {@link #CLASSIC} format but new encoding will always done via {@link #JBCRYPT_ENCODER}.
@@ -880,11 +953,13 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
 
             '#' is neither in base64 nor hex, which makes it a good choice.
          */
-        public String encodePassword(String rawPass, Object salt) throws DataAccessException {
+        @Override
+		public String encodePassword(String rawPass, Object salt) {
             return JBCRYPT_HEADER+JBCRYPT_ENCODER.encodePassword(rawPass,salt);
         }
 
-        public boolean isPasswordValid(String encPass, String rawPass, Object salt) throws DataAccessException {
+        @Override
+		public boolean isPasswordValid(String encPass, String rawPass, Object salt) {
             if (isPasswordHashed(encPass)) {
                 return JBCRYPT_ENCODER.isPasswordValid(encPass.substring(JBCRYPT_HEADER.length()), rawPass, salt);
             } else {
@@ -904,42 +979,11 @@ public class HudsonPrivateSecurityRealm extends AbstractPasswordBasedSecurityRea
 
     }
 
-    public static final MultiPasswordEncoder PASSWORD_ENCODER = new MultiPasswordEncoder();
-
     @Extension @Symbol("local")
     public static final class DescriptorImpl extends Descriptor<SecurityRealm> {
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.HudsonPrivateSecurityRealm_DisplayName();
         }
     }
-
-    private static final Filter CREATE_FIRST_USER_FILTER = new Filter() {
-        public void init(FilterConfig config) throws ServletException {
-        }
-
-        public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
-            HttpServletRequest req = (HttpServletRequest) request;
-
-            /* allow signup from the Jenkins home page, or /manage, which is where a /configureSecurity form redirects to */
-            if(req.getRequestURI().equals(req.getContextPath()+"/") || req.getRequestURI().equals(req.getContextPath() + "/manage")) {
-                if (needsToCreateFirstUser()) {
-                    ((HttpServletResponse)response).sendRedirect("securityRealm/firstUser");
-                } else {// the first user already created. the role of this filter is over.
-                    PluginServletFilter.removeFilter(this);
-                    chain.doFilter(request,response);
-                }
-            } else
-                chain.doFilter(request,response);
-        }
-
-        private boolean needsToCreateFirstUser() {
-            return !hasSomeUser()
-                && Jenkins.get().getSecurityRealm() instanceof HudsonPrivateSecurityRealm;
-        }
-
-        public void destroy() {
-        }
-    };
-
-    private static final Logger LOGGER = Logger.getLogger(HudsonPrivateSecurityRealm.class.getName());
 }

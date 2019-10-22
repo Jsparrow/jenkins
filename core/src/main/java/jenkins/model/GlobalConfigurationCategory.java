@@ -44,7 +44,7 @@ public abstract class GlobalConfigurationCategory implements ExtensionPoint, Mod
     public static @Nonnull <T extends GlobalConfigurationCategory> T get(Class<T> type) {
         T category = all().get(type);
         if(category == null){
-            throw new AssertionError("Category not found. It seems the " + type + " is not annotated with @Extension and so not registered");
+            throw new AssertionError(new StringBuilder().append("Category not found. It seems the ").append(type).append(" is not annotated with @Extension and so not registered").toString());
         }
         return category;
     }
@@ -66,7 +66,8 @@ public abstract class GlobalConfigurationCategory implements ExtensionPoint, Mod
             return jenkins.management.Messages.ConfigureLink_Description();
         }
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return jenkins.management.Messages.ConfigureLink_DisplayName();
         }
     }
@@ -81,7 +82,8 @@ public abstract class GlobalConfigurationCategory implements ExtensionPoint, Mod
             return hudson.security.Messages.GlobalSecurityConfiguration_Description();
         }
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return hudson.security.Messages.GlobalSecurityConfiguration_DisplayName();
         }
     }

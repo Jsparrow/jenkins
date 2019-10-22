@@ -112,7 +112,8 @@ public class TarInputStream extends FilterInputStream {
      * Closes this stream. Calls the TarBuffer's close() method.
      * @throws IOException on error
      */
-    public void close() throws IOException {
+    @Override
+	public void close() throws IOException {
         this.buffer.close();
     }
 
@@ -137,7 +138,8 @@ public class TarInputStream extends FilterInputStream {
      * @return The number of available bytes for the current entry.
      * @throws IOException for signature
      */
-    public int available() throws IOException {
+    @Override
+	public int available() throws IOException {
         if (this.entrySize - this.entryOffset > Integer.MAX_VALUE) {
             return Integer.MAX_VALUE;
         }
@@ -154,7 +156,8 @@ public class TarInputStream extends FilterInputStream {
      * @return the number actually skipped
      * @throws IOException on error
      */
-    public long skip(long numToSkip) throws IOException {
+    @Override
+	public long skip(long numToSkip) throws IOException {
         // REVIEW
         // This is horribly inefficient, but it ensures that we
         // properly skip over bytes via the TarBuffer...
@@ -177,7 +180,8 @@ public class TarInputStream extends FilterInputStream {
      *
      * @return False.
      */
-    public boolean markSupported() {
+    @Override
+	public boolean markSupported() {
         return false;
     }
 
@@ -186,13 +190,15 @@ public class TarInputStream extends FilterInputStream {
      *
      * @param markLimit The limit to mark.
      */
-    public void mark(int markLimit) {
+    @Override
+	public void mark(int markLimit) {
     }
 
     /**
      * Since we do not support marking just yet, we do nothing.
      */
-    public void reset() {
+    @Override
+	public void reset() {
     }
 
     /**
@@ -217,11 +223,8 @@ public class TarInputStream extends FilterInputStream {
             long numToSkip = this.entrySize - this.entryOffset;
 
             if (this.debug) {
-                System.err.println("TarInputStream: SKIP currENTRY '"
-                        + this.currEntry.getName() + "' SZ "
-                        + this.entrySize + " OFF "
-                        + this.entryOffset + "  skipping "
-                        + numToSkip + " bytes");
+                System.err.println(new StringBuilder().append("TarInputStream: SKIP currENTRY '").append(this.currEntry.getName()).append("' SZ ").append(this.entrySize).append(" OFF ")
+						.append(this.entryOffset).append("  skipping ").append(numToSkip).append(" bytes").toString());
             }
 
             if (numToSkip > 0) {
@@ -251,10 +254,7 @@ public class TarInputStream extends FilterInputStream {
             this.currEntry = new TarEntry(headerBuf);
 
             if (this.debug) {
-                System.err.println("TarInputStream: SET currENTRY '"
-                        + this.currEntry.getName()
-                        + "' size = "
-                        + this.currEntry.getSize());
+                System.err.println(new StringBuilder().append("TarInputStream: SET currENTRY '").append(this.currEntry.getName()).append("' size = ").append(this.currEntry.getSize()).toString());
             }
 
             this.entryOffset = 0;
@@ -296,7 +296,8 @@ public class TarInputStream extends FilterInputStream {
      * @return The byte read, or -1 at EOF.
      * @throws IOException on error
      */
-    public int read() throws IOException {
+    @Override
+	public int read() throws IOException {
         int num = this.read(this.oneBuf, 0, 1);
         return num == -1 ? -1 : ((int) this.oneBuf[0]) & 0xFF;
     }
@@ -314,7 +315,8 @@ public class TarInputStream extends FilterInputStream {
      * @return The number of bytes read, or -1 at EOF.
      * @throws IOException on error
      */
-    public int read(byte[] buf, int offset, int numToRead) throws IOException {
+    @Override
+	public int read(byte[] buf, int offset, int numToRead) throws IOException {
         int totalRead = 0;
 
         if (this.entryOffset >= this.entrySize) {
@@ -352,8 +354,7 @@ public class TarInputStream extends FilterInputStream {
 
             if (rec == null) {
                 // Unexpected EOF!
-                throw new IOException("unexpected EOF with " + numToRead
-                        + " bytes unread");
+                throw new IOException(new StringBuilder().append("unexpected EOF with ").append(numToRead).append(" bytes unread").toString());
             }
 
             int sz = numToRead;

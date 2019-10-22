@@ -34,6 +34,11 @@ public class Timer {
 
 
     /**
+     * Do not create this.
+     */
+    private Timer() {}
+
+	/**
      * Returns the scheduled executor service used by all timed tasks in Jenkins.
      *
      * @return the single {@link ScheduledExecutorService}.
@@ -49,19 +54,15 @@ public class Timer {
         return executorService;
     }
 
-    /**
+	/**
      * Shutdown the timer and throw it away.
      */
     public static synchronized void shutdown() {
-        if (executorService != null) {
-            executorService.shutdownNow();
-            executorService = null;
-        }
+        if (executorService == null) {
+			return;
+		}
+		executorService.shutdownNow();
+		executorService = null;
     }
-
-    /**
-     * Do not create this.
-     */
-    private Timer() {}
 
 }

@@ -134,8 +134,9 @@ public class ParametersDefinitionProperty extends OptionalJobProperty<Job<?, ?>>
      * This method is supposed to be invoked from {@link ParameterizedJobMixIn#doBuild(StaplerRequest, StaplerResponse, TimeDuration)}.
      */
     public void _doBuild(StaplerRequest req, StaplerResponse rsp, @QueryParameter TimeDuration delay) throws IOException, ServletException {
-        if (delay==null)
-            delay=new TimeDuration(TimeUnit.MILLISECONDS.convert(getJob().getQuietPeriod(), TimeUnit.SECONDS));
+        if (delay==null) {
+			delay=new TimeDuration(TimeUnit.MILLISECONDS.convert(getJob().getQuietPeriod(), TimeUnit.SECONDS));
+		}
 
 
         List<ParameterValue> values = new ArrayList<>();
@@ -148,8 +149,9 @@ public class ParametersDefinitionProperty extends OptionalJobProperty<Job<?, ?>>
             String name = jo.getString("name");
 
             ParameterDefinition d = getParameterDefinition(name);
-            if(d==null)
-                throw new IllegalArgumentException("No such parameter definition: " + name);
+            if(d==null) {
+				throw new IllegalArgumentException("No such parameter definition: " + name);
+			}
             ParameterValue parameterValue = d.createValue(req, jo);
             if (parameterValue != null) {
                 values.add(parameterValue);
@@ -162,12 +164,14 @@ public class ParametersDefinitionProperty extends OptionalJobProperty<Job<?, ?>>
                 getJob(), delay.getTimeInSeconds(), new ParametersAction(values), new CauseAction(new Cause.UserIdCause()));
         if (item!=null) {
             String url = formData.optString("redirectTo");
-            if (url==null || !Util.isSafeToRedirectTo(url))   // avoid open redirect
-                url = req.getContextPath()+'/'+item.getUrl();
+            if (url==null || !Util.isSafeToRedirectTo(url)) {
+				url = new StringBuilder().append(req.getContextPath()).append('/').append(item.getUrl()).toString();
+			}
             rsp.sendRedirect(formData.optInt("statusCode",SC_CREATED), url);
-        } else
-            // send the user back to the job top page.
+        } else {
+			// send the user back to the job top page.
             rsp.sendRedirect(".");
+		}
     }
 
     /** @deprecated use {@link #buildWithParameters(StaplerRequest, StaplerResponse, TimeDuration)} */
@@ -178,20 +182,20 @@ public class ParametersDefinitionProperty extends OptionalJobProperty<Job<?, ?>>
 
     public void buildWithParameters(StaplerRequest req, StaplerResponse rsp, @CheckForNull TimeDuration delay) throws IOException, ServletException {
         List<ParameterValue> values = new ArrayList<>();
-        for (ParameterDefinition d: parameterDefinitions) {
-        	ParameterValue value = d.createValue(req);
-        	if (value != null) {
+        parameterDefinitions.stream().map(d -> d.createValue(req)).forEach(value -> {
+			if (value != null) {
         		values.add(value);
         	}
-        }
-        if (delay==null)
-            delay=new TimeDuration(TimeUnit.MILLISECONDS.convert(getJob().getQuietPeriod(), TimeUnit.SECONDS));
+		});
+        if (delay==null) {
+			delay=new TimeDuration(TimeUnit.MILLISECONDS.convert(getJob().getQuietPeriod(), TimeUnit.SECONDS));
+		}
 
         Queue.Item item = Jenkins.get().getQueue().schedule2(
                 getJob(), delay.getTimeInSeconds(), new ParametersAction(values), ParameterizedJobMixIn.getBuildCause(getJob(), req)).getItem();
 
         if (item != null) {
-            rsp.sendRedirect(SC_CREATED, req.getContextPath() + '/' + item.getUrl());
+            rsp.sendRedirect(SC_CREATED, new StringBuilder().append(req.getContextPath()).append('/').append(item.getUrl()).toString());
         } else {
             rsp.sendRedirect(".");
         }
@@ -201,13 +205,25 @@ public class ParametersDefinitionProperty extends OptionalJobProperty<Job<?, ?>>
      * Gets the {@link ParameterDefinition} of the given name, if any.
      */
     public ParameterDefinition getParameterDefinition(String name) {
-        for (ParameterDefinition pd : parameterDefinitions)
-            if (pd.getName().equals(name))
-                return pd;
+        return parameterDefinitions.stream().filter(pd -> pd.getName().equals(name)).findFirst().orElse(null);
+    }
+
+    @Override
+	public String getDisplayName() {
         return null;
     }
 
-    @Extension
+	@Override
+	public String getIconFileName() {
+        return null;
+    }
+
+	@Override
+	public String getUrlName() {
+        return null;
+    }
+
+	@Extension
     @Symbol("parameters")
     public static class DescriptorImpl extends OptionalJobPropertyDescriptor {
         @Override
@@ -230,18 +246,6 @@ public class ParametersDefinitionProperty extends OptionalJobProperty<Job<?, ?>>
         }
     }
 
-    public String getDisplayName() {
-        return null;
-    }
-
-    public String getIconFileName() {
-        return null;
-    }
-
-    public String getUrlName() {
-        return null;
-    }
-
     private static class DefinitionsAbstractList extends AbstractList<String> {
         private final List<ParameterDefinition> parameterDefinitions;
 
@@ -249,11 +253,13 @@ public class ParametersDefinitionProperty extends OptionalJobProperty<Job<?, ?>>
             this.parameterDefinitions = parameterDefinitions;
         }
 
-        public String get(int index) {
+        @Override
+		public String get(int index) {
             return this.parameterDefinitions.get(index).getName();
         }
 
-        public int size() {
+        @Override
+		public int size() {
             return this.parameterDefinitions.size();
         }
     }

@@ -39,21 +39,21 @@ import java.io.IOException;
 public class FakeMapBuilder implements TestRule {
     private File dir;
 
-    protected File getDir() {
-        return dir;
-    }
-
     public FakeMapBuilder() {
     }
 
-    public FakeMapBuilder add(int n) throws IOException {
+	protected File getDir() {
+        return dir;
+    }
+
+	public FakeMapBuilder add(int n) throws IOException {
         File build = new File(dir, Integer.toString(n));
         FileUtils.writeStringToFile(new File(build, "n"), Integer.toString(n));
         build.mkdir();
         return this;
     }
 
-    /**
+	/**
      * Adds a build record under the givn ID but make it unloadable,
      * which will cause a failure when a load is attempted on this build ID.
      */
@@ -63,12 +63,13 @@ public class FakeMapBuilder implements TestRule {
         return this;
     }
 
-    public FakeMap make() {
+	public FakeMap make() {
         assert dir!=null;
         return new FakeMap(dir);
     }
 
-    public Statement apply(final Statement base, Description description) {
+	@Override
+	public Statement apply(final Statement base, Description description) {
         return new Statement() {
             @Override
             public void evaluate() throws Throwable {

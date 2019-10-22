@@ -9,7 +9,6 @@ import static org.powermock.api.mockito.PowerMockito.mockStatic;
 import hudson.views.ListViewColumn;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.junit.Ignore;
@@ -25,8 +24,6 @@ import org.powermock.modules.junit4.PowerMockRunner;
 @PowerMockIgnore({"com.sun.org.apache.xerces.*", "javax.xml.*", "org.xml.*"})
 public class ListViewTest {
     
-    private interface ItemGroupOfNonTopLevelItem extends TopLevelItem, ItemGroup<Item> {}
-
     @Ignore("TODO I am not smart enough to figure out what PowerMock is actually doing; whatever this was testing, better move to the test module and use JenkinsRule")
     @Test
     @PrepareForTest({ListViewColumn.class,Items.class})
@@ -40,14 +37,14 @@ public class ListViewTest {
         when(owner.getItemGroup()).thenReturn(itemGroupOwner);
         ListView lv = new ListView("test", owner);
         ItemGroupOfNonTopLevelItem ig = Mockito.mock(ItemGroupOfNonTopLevelItem.class);
-        when(Items.getAllItems(eq(itemGroupOwner), eq(TopLevelItem.class))).thenReturn(Arrays.asList(ig));
+        when(Items.getAllItems(eq(itemGroupOwner), eq(TopLevelItem.class))).thenReturn(Collections.singletonList(ig));
         when(ig.getRelativeNameFrom(any(ItemGroup.class))).thenReturn("test-item");
         lv.setRecurse(true);
         lv.add(ig);
         assertEquals(1, lv.getItems().size());
     }
-    
-    @Test
+
+	@Test
     @PrepareForTest({ListViewColumn.class,Items.class})
     public void includeRegexProgrammatic() {
         mockStatic(Items.class);
@@ -60,10 +57,12 @@ public class ListViewTest {
         ListView view = new ListView("test", owner);
         view.setIncludeRegex(".*");
         TopLevelItem it = Mockito.mock(TopLevelItem.class);
-        List<TopLevelItem> igContent = Arrays.asList(it);
+        List<TopLevelItem> igContent = Collections.singletonList(it);
         when(Items.getAllItems(eq(ig), eq(TopLevelItem.class))).thenReturn(igContent);
         when(ig.getItems()).thenReturn(igContent);
         when(it.getRelativeNameFrom(any(ItemGroup.class))).thenReturn("test-item");
         assertEquals(1, view.getItems().size());
     }
+
+	private interface ItemGroupOfNonTopLevelItem extends TopLevelItem, ItemGroup<Item> {}
 }

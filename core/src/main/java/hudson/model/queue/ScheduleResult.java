@@ -54,7 +54,19 @@ public abstract class ScheduleResult {
         return !isRefused();
     }
 
-    public static final class Created extends ScheduleResult {
+    public static Created created(WaitingItem i) {
+        return new Created(i);
+    }
+
+	public static Existing existing(Item i) {
+        return new Existing(i);
+    }
+
+	public static Refused refused() {
+        return new Refused();
+    }
+
+	public static final class Created extends ScheduleResult {
         private final WaitingItem item;
         private Created(WaitingItem item) {
             this.item = item;
@@ -94,17 +106,5 @@ public abstract class ScheduleResult {
         public boolean isRefused() {
             return true;
         }
-    }
-
-    public static Created created(WaitingItem i) {
-        return new Created(i);
-    }
-
-    public static Existing existing(Item i) {
-        return new Existing(i);
-    }
-
-    public static Refused refused() {
-        return new Refused();
     }
 }

@@ -69,7 +69,9 @@ import javax.annotation.Nonnull;
  * @since 1.349
  */
 public abstract class ConsoleAnnotator<T> implements Serializable {
-    /**
+    private static final long serialVersionUID = 1L;
+
+	/**
      * Annotates one line.
      *
      * @param context
@@ -84,7 +86,7 @@ public abstract class ConsoleAnnotator<T> implements Serializable {
     @CheckForNull
     public abstract ConsoleAnnotator<T> annotate(@Nonnull T context, @Nonnull MarkupText text );
 
-    /**
+	/**
      * Cast operation that restricts T.
      */
     @SuppressWarnings("unchecked")
@@ -92,7 +94,44 @@ public abstract class ConsoleAnnotator<T> implements Serializable {
         return (ConsoleAnnotator)a;
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"}) // unclear to jglick what is going on here
+	/**
+     * Bundles all the given {@link ConsoleAnnotator} into a single annotator.
+     */
+    public static <T> ConsoleAnnotator<T> combine(Collection<? extends ConsoleAnnotator<? super T>> all) {
+        switch (all.size()) {
+        case 0:     return null;    // none
+        case 1:     return  cast(all.iterator().next()); // just one
+        }
+
+        return new ConsoleAnnotatorAggregator<>(all);
+    }
+
+	/**
+     * Returns the all {@link ConsoleAnnotator}s for the given context type aggregated into a single
+     * annotator.
+     */
+    public static <T> ConsoleAnnotator<T> initial(T context) {
+        return combine(_for(context));
+    }
+
+	/**
+     * List all the console annotators that can work for the specified context type.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"}) // reflective
+    public static <T> List<ConsoleAnnotator<T>> _for(T context) {
+        List<ConsoleAnnotator<T>> r  = new ArrayList<>();
+        for (ConsoleAnnotatorFactory f : ConsoleAnnotatorFactory.all()) {
+            if (f.type().isInstance(context)) {
+                ConsoleAnnotator ca = f.newInstance(context);
+                if (ca!=null) {
+					r.add(ca);
+				}
+            }
+        }
+        return r;
+    }
+
+	@SuppressWarnings({"unchecked", "rawtypes"}) // unclear to jglick what is going on here
     private static final class ConsoleAnnotatorAggregator<T> extends ConsoleAnnotator<T> {
         List<ConsoleAnnotator<T>> list;
 
@@ -107,8 +146,11 @@ public abstract class ConsoleAnnotator<T> implements Serializable {
                 ConsoleAnnotator a =  itr.next();
                 ConsoleAnnotator b = a.annotate(context,text);
                 if (a!=b) {
-                    if (b==null)    itr.remove();
-                    else            itr.set(b);
+                    if (b==null) {
+						itr.remove();
+					} else {
+						itr.set(b);
+					}
                 }
             }
 
@@ -119,42 +161,4 @@ public abstract class ConsoleAnnotator<T> implements Serializable {
             }
         }
     }
-
-    /**
-     * Bundles all the given {@link ConsoleAnnotator} into a single annotator.
-     */
-    public static <T> ConsoleAnnotator<T> combine(Collection<? extends ConsoleAnnotator<? super T>> all) {
-        switch (all.size()) {
-        case 0:     return null;    // none
-        case 1:     return  cast(all.iterator().next()); // just one
-        }
-
-        return new ConsoleAnnotatorAggregator<>(all);
-    }
-
-    /**
-     * Returns the all {@link ConsoleAnnotator}s for the given context type aggregated into a single
-     * annotator.
-     */
-    public static <T> ConsoleAnnotator<T> initial(T context) {
-        return combine(_for(context));
-    }
-
-    /**
-     * List all the console annotators that can work for the specified context type.
-     */
-    @SuppressWarnings({"unchecked", "rawtypes"}) // reflective
-    public static <T> List<ConsoleAnnotator<T>> _for(T context) {
-        List<ConsoleAnnotator<T>> r  = new ArrayList<>();
-        for (ConsoleAnnotatorFactory f : ConsoleAnnotatorFactory.all()) {
-            if (f.type().isInstance(context)) {
-                ConsoleAnnotator ca = f.newInstance(context);
-                if (ca!=null)
-                    r.add(ca);
-            }
-        }
-        return r;
-    }
-
-    private static final long serialVersionUID = 1L;
 }

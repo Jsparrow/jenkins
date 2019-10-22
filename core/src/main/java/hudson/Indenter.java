@@ -34,12 +34,14 @@ public abstract class Indenter<J extends Job> {
     protected abstract int getNestLevel(J job);
 
     public final String getCss(J job) {
-        return "padding-left: "+getNestLevel(job)*2+"em";
+        return new StringBuilder().append("padding-left: ").append(getNestLevel(job)*2).append("em").toString();
     }
 
     public final String getRelativeShift(J job) {
         int i = getNestLevel(job);
-        if(i==0)    return null;
-        return "position:relative; left: "+ i *2+"em";
+        if(i==0) {
+			return null;
+		}
+        return new StringBuilder().append("position:relative; left: ").append(i *2).append("em").toString();
     }
 }

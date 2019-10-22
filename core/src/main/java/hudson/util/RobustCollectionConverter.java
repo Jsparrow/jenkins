@@ -70,7 +70,7 @@ public class RobustCollectionConverter extends CollectionConverter {
         // CopyOnWriteArrayList used to serialize as custom serialization,
         // so read it in a compatible fashion.
         String s = reader.getAttribute("serialization");
-        if(s!=null && s.equals("custom")) {
+        if(s!=null && "custom".equals(s)) {
             return sc.unmarshal(reader,context);
         } else {
             return super.unmarshal(reader, context);

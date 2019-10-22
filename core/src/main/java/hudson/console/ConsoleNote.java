@@ -146,8 +146,20 @@ public abstract class ConsoleNote<T> implements Serializable, Describable<Consol
      */
     @Restricted(NoExternalUse.class)
     public static /* nonfinal for tests & script console */ boolean INSECURE = SystemProperties.getBoolean(ConsoleNote.class.getName() + ".INSECURE");
+	private static final long serialVersionUID = 1L;
+	public static final String PREAMBLE_STR = "\u001B[8mha:";
+	public static final String POSTAMBLE_STR = "\u001B[0m";
+	/**
+     * Preamble of the encoded form. ANSI escape sequence to stop echo back
+     * plus a few magic characters.
+     */
+    public static final byte[] PREAMBLE = PREAMBLE_STR.getBytes();
+	/**
+     * Post amble is the ANSI escape sequence that brings back the echo.
+     */
+    public static final byte[] POSTAMBLE = POSTAMBLE_STR.getBytes();
 
-    /**
+	/**
      * When the line of a console output that this annotation is attached is read by someone,
      * a new {@link ConsoleNote} is de-serialized and this method is invoked to annotate that line.
      *
@@ -164,11 +176,12 @@ public abstract class ConsoleNote<T> implements Serializable, Describable<Consol
      */
     public abstract ConsoleAnnotator annotate(T context, MarkupText text, int charPos);
 
-    public ConsoleAnnotationDescriptor getDescriptor() {
+	@Override
+	public ConsoleAnnotationDescriptor getDescriptor() {
         return (ConsoleAnnotationDescriptor) Jenkins.get().getDescriptorOrDie(getClass());
     }
 
-    /**
+	/**
      * Prints this note into a stream.
      *
      * <p>
@@ -183,7 +196,7 @@ public abstract class ConsoleNote<T> implements Serializable, Describable<Consol
         out.write(encodeToBytes().toByteArray());
     }
 
-    /**
+	/**
      * Prints this note into a writer.
      *
      * <p>
@@ -194,7 +207,7 @@ public abstract class ConsoleNote<T> implements Serializable, Describable<Consol
         out.write(encodeToBytes().toString());
     }
 
-    private ByteArrayOutputStream encodeToBytes() throws IOException {
+	private ByteArrayOutputStream encodeToBytes() throws IOException {
         ByteArrayOutputStream buf = new ByteArrayOutputStream();
         try (OutputStream gzos = new GZIPOutputStream(buf);
              ObjectOutputStream oos = JenkinsJVM.isJenkinsJVM() ? AnonymousClassWarnings.checkingObjectOutputStream(gzos) : new ObjectOutputStream(gzos)) {
@@ -217,14 +230,14 @@ public abstract class ConsoleNote<T> implements Serializable, Describable<Consol
         return buf2;
     }
 
-    /**
+	/**
      * Works like {@link #encodeTo(Writer)} but obtain the result as a string.
      */
     public String encode() throws IOException {
         return encodeToBytes().toString();
     }
 
-    /**
+	/**
      * Reads a note back from {@linkplain #encodeTo(OutputStream) its encoded form}.
      *
      * @param in
@@ -237,7 +250,9 @@ public abstract class ConsoleNote<T> implements Serializable, Describable<Consol
             byte[] preamble = new byte[PREAMBLE.length];
             in.readFully(preamble);
             if (!Arrays.equals(preamble,PREAMBLE))
-                return null;    // not a valid preamble
+			 {
+				return null;    // not a valid preamble
+			}
 
             DataInputStream decoded = new DataInputStream(new UnbufferedBase64InputStream(in));
             int macSz = - decoded.readInt();
@@ -260,7 +275,9 @@ public abstract class ConsoleNote<T> implements Serializable, Describable<Consol
             byte[] postamble = new byte[POSTAMBLE.length];
             in.readFully(postamble);
             if (!Arrays.equals(postamble,POSTAMBLE))
-                return null;    // not a valid postamble
+			 {
+				return null;    // not a valid postamble
+			}
 
             if (!INSECURE) {
                 if (mac == null) {
@@ -283,14 +300,16 @@ public abstract class ConsoleNote<T> implements Serializable, Describable<Consol
         }
     }
 
-    /**
+	/**
      * Skips the encoded console note.
      */
     public static void skip(DataInputStream in) throws IOException {
         byte[] preamble = new byte[PREAMBLE.length];
         in.readFully(preamble);
         if (!Arrays.equals(preamble,PREAMBLE))
-            return;    // not a valid preamble
+		 {
+			return;    // not a valid preamble
+		}
 
         DataInputStream decoded = new DataInputStream(new UnbufferedBase64InputStream(in));
         int macSz = - decoded.readInt();
@@ -307,22 +326,7 @@ public abstract class ConsoleNote<T> implements Serializable, Describable<Consol
         in.readFully(postamble);
     }
 
-    private static final long serialVersionUID = 1L;
-
-    public static final String PREAMBLE_STR = "\u001B[8mha:";
-    public static final String POSTAMBLE_STR = "\u001B[0m";
-
-    /**
-     * Preamble of the encoded form. ANSI escape sequence to stop echo back
-     * plus a few magic characters.
-     */
-    public static final byte[] PREAMBLE = PREAMBLE_STR.getBytes();
-    /**
-     * Post amble is the ANSI escape sequence that brings back the echo.
-     */
-    public static final byte[] POSTAMBLE = POSTAMBLE_STR.getBytes();
-
-    /**
+	/**
      * Locates the preamble in the given buffer.
      */
     public static int findPreamble(byte[] buf, int start, int len) {
@@ -333,8 +337,9 @@ public abstract class ConsoleNote<T> implements Serializable, Describable<Consol
             if (buf[i]==PREAMBLE[0]) {
                 // check for the rest of the match
                 for (int j=1; j<PREAMBLE.length; j++) {
-                    if (buf[i+j]!=PREAMBLE[j])
-                        continue OUTER;
+                    if (buf[i+j]!=PREAMBLE[j]) {
+						continue OUTER;
+					}
                 }
                 return i; // found it
             }
@@ -342,19 +347,18 @@ public abstract class ConsoleNote<T> implements Serializable, Describable<Consol
         return -1; // not found
     }
 
-    /**
+	/**
      * Removes the embedded console notes in the given log lines.
      *
      * @since 1.350
      */
     public static List<String> removeNotes(Collection<String> logLines) {
         List<String> r = new ArrayList<>(logLines.size());
-        for (String l : logLines)
-            r.add(removeNotes(l));
+        logLines.forEach(l -> r.add(removeNotes(l)));
         return r;
     }
 
-    /**
+	/**
      * Removes the embedded console notes in the given log line.
      *
      * @since 1.350
@@ -362,9 +366,13 @@ public abstract class ConsoleNote<T> implements Serializable, Describable<Consol
     public static String removeNotes(String line) {
         while (true) {
             int idx = line.indexOf(PREAMBLE_STR);
-            if (idx<0)  return line;
+            if (idx<0) {
+				return line;
+			}
             int e = line.indexOf(POSTAMBLE_STR,idx);
-            if (e<0)    return line;
+            if (e<0) {
+				return line;
+			}
             line = line.substring(0,idx)+line.substring(e+POSTAMBLE_STR.length());
         }
     }

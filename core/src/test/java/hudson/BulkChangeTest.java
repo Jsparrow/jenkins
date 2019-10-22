@@ -37,36 +37,6 @@ import java.io.IOException;
  */
 public class BulkChangeTest {
 
-    private class Point implements Saveable {
-        /**
-         * Don't actually do any save, but just remember how many the actual I/O would have happened.
-         */
-        int saveCount = 0;
-
-        @SuppressWarnings("unused")
-        int x,y;
-
-        public void setX(int x) throws IOException {
-            this.x = x;
-            save();
-        }
-
-        public void setY(int y) throws IOException {
-            this.y = y;
-            save();
-        }
-
-        public void set(int x, int y) throws IOException {
-            setX(x);
-            setY(y);
-        }
-
-        public void save() throws IOException {
-            if(BulkChange.contains(this))   return;
-            saveCount++;
-        }
-    }
-
     /**
      * If there is no BulkChange, we should see two saves.
      */
@@ -77,7 +47,7 @@ public class BulkChangeTest {
         assertEquals(2,pt.saveCount);
     }
 
-    /**
+	/**
      * With a {@link BulkChange}, this will become just one save.
      */
     @Test
@@ -92,7 +62,7 @@ public class BulkChangeTest {
         assertEquals(1,pt.saveCount);
     }
 
-    /**
+	/**
      * {@link BulkChange}s can be nested.
      */
     @Test
@@ -117,5 +87,41 @@ public class BulkChangeTest {
             bc1.commit();
         }
         assertEquals(1,pt.saveCount);
+    }
+
+	private class Point implements Saveable {
+        /**
+         * Don't actually do any save, but just remember how many the actual I/O would have happened.
+         */
+        int saveCount = 0;
+
+        @SuppressWarnings("unused")
+        int x;
+
+		@SuppressWarnings("unused")
+		int y;
+
+        public void setX(int x) throws IOException {
+            this.x = x;
+            save();
+        }
+
+        public void setY(int y) throws IOException {
+            this.y = y;
+            save();
+        }
+
+        public void set(int x, int y) throws IOException {
+            setX(x);
+            setY(y);
+        }
+
+        @Override
+		public void save() throws IOException {
+            if(BulkChange.contains(this)) {
+				return;
+			}
+            saveCount++;
+        }
     }
 }

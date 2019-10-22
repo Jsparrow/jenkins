@@ -76,23 +76,31 @@ import static java.util.logging.Level.*;
 @Restricted(NoExternalUse.class)
 public final class RunIdMigrator {
 
-    private final DateFormat legacyIdFormatter = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
-
     static final Logger LOGGER = Logger.getLogger(RunIdMigrator.class.getName());
-    private static final String MAP_FILE = "legacyIds";
-    /** avoids wasting a map for new jobs */
+
+	private static final String MAP_FILE = "legacyIds";
+
+	/** avoids wasting a map for new jobs */
     private static final Map<String,Integer> EMPTY = new TreeMap<>();
 
-    /**
+	/**
      * Did we record "unmigrate" instruction for this $JENKINS_HOME? Yes if it's in the set.
      */
     private static final Set<File> offeredToUnmigrate = Collections.synchronizedSet(new HashSet<>());
 
-    private @Nonnull Map<String,Integer> idToNumber = EMPTY;
+	private static final Pattern NUMBER_ELT = Pattern.compile("(?m)^  <number>(\\d+)</number>(\r?\n)");
 
-    public RunIdMigrator() {}
+	private static final Pattern ID_ELT = Pattern.compile("(?m)^  <id>([0-9_-]+)</id>(\r?\n)");
 
-    /**
+	private static final Pattern TIMESTAMP_ELT = Pattern.compile("(?m)^  <timestamp>(\\d+)</timestamp>(\r?\n)");
+
+	private final DateFormat legacyIdFormatter = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
+
+	private @Nonnull Map<String,Integer> idToNumber = EMPTY;
+
+	public RunIdMigrator() {}
+
+	/**
      * @return whether there was a file to load
      */
     private boolean load(File dir) {
@@ -115,13 +123,13 @@ public final class RunIdMigrator {
         return true;
     }
 
-    private void save(File dir) {
+	private void save(File dir) {
         File f = new File(dir, MAP_FILE);
         try {
             AtomicFileWriter w = new AtomicFileWriter(f);
             try {
                 for (Map.Entry<String,Integer> entry : idToNumber.entrySet()) {
-                    w.write(entry.getKey() + ' ' + entry.getValue() + '\n');
+                    w.write(new StringBuilder().append(entry.getKey()).append(' ').append(entry.getValue()).append('\n').toString());
                 }
                 w.commit();
             } finally {
@@ -132,7 +140,7 @@ public final class RunIdMigrator {
         }
     }
 
-    /**
+	/**
      * Called when a job is first created.
      * Just saves an empty marker indicating that this job needs no migration.
      * @param dir as in {@link Job#getBuildDir}
@@ -141,7 +149,7 @@ public final class RunIdMigrator {
         save(dir);
     }
 
-    /**
+	/**
      * Perform one-time migration if this has not been done already.
      * Where previously there would be a {@code 2014-01-02_03-04-05/build.xml} specifying {@code <number>99</number>} plus a symlink {@code 99 → 2014-01-02_03-04-05},
      * after migration there will be just {@code 99/build.xml} specifying {@code <id>2014-01-02_03-04-05</id>} and {@code <timestamp>…</timestamp>} according to local time zone at time of migration.
@@ -163,17 +171,18 @@ public final class RunIdMigrator {
         LOGGER.log(INFO, "Migrating build records in {0}", dir);
         doMigrate(dir);
         save(dir);
-        if (jenkinsHome != null && offeredToUnmigrate.add(jenkinsHome))
-            LOGGER.log(WARNING, "Build record migration (https://jenkins.io/redirect/build-record-migration) is one-way. If you need to downgrade Jenkins, run: {0}", getUnmigrationCommandLine(jenkinsHome));
+        if (jenkinsHome != null && offeredToUnmigrate.add(jenkinsHome)) {
+			LOGGER.log(WARNING, "Build record migration (https://jenkins.io/redirect/build-record-migration) is one-way. If you need to downgrade Jenkins, run: {0}", getUnmigrationCommandLine(jenkinsHome));
+		}
         return true;
     }
 
-    private static String getUnmigrationCommandLine(File jenkinsHome) {
+	private static String getUnmigrationCommandLine(File jenkinsHome) {
         StringBuilder cp = new StringBuilder();
         for (Class<?> c : new Class<?>[] {RunIdMigrator.class, /* TODO how to calculate transitive dependencies automatically? */Charsets.class, WriterOutputStream.class, BuildException.class, FastDateFormat.class}) {
             URL location = c.getProtectionDomain().getCodeSource().getLocation();
             String locationS = location.toString();
-            if (location.getProtocol().equals("file")) {
+            if ("file".equals(location.getProtocol())) {
                 try {
                     locationS = new File(location.toURI()).getAbsolutePath();
                 } catch (URISyntaxException x) {
@@ -188,8 +197,7 @@ public final class RunIdMigrator {
         return String.format("java -classpath \"%s\" %s \"%s\"", cp, RunIdMigrator.class.getName(), jenkinsHome);
     }
 
-    private static final Pattern NUMBER_ELT = Pattern.compile("(?m)^  <number>(\\d+)</number>(\r?\n)");
-    private void doMigrate(File dir) {
+	private void doMigrate(File dir) {
         idToNumber = new TreeMap<>();
         File[] kids = dir.listFiles();
         // Need to process symlinks first so we can rename to them.
@@ -257,7 +265,8 @@ public final class RunIdMigrator {
                 }
                 int number = Integer.parseInt(m.group(1));
                 String nl = m.group(2);
-                xml = m.replaceFirst("  <id>" + name + "</id>" + nl + "  <timestamp>" + timestamp + "</timestamp>" + nl);
+                xml = m.replaceFirst(new StringBuilder().append("  <id>").append(name).append("</id>").append(nl).append("  <timestamp>").append(timestamp)
+						.append("</timestamp>").append(nl).toString());
                 File newKid = new File(dir, Integer.toString(number));
                 move(kid, newKid);
                 FileUtils.writeStringToFile(new File(newKid, "build.xml"), xml, Charsets.UTF_8);
@@ -269,7 +278,7 @@ public final class RunIdMigrator {
         }
     }
 
-    /**
+	/**
      * Tries to move/rename a file from one path to another.
      * Uses {@link java.nio.file.Files#move} when available.
      * Does not use {@link java.nio.file.StandardCopyOption#REPLACE_EXISTING} or any other options.
@@ -285,7 +294,7 @@ public final class RunIdMigrator {
         }
     }
 
-    /**
+	/**
      * Look up a historical run by ID.
      * @param id a nonnumeric ID which may be a valid {@link Run#getId}
      * @return the corresponding {@link Run#number}, or 0 if unknown
@@ -295,7 +304,7 @@ public final class RunIdMigrator {
         return number != null ? number : 0;
     }
 
-    /**
+	/**
      * Delete the record of a build.
      * @param dir as in {@link Job#getBuildDir}
      * @param id a {@link Run#getId}
@@ -306,7 +315,7 @@ public final class RunIdMigrator {
         }
     }
 
-    /**
+	/**
      * Reverses the migration, in case you want to revert to the older format.
      * @param args one parameter, {@code $JENKINS_HOME}
      */
@@ -321,7 +330,8 @@ public final class RunIdMigrator {
         }
         new RunIdMigrator().unmigrateJobsDir(jobs);
     }
-    private void unmigrateJobsDir(File jobs) throws Exception {
+
+	private void unmigrateJobsDir(File jobs) throws Exception {
         File[] jobDirs = jobs.listFiles();
         if (jobDirs == null) {
             System.err.println(jobs + " claimed to exist, but cannot be listed");
@@ -329,7 +339,7 @@ public final class RunIdMigrator {
         }
         for (File job : jobDirs) {
 
-            if (job.getName().equals("builds")) {
+            if ("builds".equals(job.getName())) {
                 // Might be maven modules, matrix builds, etc. which are direct children of job
                 unmigrateBuildsDir(job);
             }
@@ -342,7 +352,7 @@ public final class RunIdMigrator {
                 if (!kid.isDirectory()) {
                     continue;
                 }
-                if (kid.getName().equals("builds")) {
+                if ("builds".equals(kid.getName())) {
                     unmigrateBuildsDir(kid);
                 } else {
                     // Might be jobs, modules, promotions, etc.; we assume an ItemGroup.getRootDirFor implementation
@@ -352,9 +362,8 @@ public final class RunIdMigrator {
             }
         }
     }
-    private static final Pattern ID_ELT = Pattern.compile("(?m)^  <id>([0-9_-]+)</id>(\r?\n)");
-    private static final Pattern TIMESTAMP_ELT = Pattern.compile("(?m)^  <timestamp>(\\d+)</timestamp>(\r?\n)");
-    /** Inverse of {@link #doMigrate}. */
+
+	/** Inverse of {@link #doMigrate}. */
     private void unmigrateBuildsDir(File builds) throws Exception {
         File mapFile = new File(builds, MAP_FILE);
         if (!mapFile.isFile()) {
@@ -381,7 +390,7 @@ public final class RunIdMigrator {
             }
             long timestamp = Long.parseLong(m.group(1));
             String nl = m.group(2);
-            xml = m.replaceFirst("  <number>" + number + "</number>" + nl);
+            xml = m.replaceFirst(new StringBuilder().append("  <number>").append(number).append("</number>").append(nl).toString());
             m = ID_ELT.matcher(xml);
             String id;
             if (m.find()) {
@@ -401,7 +410,7 @@ public final class RunIdMigrator {
         System.err.println(builds + " has been restored to its original format");
     }
 
-    /**
+	/**
      * Expose unmigration instruction to the user.
      */
     @Extension

@@ -44,21 +44,21 @@ import java.util.logging.Logger;
 @Extension
 public class ConnectNodeCommand extends CLICommand {
 
-    @SuppressWarnings("MismatchedQueryAndUpdateOfCollection")
+    private static final Logger LOGGER = Logger.getLogger(ConnectNodeCommand.class.getName());
+
+	@SuppressWarnings("MismatchedQueryAndUpdateOfCollection")
     @Argument(metaVar="NAME", usage="Slave name, or empty string for master; comma-separated list is supported", required=true, multiValued=true)
     private List<String> nodes;
 
-    @Option(name="-f", usage="Cancel any currently pending connect operation and retry from scratch")
+	@Option(name="-f", usage="Cancel any currently pending connect operation and retry from scratch")
     public boolean force = false;
 
-    private static final Logger LOGGER = Logger.getLogger(ConnectNodeCommand.class.getName());
-
-    @Override
+	@Override
     public String getShortDescription() {
         return Messages.ConnectNodeCommand_ShortDescription();
     }
 
-    @Override
+	@Override
     protected int run() throws Exception {
         boolean errorOccurred = false;
         final HashSet<String> hs = new HashSet<>(nodes);
@@ -72,7 +72,7 @@ public class ConnectNodeCommand extends CLICommand {
                     throw e;
                 }
 
-                final String errorMsg = node_s + ": " + e.getMessage();
+                final String errorMsg = new StringBuilder().append(node_s).append(": ").append(e.getMessage()).toString();
                 stderr.println(errorMsg);
                 errorOccurred = true;
                 continue;

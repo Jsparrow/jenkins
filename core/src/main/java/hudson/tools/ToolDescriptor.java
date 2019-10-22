@@ -73,19 +73,20 @@ public abstract class ToolDescriptor<T extends ToolInstallation> extends Descrip
      */
     @SuppressWarnings("unchecked")
     public T[] getInstallations() {
-        if (installations != null)
-            return installations.clone();
+        if (installations != null) {
+			return installations.clone();
+		}
 
         Type bt = Types.getBaseClass(getClass(), ToolDescriptor.class);
-        if (bt instanceof ParameterizedType) {
-            ParameterizedType pt = (ParameterizedType) bt;
-            // this 't' is the closest approximation of T of Descriptor<T>.
-            Class t = Types.erasure(pt.getActualTypeArguments()[0]);
-            return (T[])Array.newInstance(t,0);
-        } else {
-            // can't infer the type. Fallback
+        // can't infer the type. Fallback
+		if (!(bt instanceof ParameterizedType)) {
+			// can't infer the type. Fallback
             return emptyArray_unsafeCast();
-        }
+		}
+		ParameterizedType pt = (ParameterizedType) bt;
+		// this 't' is the closest approximation of T of Descriptor<T>.
+		Class t = Types.erasure(pt.getActualTypeArguments()[0]);
+		return (T[])Array.newInstance(t,0);
     }
     
     //TODO: Get rid of it? 
@@ -139,8 +140,9 @@ public abstract class ToolDescriptor<T extends ToolInstallation> extends Descrip
                 = new DescribableList<>(NOOP);
 
         List<? extends ToolInstaller> installers = getDefaultInstallers();
-        if(!installers.isEmpty())
-            r.add(new InstallSourceProperty(installers));
+        if(!installers.isEmpty()) {
+			r.add(new InstallSourceProperty(installers));
+		}
 
         return r;
     }

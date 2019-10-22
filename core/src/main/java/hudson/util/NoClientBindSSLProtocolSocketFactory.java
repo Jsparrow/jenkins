@@ -51,33 +51,33 @@ public class NoClientBindSSLProtocolSocketFactory implements SecureProtocolSocke
     private static final NoClientBindSSLProtocolSocketFactory factory = new NoClientBindSSLProtocolSocketFactory();
     
     /**
+     * Constructor for SSLProtocolSocketFactory.
+     */
+    public NoClientBindSSLProtocolSocketFactory() {
+    }
+
+	/**
      * Gets an singleton instance of the SSLProtocolSocketFactory.
      * @return a SSLProtocolSocketFactory
      */
     static NoClientBindSSLProtocolSocketFactory getSocketFactory() {
         return factory;
-    }    
-    
-    /**
-     * Constructor for SSLProtocolSocketFactory.
-     */
-    public NoClientBindSSLProtocolSocketFactory() {
-        super();
     }
 
-    /**
+	/**
      * @see SecureProtocolSocketFactory#createSocket(java.lang.String,int,java.net.InetAddress,int)
      */
-    public Socket createSocket(
+    @Override
+	public Socket createSocket(
         String host,
         int port,
         InetAddress clientHost,
         int clientPort)
-        throws IOException, UnknownHostException {
+        throws IOException {
             return createSocket(host,port);
     }
 
-    /**
+	/**
      * Attempts to get a new socket connection to the given host within the given time limit.
      * <p>
      * This method employs several techniques to circumvent the limitations of older JREs that 
@@ -102,13 +102,14 @@ public class NoClientBindSSLProtocolSocketFactory implements SecureProtocolSocke
      * 
      * @since 3.0
      */
-    public Socket createSocket(
+    @Override
+	public Socket createSocket(
         final String host,
         final int port,
         final InetAddress localAddress,
         final int localPort,
         final HttpConnectionParams params
-    ) throws IOException, UnknownHostException, ConnectTimeoutException {
+    ) throws IOException {
         if (params == null) {
             throw new IllegalArgumentException("Parameters may not be null");
         }
@@ -127,26 +128,28 @@ public class NoClientBindSSLProtocolSocketFactory implements SecureProtocolSocke
         }
     }
 
-    /**
+	/**
      * @see SecureProtocolSocketFactory#createSocket(java.lang.String,int)
      */
-    public Socket createSocket(String host, int port)
-        throws IOException, UnknownHostException {
+    @Override
+	public Socket createSocket(String host, int port)
+        throws IOException {
         return SSLSocketFactory.getDefault().createSocket(
             host,
             port
         );
     }
 
-    /**
+	/**
      * @see SecureProtocolSocketFactory#createSocket(java.net.Socket,java.lang.String,int,boolean)
      */
-    public Socket createSocket(
+    @Override
+	public Socket createSocket(
         Socket socket,
         String host,
         int port,
         boolean autoClose)
-        throws IOException, UnknownHostException {
+        throws IOException {
         return ((SSLSocketFactory) SSLSocketFactory.getDefault()).createSocket(
             socket,
             host,
@@ -155,17 +158,19 @@ public class NoClientBindSSLProtocolSocketFactory implements SecureProtocolSocke
         );
     }
 
-    /**
+	/**
      * All instances are the same.
      */
-    public boolean equals(Object obj) {
+    @Override
+	public boolean equals(Object obj) {
         return ((obj != null) && obj.getClass().equals(SSLProtocolSocketFactory.class));
     }
 
-    /**
+	/**
      * All instances have the same hash code.
      */
-    public int hashCode() {
+    @Override
+	public int hashCode() {
         return SSLProtocolSocketFactory.class.hashCode();
     }       
 }

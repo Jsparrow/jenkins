@@ -38,15 +38,16 @@ import org.kohsuke.args4j.Argument;
  */
 @Extension
 public class ListPluginsCommand extends CLICommand {
-    @Override
+    @Argument(metaVar = "NAME", usage = "Name of a specific plugin", required = false)
+    public String name;
+
+	@Override
     public String getShortDescription() {
         return Messages.ListPluginsCommand_ShortDescription();
     }
 
-    @Argument(metaVar = "NAME", usage = "Name of a specific plugin", required = false)
-    public String name;
-
-    protected int run() {
+	@Override
+	protected int run() {
         Jenkins h = Jenkins.get();
         h.checkPermission(Jenkins.ADMINISTER);
         
@@ -59,7 +60,7 @@ public class ListPluginsCommand extends CLICommand {
                 printPlugin(plugin, plugin.getShortName().length(), plugin.getDisplayName().length());
             }
             else {
-                throw new IllegalArgumentException("No plugin with the name '" + name + "' found");
+                throw new IllegalArgumentException(new StringBuilder().append("No plugin with the name '").append(name).append("' found").toString());
             }
         }
         else {
@@ -82,7 +83,7 @@ public class ListPluginsCommand extends CLICommand {
         return 0;
     }
 
-    private void printPlugin(PluginWrapper plugin, int colWidthShortName, int colWidthDisplayName) {
+	private void printPlugin(PluginWrapper plugin, int colWidthShortName, int colWidthDisplayName) {
         final String version;
 
         if (plugin.hasUpdate()) {

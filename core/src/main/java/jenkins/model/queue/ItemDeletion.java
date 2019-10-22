@@ -142,14 +142,15 @@ public class ItemDeletion extends Queue.QueueDecisionHandler {
      */
     public static void deregister(@Nonnull Item item) {
         ItemDeletion instance = instance();
-        if (instance != null) {
-            instance.lock.writeLock().lock();
-            try {
-                instance.registrations.remove(item);
-            } finally {
-                instance.lock.writeLock().unlock();
-            }
-        }
+        if (instance == null) {
+			return;
+		}
+		instance.lock.writeLock().lock();
+		try {
+		    instance.registrations.remove(item);
+		} finally {
+		    instance.lock.writeLock().unlock();
+		}
     }
 
     /**

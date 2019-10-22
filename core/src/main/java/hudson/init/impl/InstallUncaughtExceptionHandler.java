@@ -20,7 +20,9 @@ public class InstallUncaughtExceptionHandler {
 
     private static final Logger LOGGER = Logger.getLogger(InstallUncaughtExceptionHandler.class.getName());
 
-    @Initializer
+    private InstallUncaughtExceptionHandler() {}
+
+	@Initializer
     public static void init(final Jenkins j) throws IOException {
         CompressionFilter.setUncaughtExceptionHandler(j.servletContext, (e, context, req, rsp) -> {
                 if (rsp.isCommitted()) {
@@ -46,15 +48,12 @@ public class InstallUncaughtExceptionHandler {
         }
         catch (SecurityException ex) {
             LOGGER.log(Level.SEVERE,
-                                                       "Failed to set the default UncaughtExceptionHandler.  " +
-                                                       "If any threads die due to unhandled coding errors then there will be no logging of this information.  " +
-                                                       "The lack of this diagnostic information will make it harder to track down issues which will reduce the supportability of Jenkins.  " +
-                                                       "It is highly recommended that you consult the documentation that comes with you servlet container on how to allow the " +
-                                                       "`setDefaultUncaughtExceptionHandler` permission and enable it.", ex);
+                                                       new StringBuilder().append("Failed to set the default UncaughtExceptionHandler.  ").append("If any threads die due to unhandled coding errors then there will be no logging of this information.  ").append("The lack of this diagnostic information will make it harder to track down issues which will reduce the supportability of Jenkins.  ").append("It is highly recommended that you consult the documentation that comes with you servlet container on how to allow the ")
+															.append("`setDefaultUncaughtExceptionHandler` permission and enable it.").toString(), ex);
         }
     }
 
-    private static boolean isEOFException(Throwable e) {
+	private static boolean isEOFException(Throwable e) {
         if (e == null) {
             return false;
         } else if (e instanceof EOFException) {
@@ -64,15 +63,14 @@ public class InstallUncaughtExceptionHandler {
         }
     }
 
-    /** An UncaughtExceptionHandler that just logs the exception */
+	/** An UncaughtExceptionHandler that just logs the exception */
     private static class DefaultUncaughtExceptionHandler implements Thread.UncaughtExceptionHandler {
 
         @Override
         public void uncaughtException(Thread t, Throwable ex) {
             // if this was an OutOfMemoryError then all bets about logging are off - but in the absence of anything else...
             LOGGER.log(Level.SEVERE,
-                       "A thread (" + t.getName() + '/' + t.getId()
-                                     + ") died unexpectedly due to an uncaught exception, this may leave your Jenkins in a bad way and is usually indicative of a bug in the code.",
+                       new StringBuilder().append("A thread (").append(t.getName()).append('/').append(t.getId()).append(") died unexpectedly due to an uncaught exception, this may leave your Jenkins in a bad way and is usually indicative of a bug in the code.").toString(),
                        ex);
 
             // If we have an exception, let's see if it's related with missing classes on Java 11. We reach
@@ -82,6 +80,4 @@ public class InstallUncaughtExceptionHandler {
         }
 
     }
-
-    private InstallUncaughtExceptionHandler() {}
 }

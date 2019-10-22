@@ -58,7 +58,9 @@ import org.kohsuke.stapler.export.ExportedBean;
  */
 @ExportedBean
 public abstract class RepositoryBrowser<E extends ChangeLogSet.Entry> extends AbstractDescribableImpl<RepositoryBrowser<?>> implements ExtensionPoint, Serializable {
-    /**
+    private static final long serialVersionUID = 1L;
+
+	/**
      * Determines the link to the given change set.
      *
      * @return
@@ -68,40 +70,41 @@ public abstract class RepositoryBrowser<E extends ChangeLogSet.Entry> extends Ab
      */
     public abstract URL getChangeSetLink(E changeSet) throws IOException;
 
-    /**
+	/**
      * If the given string starts with '/', return a string that removes it.
      */
     protected static String trimHeadSlash(String s) {
-        if(s.startsWith("/"))   return s.substring(1);
+        if(s.startsWith("/")) {
+			return s.substring(1);
+		}
         return s;
     }
 
-    /**
+	/**
      * Normalize the URL so that it ends with '/'.
      * <p>
      * An attention is paid to preserve the query parameters in URL if any. 
      */
     protected static URL normalizeToEndWithSlash(URL url) {
-        if(url.getPath().endsWith("/"))
-            return url;
+        if(url.getPath().endsWith("/")) {
+			return url;
+		}
 
         // normalize
         String q = url.getQuery();
         q = q!=null?('?'+q):"";
         try {
-            return new URL(url,url.getPath()+'/'+q);
+            return new URL(url,new StringBuilder().append(url.getPath()).append('/').append(q).toString());
         } catch (MalformedURLException e) {
             // impossible
             throw new Error(e);
         }
     }
 
-    /**
+	/**
      * Returns all the registered {@link RepositoryBrowser} descriptors.
      */
     public static DescriptorExtensionList<RepositoryBrowser<?>,Descriptor<RepositoryBrowser<?>>> all() {
         return (DescriptorExtensionList) Jenkins.get().getDescriptorList(RepositoryBrowser.class);
     }
-
-    private static final long serialVersionUID = 1L;
 }

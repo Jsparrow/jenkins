@@ -22,7 +22,7 @@ public abstract class MasterToSlaveCallable<V, T extends Throwable> implements C
     private static final long serialVersionUID = 1L;
 
     @Override
-    public void checkRoles(RoleChecker checker) throws SecurityException {
+    public void checkRoles(RoleChecker checker) {
         checker.check(this,Roles.SLAVE);
     }
 
@@ -41,7 +41,7 @@ public abstract class MasterToSlaveCallable<V, T extends Throwable> implements C
     public Channel getOpenChannelOrFail() throws ChannelClosedException {
         final Channel ch = getChannelOrFail();
         if (ch.isClosingOrClosed()) { // TODO: Since Remoting 2.33, we still need to explicitly declare minimum Remoting version
-            throw new ChannelClosedException(new IllegalStateException("The associated channel " + ch + " is closing down or has closed down", ch.getCloseRequestCause()));
+            throw new ChannelClosedException(new IllegalStateException(new StringBuilder().append("The associated channel ").append(ch).append(" is closing down or has closed down").toString(), ch.getCloseRequestCause()));
         }
         return ch;
     }

@@ -66,16 +66,17 @@ import org.kohsuke.stapler.verb.POST;
 public class GlobalSecurityConfiguration extends ManagementLink implements Describable<GlobalSecurityConfiguration> {
     
     private static final Logger LOGGER = Logger.getLogger(GlobalSecurityConfiguration.class.getName());
+	public static Predicate<GlobalConfigurationCategory> FILTER = (GlobalConfigurationCategory input) -> input instanceof GlobalConfigurationCategory.Security;
 
-    public MarkupFormatter getMarkupFormatter() {
+	public MarkupFormatter getMarkupFormatter() {
         return Jenkins.get().getMarkupFormatter();
     }
 
-    public int getSlaveAgentPort() {
+	public int getSlaveAgentPort() {
         return Jenkins.get().getSlaveAgentPort();
     }
 
-    /**
+	/**
      * @since 2.24
      * @return true if the slave agent port is enforced on this instance.
      */
@@ -84,15 +85,15 @@ public class GlobalSecurityConfiguration extends ManagementLink implements Descr
         return Jenkins.get().isSlaveAgentPortEnforced();
     }
 
-    public Set<String> getAgentProtocols() {
+	public Set<String> getAgentProtocols() {
         return Jenkins.get().getAgentProtocols();
     }
 
-    public boolean isDisableRememberMe() {
+	public boolean isDisableRememberMe() {
         return Jenkins.get().isDisableRememberMe();
     }
 
-    @POST
+	@POST
     public synchronized void doConfigure(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException, FormException {
         // for compatibility reasons, the actual value is stored in Jenkins
         BulkChange bc = new BulkChange(Jenkins.get());
@@ -106,7 +107,7 @@ public class GlobalSecurityConfiguration extends ManagementLink implements Descr
         }
     }
 
-    public boolean configure(StaplerRequest req, JSONObject json) throws hudson.model.Descriptor.FormException {
+	public boolean configure(StaplerRequest req, JSONObject json) throws hudson.model.Descriptor.FormException {
         // for compatibility reasons, the actual value is stored in Jenkins
         Jenkins j = Jenkins.get();
         j.checkPermission(Jenkins.ADMINISTER);
@@ -154,47 +155,41 @@ public class GlobalSecurityConfiguration extends ManagementLink implements Descr
         
         return result;
     }
-    
-    private boolean configureDescriptor(StaplerRequest req, JSONObject json, Descriptor<?> d) throws FormException {
+
+	private boolean configureDescriptor(StaplerRequest req, JSONObject json, Descriptor<?> d) throws FormException {
         // collapse the structure to remain backward compatible with the JSON structure before 1.
         String name = d.getJsonSafeClassName();
         JSONObject js = json.has(name) ? json.getJSONObject(name) : new JSONObject(); // if it doesn't have the property, the method returns invalid null object.
         json.putAll(js);
         return d.configure(req, js);
-    }    
+    }
 
-    @Override
+	@Override
     public String getDisplayName() {
         return getDescriptor().getDisplayName();
     }
-    
-    @Override
+
+	@Override
     public String getDescription() {
         return Messages.GlobalSecurityConfiguration_Description();
     }
 
-    @Override
+	@Override
     public String getIconFileName() {
         return "secure.png";
     }
 
-    @Override
+	@Override
     public String getUrlName() {
         return "configureSecurity";
     }
-    
-    @Override
+
+	@Override
     public Permission getRequiredPermission() {
         return Jenkins.ADMINISTER;
     }
 
-    public static Predicate<GlobalConfigurationCategory> FILTER = new Predicate<GlobalConfigurationCategory>() {
-        public boolean apply(GlobalConfigurationCategory input) {
-            return input instanceof GlobalConfigurationCategory.Security;
-        }
-    };
-
-    /**
+	/**
      * @return
      * @see hudson.model.Describable#getDescriptor()
      */
@@ -203,7 +198,7 @@ public class GlobalSecurityConfiguration extends ManagementLink implements Descr
     public Descriptor<GlobalSecurityConfiguration> getDescriptor() {
         return Jenkins.get().getDescriptorOrDie(getClass());
     }
-    
+
     @Extension @Symbol("security")
     public static final class DescriptorImpl extends Descriptor<GlobalSecurityConfiguration> {
         @Override

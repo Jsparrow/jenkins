@@ -83,21 +83,29 @@ public class WebAppMain implements ServletContextListener {
     // use RingBufferLogHandler class name to configure for backward compatibility
     private static final int DEFAULT_RING_BUFFER_SIZE = SystemProperties.getInteger(RingBufferLogHandler.class.getName() + ".defaultSize", 256);
 
-    private final RingBufferLogHandler handler = new RingBufferLogHandler(DEFAULT_RING_BUFFER_SIZE) {
+	private static final String APP = "app";
+
+	private static final Logger LOGGER = Logger.getLogger(WebAppMain.class.getName());
+
+	private static final String[] HOME_NAMES = {"JENKINS_HOME","HUDSON_HOME"};
+
+	private final RingBufferLogHandler handler = new RingBufferLogHandler(DEFAULT_RING_BUFFER_SIZE) {
         @Override public synchronized void publish(LogRecord record) {
             if (record.getLevel().intValue() >= Level.INFO.intValue()) {
                 super.publish(record);
             }
         }
     };
-    private static final String APP = "app";
-    private boolean terminated;
-    private Thread initThread;
 
-    /**
+	private boolean terminated;
+
+	private Thread initThread;
+
+	/**
      * Creates the sole instance of {@link jenkins.model.Jenkins} and register it to the {@link ServletContext}.
      */
-    public void contextInitialized(ServletContextEvent event) {
+    @Override
+	public void contextInitialized(ServletContextEvent event) {
         JenkinsJVMAccess._setJenkinsJVM(true);
         final ServletContext context = event.getServletContext();
         File home=null;
@@ -105,7 +113,8 @@ public class WebAppMain implements ServletContextListener {
 
             // use the current request to determine the language
             LocaleProvider.setProvider(new LocaleProvider() {
-                public Locale get() {
+                @Override
+				public Locale get() {
                     return Functions.getCurrentLocale();
                 }
             });
@@ -130,11 +139,12 @@ public class WebAppMain implements ServletContextListener {
             final FileAndDescription describedHomeDir = getHomeDir(event);
             home = describedHomeDir.file.getAbsoluteFile();
             home.mkdirs();
-            System.out.println("Jenkins home directory: "+home+" found at: "+describedHomeDir.description);
+            System.out.println(new StringBuilder().append("Jenkins home directory: ").append(home).append(" found at: ").append(describedHomeDir.description).toString());
 
             // check that home exists (as mkdirs could have failed silently), otherwise throw a meaningful error
-            if (!home.exists())
-                throw new NoHomeDir(home);
+            if (!home.exists()) {
+				throw new NoHomeDir(home);
+			}
 
             recordBootAttempt(home);
 
@@ -233,8 +243,9 @@ public class WebAppMain implements ServletContextListener {
                         Jenkins instance = new Hudson(_home, context);
 
                         // one last check to make sure everything is in order before we go live
-                        if (Thread.interrupted())
-                            throw new InterruptedException();
+                        if (Thread.interrupted()) {
+							throw new InterruptedException();
+						}
 
                         context.setAttribute(APP, instance);
 
@@ -250,8 +261,9 @@ public class WebAppMain implements ServletContextListener {
                         new HudsonFailedToLoad(e).publish(context,_home);
                     } finally {
                         Jenkins instance = Jenkins.getInstanceOrNull();
-                        if(!success && instance!=null)
-                            instance.cleanUp();
+                        if(!success && instance!=null) {
+							instance.cleanUp();
+						}
                     }
                 }
             };
@@ -264,11 +276,11 @@ public class WebAppMain implements ServletContextListener {
         }
     }
 
-    public void joinInit() throws InterruptedException {
+	public void joinInit() throws InterruptedException {
         initThread.join();
     }
 
-    /**
+	/**
      * To assist boot failure script, record the number of boot attempts.
      * This file gets deleted in case of successful boot.
      *
@@ -282,7 +294,7 @@ public class WebAppMain implements ServletContextListener {
         }
     }
 
-    public static void installExpressionFactory(ServletContextEvent event) {
+	public static void installExpressionFactory(ServletContextEvent event) {
         JellyFacet.setExpressionFactory(event, new ExpressionFactory2());
     }
 
@@ -295,17 +307,7 @@ public class WebAppMain implements ServletContextListener {
         Logger.getLogger("").addHandler(handler);
     }
 
-    /** Add some metadata to a File, allowing to trace setup issues */
-    public static class FileAndDescription {
-        public final File file;
-        public final String description;
-        public FileAndDescription(File file,String description) {
-            this.file = file;
-            this.description = description;
-        }
-    }
-
-    /**
+	/**
      * Determines the home directory for Jenkins.
      *
      * <p>
@@ -325,12 +327,14 @@ public class WebAppMain implements ServletContextListener {
                 InitialContext iniCtxt = new InitialContext();
                 Context env = (Context) iniCtxt.lookup("java:comp/env");
                 String value = (String) env.lookup(name);
-                if(value!=null && value.trim().length()>0)
-                    return new FileAndDescription(new File(value.trim()),"JNDI/java:comp/env/"+name);
+                if(value!=null && value.trim().length()>0) {
+					return new FileAndDescription(new File(value.trim()),"JNDI/java:comp/env/"+name);
+				}
                 // look at one more place. See issue #1314
                 value = (String) iniCtxt.lookup(name);
-                if(value!=null && value.trim().length()>0)
-                    return new FileAndDescription(new File(value.trim()),"JNDI/"+name);
+                if(value!=null && value.trim().length()>0) {
+					return new FileAndDescription(new File(value.trim()),"JNDI/"+name);
+				}
             } catch (NamingException e) {
                 // ignore
             }
@@ -339,15 +343,17 @@ public class WebAppMain implements ServletContextListener {
         // next the system property
         for (String name : HOME_NAMES) {
             String sysProp = SystemProperties.getString(name);
-            if(sysProp!=null)
-                return new FileAndDescription(new File(sysProp.trim()),"SystemProperties.getProperty(\""+name+"\")");
+            if(sysProp!=null) {
+				return new FileAndDescription(new File(sysProp.trim()),new StringBuilder().append("SystemProperties.getProperty(\"").append(name).append("\")").toString());
+			}
         }
 
         // look at the env var next
         for (String name : HOME_NAMES) {
             String env = EnvVars.masterEnvVars.get(name);
-            if(env!=null)
-                return new FileAndDescription(new File(env.trim()).getAbsoluteFile(),"EnvVars.masterEnvVars.get(\""+name+"\")");
+            if(env!=null) {
+				return new FileAndDescription(new File(env.trim()).getAbsoluteFile(),new StringBuilder().append("EnvVars.masterEnvVars.get(\"").append(name).append("\")").toString());
+			}
         }
 
         // otherwise pick a place by ourselves
@@ -355,11 +361,12 @@ public class WebAppMain implements ServletContextListener {
         String root = event.getServletContext().getRealPath("/WEB-INF/workspace");
         if(root!=null) {
             File ws = new File(root.trim());
-            if(ws.exists())
-                // Hudson <1.42 used to prefer this before ~/.hudson, so
+            if(ws.exists()) {
+				// Hudson <1.42 used to prefer this before ~/.hudson, so
                 // check the existence and if it's there, use it.
                 // otherwise if this is a new installation, prefer ~/.hudson
                 return new FileAndDescription(ws,"getServletContext().getRealPath(\"/WEB-INF/workspace\")");
+			}
         }
 
         File legacyHome = new File(new File(System.getProperty("user.home")),".hudson");
@@ -371,7 +378,8 @@ public class WebAppMain implements ServletContextListener {
         return new FileAndDescription(newHome,"$user.home/.jenkins");
     }
 
-    public void contextDestroyed(ServletContextEvent event) {
+	@Override
+	public void contextDestroyed(ServletContextEvent event) {
         try (ACLContext old = ACL.as(ACL.SYSTEM)) {
             Jenkins instance = Jenkins.getInstanceOrNull();
             try {
@@ -397,13 +405,19 @@ public class WebAppMain implements ServletContextListener {
         }
     }
 
-    private static final Logger LOGGER = Logger.getLogger(WebAppMain.class.getName());
+    /** Add some metadata to a File, allowing to trace setup issues */
+    public static class FileAndDescription {
+        public final File file;
+        public final String description;
+        public FileAndDescription(File file,String description) {
+            this.file = file;
+            this.description = description;
+        }
+    }
 
     private static final class JenkinsJVMAccess extends JenkinsJVM {
         private static void _setJenkinsJVM(boolean jenkinsJVM) {
             JenkinsJVM.setJenkinsJVM(jenkinsJVM);
         }
     }
-
-    private static final String[] HOME_NAMES = {"JENKINS_HOME","HUDSON_HOME"};
 }

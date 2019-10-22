@@ -59,7 +59,10 @@ import java.util.logging.Logger;
  * @author Kohsuke Kawaguchi
  */
 public class Channels {
-    /**
+    private static final Logger LOGGER = Logger.getLogger(Channels.class.getName());
+
+
+	/**
      * @deprecated since 2009-04-13.
      *      Use {@link #forProcess(String, ExecutorService, InputStream, OutputStream, OutputStream, Proc)}
      */
@@ -68,7 +71,7 @@ public class Channels {
         return forProcess(name,execService,in,out,null,proc);
     }
 
-    /**
+	/**
      * Creates a channel that wraps a remote process, so that when we shut down the connection
      * we kill the process.
      */
@@ -109,14 +112,13 @@ public class Channels {
         };
         cb.withHeaderStream(header);
 
-        for (ChannelConfigurator cc : ChannelConfigurator.all()) {
-            cc.onChannelBuilding(cb,null);  // TODO: what to pass as a context?
-        }
+        // TODO: what to pass as a context?
+		ChannelConfigurator.all().forEach(cc -> cc.onChannelBuilding(cb, null));
 
         return cb.build(in,out);
     }
 
-    public static Channel forProcess(String name, ExecutorService execService, final Process proc, OutputStream header) throws IOException {
+	public static Channel forProcess(String name, ExecutorService execService, final Process proc, OutputStream header) throws IOException {
         final Thread thread = new StreamCopyThread(name + " stderr", proc.getErrorStream(), header);
         thread.start();
 
@@ -146,14 +148,13 @@ public class Channels {
         };
         cb.withHeaderStream(header);
 
-        for (ChannelConfigurator cc : ChannelConfigurator.all()) {
-            cc.onChannelBuilding(cb,null);  // TODO: what to pass as a context?
-        }
+        // TODO: what to pass as a context?
+		ChannelConfigurator.all().forEach(cc -> cc.onChannelBuilding(cb, null));
 
         return cb.build(proc.getInputStream(),proc.getOutputStream());
     }
 
-    /**
+	/**
      * Launches a new JVM with the given classpath and system properties, establish a communication channel,
      * and return a {@link Channel} to it.
      *
@@ -184,7 +185,7 @@ public class Channels {
         return newJVM(displayName,listener,vmb,workDir,classpath);
     }
 
-    /**
+	/**
      * Launches a new JVM with the given classpath, establish a communication channel,
      * and return a {@link Channel} to it.
      *
@@ -217,8 +218,9 @@ public class Channels {
         vmb.classpath().addJarOf(Channel.class);
         vmb.mainClass(Launcher.class);
 
-        if(classpath!=null)
-            vmb.args().add("-cp").add(classpath);
+        if(classpath!=null) {
+			vmb.args().add("-cp").add(classpath);
+		}
         vmb.args().add("-connectTo","localhost:"+serverSocket.getLocalPort());
 
         listener.getLogger().println("Starting "+displayName);
@@ -231,7 +233,4 @@ public class Channels {
                 new BufferedInputStream(SocketChannelStream.in(s)),
                 new BufferedOutputStream(SocketChannelStream.out(s)),null,p);
     }
-
-
-    private static final Logger LOGGER = Logger.getLogger(Channels.class.getName());
 }

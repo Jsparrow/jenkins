@@ -38,9 +38,10 @@ import java.io.OutputStream;
  * @since 1.349
  */
 public abstract class LineTransformationOutputStream extends OutputStream {
-    private ByteArrayOutputStream2 buf = new ByteArrayOutputStream2();
+    private static final int LF = 0x0A;
+	private ByteArrayOutputStream2 buf = new ByteArrayOutputStream2();
 
-    /**
+	/**
      * Called for each end of the line.
      *
      * @param b
@@ -51,35 +52,40 @@ public abstract class LineTransformationOutputStream extends OutputStream {
      */
     protected abstract void eol(byte[] b, int len) throws IOException;
 
-    public void write(int b) throws IOException {
+	@Override
+	public void write(int b) throws IOException {
         buf.write(b);
-        if (b==LF) eol();
+        if (b==LF) {
+			eol();
+		}
     }
 
-    private void eol() throws IOException {
+	private void eol() throws IOException {
         eol(buf.getBuffer(),buf.size());
 
         // reuse the buffer under normal circumstances, but don't let the line buffer grow unbounded
-        if (buf.size()>4096)
-            buf = new ByteArrayOutputStream2();
-        else
-            buf.reset();
+        if (buf.size()>4096) {
+			buf = new ByteArrayOutputStream2();
+		} else {
+			buf.reset();
+		}
     }
 
-    @Override
+	@Override
     public void write(byte[] b, int off, int len) throws IOException {
         int end = off+len;
 
-        for( int i=off; i<end; i++ )
-            write(b[i]);
+        for( int i=off; i<end; i++ ) {
+			write(b[i]);
+		}
     }
 
-    @Override
+	@Override
     public void close() throws IOException {
         forceEol();
     }
 
-    /**
+	/**
      * Forces the EOL behavior.
      *
      * Useful if the caller wants to make sure the buffered content is all processed, but without
@@ -95,7 +101,7 @@ public abstract class LineTransformationOutputStream extends OutputStream {
         }
     }
 
-    protected String trimEOL(String line) {
+	protected String trimEOL(String line) {
         int slen = line.length();
         while (slen>0) {
             char ch = line.charAt(slen-1);
@@ -109,15 +115,13 @@ public abstract class LineTransformationOutputStream extends OutputStream {
         return line;
     }
 
-    private static final int LF = 0x0A;
-
-    /**
+	/**
      * Convenience subclass for cases where you wish to process lines being sent to an underlying stream.
      * {@link #eol} will typically {@link OutputStream#write(byte[], int, int)} to {@link #out}.
      * Flushing or closing the decorated stream will behave properly.
      * @since FIXME
      */
-    public static abstract class Delegating extends LineTransformationOutputStream {
+    public abstract static class Delegating extends LineTransformationOutputStream {
 
         protected final OutputStream out;
 

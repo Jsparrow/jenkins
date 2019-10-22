@@ -27,8 +27,9 @@ class LazyLoadRunMapEntrySet<R> extends AbstractSet<Entry<Integer,R>> {
     }
 
     private synchronized Set<Entry<Integer,R>> all() {
-        if (all==null)
-            all = new BuildReferenceMapAdapter<>(owner, owner.all()).entrySet();
+        if (all==null) {
+			all = new BuildReferenceMapAdapter<>(owner, owner.all()).entrySet();
+		}
         return all;
     }
 
@@ -64,16 +65,19 @@ class LazyLoadRunMapEntrySet<R> extends AbstractSet<Entry<Integer,R>> {
             R last = null;
             R next = owner.newestBuild();
 
-            public boolean hasNext() {
+            @Override
+			public boolean hasNext() {
                 return next!=null;
             }
 
-            public Entry<Integer,R> next() {
+            @Override
+			public Entry<Integer,R> next() {
                 last = next;
                 if (last!=null) {
                     next = owner.search(owner.getNumberOf(last)-1, Direction.DESC);
-                } else
-                    throw new NoSuchElementException();
+                } else {
+					throw new NoSuchElementException();
+				}
                 return entryOf(last);
             }
 
@@ -81,9 +85,11 @@ class LazyLoadRunMapEntrySet<R> extends AbstractSet<Entry<Integer,R>> {
                 return new SimpleImmutableEntry<>(owner.getNumberOf(r), r);
             }
 
-            public void remove() {
-                if (last==null)
-                    throw new UnsupportedOperationException();
+            @Override
+			public void remove() {
+                if (last==null) {
+					throw new UnsupportedOperationException();
+				}
                 owner.removeValue(last);
             }
         };
@@ -106,10 +112,10 @@ class LazyLoadRunMapEntrySet<R> extends AbstractSet<Entry<Integer,R>> {
 
     @Override
     public boolean remove(Object o) {
-        if (o instanceof Entry) {
-            Entry e = (Entry) o;
-            return owner.removeValue((R)e.getValue());
-        }
-        return false;
+        if (!(o instanceof Entry)) {
+			return false;
+		}
+		Entry e = (Entry) o;
+		return owner.removeValue((R)e.getValue());
     }
 }

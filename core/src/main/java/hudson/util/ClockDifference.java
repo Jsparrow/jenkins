@@ -38,7 +38,12 @@ import org.kohsuke.stapler.export.Exported;
  */
 @ExportedBean
 public final class ClockDifference {
-    /**
+    public static final ClockDifference ZERO = new ClockDifference(0);
+
+	private static final String FAILED_HTML =
+            new StringBuilder().append("<span class='error'>").append(Messages.ClockDifference_Failed()).append("</span>").toString();
+
+	/**
      * The difference in milliseconds.
      *
      * Positive value means the agent is behind the master,
@@ -47,70 +52,73 @@ public final class ClockDifference {
     @Exported
     public final long diff;
 
-    public ClockDifference(long value) {
+	public ClockDifference(long value) {
         this.diff = value;
     }
 
-    /**
+	/**
      * Returns true if the difference is big enough to be considered dangerous.
      */
     public boolean isDangerous() {
         return Math.abs(diff)>5000;
     }
 
-    /**
+	/**
      * Gets the absolute value of {@link #diff}.
      */
     public long abs() {
         return Math.abs(diff);
     }
 
-    /**
+	/**
      * Gets the clock difference in HTML string.
      */
     @Override
     public String toString() {
         if(-1000<diff && diff <1000)
-            return Messages.ClockDifference_InSync();  // clock is in sync
+		 {
+			return Messages.ClockDifference_InSync();  // clock is in sync
+		}
 
         long abs = Math.abs(diff);
 
         String s = Util.getTimeSpanString(abs);
-        if(diff<0)
-            s = Messages.ClockDifference_Ahead(s);
-        else
-            s = Messages.ClockDifference_Behind(s);
+        if(diff<0) {
+			s = Messages.ClockDifference_Ahead(s);
+		} else {
+			s = Messages.ClockDifference_Behind(s);
+		}
 
         return s;
     }
 
-    public String toHtml() {
+	public String toHtml() {
         String s = toString();
-        if(isDangerous())
-            s = Util.wrapToErrorSpan(s);
+        if(isDangerous()) {
+			s = Util.wrapToErrorSpan(s);
+		}
         return s;
     }
 
-    public static String toHtml(Node d) {
+	public static String toHtml(Node d) {
         try {
-            if(d==null) return FAILED_HTML;
+            if(d==null) {
+				return FAILED_HTML;
+			}
             return d.getClockDifference().toHtml();
         } catch (IOException | InterruptedException e) {
             return FAILED_HTML;
         }
     }
 
-    /**
+	/**
      * Gets the clock difference in HTML string.
      * This version handles null {@link ClockDifference}.
      */
     public static String toHtml(ClockDifference d) {
-        if(d==null)     return FAILED_HTML;
+        if(d==null) {
+			return FAILED_HTML;
+		}
         return d.toHtml();
     }
-
-    public static final ClockDifference ZERO = new ClockDifference(0);
-
-    private static final String FAILED_HTML =
-            "<span class='error'>" + Messages.ClockDifference_Failed() + "</span>";
 }

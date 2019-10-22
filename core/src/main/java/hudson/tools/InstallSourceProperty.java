@@ -54,17 +54,18 @@ public class InstallSourceProperty extends ToolProperty<ToolInstallation> {
     @Override
     public void setTool(ToolInstallation t) {
         super.setTool(t);
-        for (ToolInstaller installer : installers)
-            installer.setTool(t);
+        installers.forEach(installer -> installer.setTool(t));
     }
 
-    public Class<ToolInstallation> type() {
+    @Override
+	public Class<ToolInstallation> type() {
         return ToolInstallation.class;
     }
 
     @Extension @Symbol("installSource")
     public static class DescriptorImpl extends ToolPropertyDescriptor {
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.InstallSourceProperty_DescriptorImpl_displayName();
         }
     }

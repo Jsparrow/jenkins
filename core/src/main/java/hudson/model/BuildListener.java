@@ -44,10 +44,8 @@ public interface BuildListener extends TaskListener {
         if (causes == null || causes.isEmpty()) {
             l.println("Started");
         } else {
-            for (Cause cause : causes) {
-                // TODO elide duplicates as per CauseAction.getCauseCounts (used in summary.jelly)
-                cause.print(this);
-            }
+            // TODO elide duplicates as per CauseAction.getCauseCounts (used in summary.jelly)
+			causes.forEach(cause -> cause.print(this));
         }
     }
 

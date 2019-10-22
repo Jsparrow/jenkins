@@ -9,19 +9,6 @@ package hudson.util;
 public class LineEndingConversion {
 
     /**
-     * Supported line ending types for conversion
-     */
-    public enum EOLType {
-        CR,
-        CRLF,
-        LF,
-        LFCR,
-        Mac,
-        Unix,
-        Windows
-    }
-
-    /**
      * Convert line endings of a string to the given type.  Default to Unix type.
      *
      * @param input
@@ -32,7 +19,7 @@ public class LineEndingConversion {
      *     String updated with the new line endings or null if given null.
      */
     public static String convertEOL(String input, EOLType type) {
-        if (null == input || 0 == input.length()) {
+        if (null == input || input.isEmpty()) {
             return input;
         }
         // Convert line endings to Unix LF,
@@ -61,6 +48,19 @@ public class LineEndingConversion {
                 break;
         }
         return input;
+    }
+
+	/**
+     * Supported line ending types for conversion
+     */
+    public enum EOLType {
+        CR,
+        CRLF,
+        LF,
+        LFCR,
+        Mac,
+        Unix,
+        Windows
     }
 }
 

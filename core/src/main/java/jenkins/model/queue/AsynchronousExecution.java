@@ -56,20 +56,23 @@ import org.kohsuke.accmod.restrictions.NoExternalUse;
  */
 public abstract class AsynchronousExecution extends RuntimeException {
 
-    @GuardedBy("this")
+    /** @see #result */
+    private static final Throwable NULL = new Throwable("NULL");
+
+	@GuardedBy("this")
     private Executor executor;
 
-    /**
+	/**
      * Initially null, and usually stays null.
      * If {@link #completed} is called before {@link #setExecutorWithoutCompleting}, then either {@link #NULL} for success, or the error.
      */
     @GuardedBy("this")
     private @CheckForNull Throwable result;
 
-    /** Constructor for subclasses. */
+	/** Constructor for subclasses. */
     protected AsynchronousExecution() {}
 
-    /**
+	/**
      * Called in lieu of {@link Thread#interrupt} by {@link Executor#interrupt()} and its overloads.
      * As with the standard Java method, you are requested to cease work as soon as possible, but there is no enforcement of this.
      * You might also want to call {@link Executor#recordCauseOfInterruption} on {@link #getExecutor}.
@@ -77,7 +80,7 @@ public abstract class AsynchronousExecution extends RuntimeException {
      */
     public abstract void interrupt(boolean forShutdown);
 
-    /**
+	/**
      * Allows an executable to indicate whether it is currently doing something which should prevent Jenkins from being shut down safely.
      * You may return false if it is fine for an administrator to exit/restart Jenkins despite this executable still being running.
      * (If so, {@link #interrupt} will be passed {@code forShutdown=true}.)
@@ -86,7 +89,7 @@ public abstract class AsynchronousExecution extends RuntimeException {
      */
     public abstract boolean blocksRestart();
 
-    /**
+	/**
      * Allows an executable to control whether or not to display {@code executorCell.jelly}.
      *
      * <p>
@@ -96,53 +99,51 @@ public abstract class AsynchronousExecution extends RuntimeException {
      */
     public abstract boolean displayCell();
 
-    /**
+	/**
      * Obtains the associated executor.
      * @return Associated Executor. May be {@code null} if {@link #setExecutorWithoutCompleting(hudson.model.Executor)} 
      * has not been called yet.
      */
     @CheckForNull
-    public synchronized final Executor getExecutor() {
+    public final synchronized Executor getExecutor() {
         return executor;
     }
 
-    /**
+	/**
      * Set the executor without notifying it about task completion.
      * The caller <b>must</b> also call {@link #maybeComplete()}
      * after releasing any problematic locks.
      */
     @Restricted(NoExternalUse.class)
-    public synchronized final void setExecutorWithoutCompleting(@Nonnull Executor executor) {
+    public final synchronized void setExecutorWithoutCompleting(@Nonnull Executor executor) {
         assert this.executor == null;
         this.executor = executor;
     }
 
-    /**
+	/**
      * If there is a pending completion notification, deliver it to the executor.
      * Must be called after {@link #setExecutorWithoutCompleting(Executor)}.
      */
     @Restricted(NoExternalUse.class)
-    public synchronized final void maybeComplete() {
+    public final synchronized void maybeComplete() {
         assert this.executor != null;
-        if (result != null) {
-            executor.completedAsynchronous(result != NULL ? result : null);
-            result = null;
-        }
+        if (result == null) {
+			return;
+		}
+		executor.completedAsynchronous(result != NULL ? result : null);
+		result = null;
     }
 
-    /**
+	/**
      * To be called when the task is actually complete.
      * @param error normally null (preferable to handle errors yourself), but may be specified to simulate an exception from {@link Executable#run}, as per {@link ExecutorListener#taskCompletedWithProblems}
      */
-    public synchronized final void completed(@CheckForNull Throwable error) {
+    public final synchronized void completed(@CheckForNull Throwable error) {
         if (executor!=null) {
             executor.completedAsynchronous(error);
         } else {
             result = error == null ? NULL : error;
         }
     }
-
-    /** @see #result */
-    private static final Throwable NULL = new Throwable("NULL");
 
 }

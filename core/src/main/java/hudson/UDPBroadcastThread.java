@@ -50,14 +50,34 @@ import java.util.logging.Logger;
  * @author Kohsuke Kawaguchi
  */
 public class UDPBroadcastThread extends Thread {
-    private final Jenkins jenkins;
-
-    public final OneShotEvent ready = new OneShotEvent();
-    private MulticastSocket mcs;
-    private boolean shutdown;
     static boolean udpHandlingProblem; // for tests
 
-    /**
+	public static final int PORT = SystemProperties.getInteger("hudson.udp",33848);
+
+	private static final Logger LOGGER = Logger.getLogger(UDPBroadcastThread.class.getName());
+
+	/**
+     * Multicast socket address.
+     */
+    public static InetAddress MULTICAST;
+
+	static {
+        try {
+            MULTICAST = InetAddress.getByAddress(new byte[]{(byte)239, (byte)77, (byte)124, (byte)213});
+        } catch (UnknownHostException e) {
+            throw new Error(e);
+        }
+    }
+
+	private final Jenkins jenkins;
+
+	public final OneShotEvent ready = new OneShotEvent();
+
+	private MulticastSocket mcs;
+
+	private boolean shutdown;
+
+	/**
      * @deprecated as of 1.416
      *      Use {@link #UDPBroadcastThread(Jenkins)}
      */
@@ -66,13 +86,13 @@ public class UDPBroadcastThread extends Thread {
         this((Jenkins)jenkins);
     }
 
-    public UDPBroadcastThread(Jenkins jenkins) throws IOException {
-        super("Jenkins UDP "+PORT+" monitoring thread");
+	public UDPBroadcastThread(Jenkins jenkins) throws IOException {
+        super(new StringBuilder().append("Jenkins UDP ").append(PORT).append(" monitoring thread").toString());
         this.jenkins = jenkins;
         mcs = new MulticastSocket(PORT);
     }
 
-    @SuppressFBWarnings("ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD")
+	@SuppressFBWarnings("ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD")
     @Override
     public void run() {
         try {
@@ -96,8 +116,7 @@ public class UDPBroadcastThread extends Thread {
                 tag(rsp,"server-id", jenkins.getLegacyInstanceId());
                 tag(rsp,"slave-port",tal==null?null:tal.getPort());
 
-                for (UDPBroadcastFragment f : UDPBroadcastFragment.all())
-                    f.buildFragment(rsp,sender);
+                UDPBroadcastFragment.all().forEach(f -> f.buildFragment(rsp, sender));
 
                 rsp.append("</hudson>");
 
@@ -114,37 +133,25 @@ public class UDPBroadcastThread extends Thread {
             LOGGER.log(Level.INFO, "Cannot listen to UDP port {0}, skipping: {1}", new Object[] {PORT, e});
             LOGGER.log(Level.FINE, null, e);
         } catch (IOException e) {
-            if (shutdown)   return; // forcibly closed
+            if (shutdown)
+			 {
+				return; // forcibly closed
+			}
             LOGGER.log(Level.WARNING, "UDP handling problem",e);
             udpHandlingProblem = true;
         }
     }
 
-    private void tag(StringBuilder buf, String tag, Object value) {
-        if(value==null) return;
+	private void tag(StringBuilder buf, String tag, Object value) {
+        if(value==null) {
+			return;
+		}
         buf.append('<').append(tag).append('>').append(value).append("</").append(tag).append('>');
     }
 
-    public void shutdown() {
+	public void shutdown() {
         shutdown = true;
         mcs.close();
         interrupt();
-    }
-
-    public static final int PORT = SystemProperties.getInteger("hudson.udp",33848);
-
-    private static final Logger LOGGER = Logger.getLogger(UDPBroadcastThread.class.getName());
-
-    /**
-     * Multicast socket address.
-     */
-    public static InetAddress MULTICAST;
-
-    static {
-        try {
-            MULTICAST = InetAddress.getByAddress(new byte[]{(byte)239, (byte)77, (byte)124, (byte)213});
-        } catch (UnknownHostException e) {
-            throw new Error(e);
-        }
     }
 }

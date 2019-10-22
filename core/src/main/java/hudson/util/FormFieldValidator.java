@@ -127,17 +127,20 @@ public abstract class FormFieldValidator {
      * Runs the validation code.
      */
     public final void process() throws IOException, ServletException {
-        if(permission!=null)
-            try {
-                if(subject==null)
-                    throw new AccessDeniedException("No subject");
+        if(permission!=null) {
+			try {
+                if(subject==null) {
+					throw new AccessDeniedException("No subject");
+				}
                 subject.checkPermission(permission);
             } catch (AccessDeniedException e) {
                 // if the user has hudson-wide admin permission, all checks are allowed
                 // this is to protect Hudson administrator from broken ACL/SecurityRealm implementation/configuration.
-                if(!Jenkins.get().hasPermission(Jenkins.ADMINISTER))
-                    throw e;
+                if(!Jenkins.get().hasPermission(Jenkins.ADMINISTER)) {
+					throw e;
+				}
             }
+		}
 
         check();
     }
@@ -230,9 +233,8 @@ public abstract class FormFieldValidator {
         } else {
             response.setContentType("text/html;charset=UTF-8");
             // 1x16 spacer needed for IE since it doesn't support min-height
-            response.getWriter().print("<div class="+ cssClass +"><img src='"+
-                    request.getContextPath()+ Jenkins.RESOURCE_PATH+"/images/none.gif' height=16 width=1>"+
-                    message+"</div>");
+            response.getWriter().print(new StringBuilder().append("<div class=").append(cssClass).append("><img src='").append(request.getContextPath()).append(Jenkins.RESOURCE_PATH)
+					.append("/images/none.gif' height=16 width=1>").append(message).append("</div>").toString());
         }
     }
 
@@ -243,7 +245,7 @@ public abstract class FormFieldValidator {
      *      Use {@link FormValidation.URLCheck}
      */
     @Deprecated
-    public static abstract class URLCheck extends FormFieldValidator {
+    public abstract static class URLCheck extends FormFieldValidator {
 
         public URLCheck(StaplerRequest request, StaplerResponse response) {
             // can be used to check the existence of any file in file system
@@ -272,9 +274,11 @@ public abstract class FormFieldValidator {
          */
         protected boolean findText(BufferedReader in, String literal) throws IOException {
             String line;
-            while((line=in.readLine())!=null)
-                if(line.contains(literal))
-                    return true;
+            while((line=in.readLine())!=null) {
+				if(line.contains(literal)) {
+					return true;
+				}
+			}
             return false;
         }
 
@@ -287,11 +291,12 @@ public abstract class FormFieldValidator {
          */
         protected void handleIOException(String url, IOException e) throws IOException, ServletException {
             // any invalid URL comes here
-            if(e.getMessage().equals(url))
-                // Sun JRE (and probably others too) often return just the URL in the error.
+            if(e.getMessage().equals(url)) {
+				// Sun JRE (and probably others too) often return just the URL in the error.
                 error("Unable to connect "+url);
-            else
-                error(e.getMessage());
+			} else {
+				error(e.getMessage());
+			}
         }
 
         /**
@@ -300,8 +305,9 @@ public abstract class FormFieldValidator {
         private String getCharset(URLConnection con) {
             for( String t : con.getContentType().split(";") ) {
                 t = t.trim().toLowerCase(Locale.ENGLISH);
-                if(t.startsWith("charset="))
-                    return t.substring(8);
+                if(t.startsWith("charset=")) {
+					return t.substring(8);
+				}
             }
             // couldn't find it. HTML spec says default is US-ASCII,
             // but UTF-8 is a better choice since
@@ -320,14 +326,17 @@ public abstract class FormFieldValidator {
             super(request, response);
         }
 
-        protected void check() throws IOException, ServletException {
+        @Override
+		protected void check() throws IOException, ServletException {
             String value = fixEmpty(request.getParameter("value"));
             if(value==null) {// nothing entered yet
                 ok();
                 return;
             }
 
-            if(!value.endsWith("/")) value+='/';
+            if(!value.endsWith("/")) {
+				value+='/';
+			}
 
             try {
                 URL url = new URL(value);
@@ -335,7 +344,7 @@ public abstract class FormFieldValidator {
                 con.connect();
                 if(con.getResponseCode()!=200
                 || con.getHeaderField("X-Hudson")==null) {
-                    error(value+" is not Hudson ("+con.getResponseMessage()+")");
+                    error(new StringBuilder().append(value).append(" is not Hudson (").append(con.getResponseMessage()).append(")").toString());
                     return;
                 }
 
@@ -366,7 +375,8 @@ public abstract class FormFieldValidator {
             this.errorIfNotExist = errorIfNotExist;
         }
 
-        protected void check() throws IOException, ServletException {
+        @Override
+		protected void check() throws IOException, ServletException {
             String value = fixEmpty(request.getParameter("value"));
             AbstractProject<?,?> p = (AbstractProject<?,?>)subject;
 
@@ -384,8 +394,11 @@ public abstract class FormFieldValidator {
                 }
 
                 String msg = ws.validateAntFileMask(value, FilePath.VALIDATE_ANT_FILE_MASK_BOUND);
-                if(errorIfNotExist)     error(msg);
-                else                    warning(msg);
+                if(errorIfNotExist) {
+					error(msg);
+				} else {
+					warning(msg);
+				}
             } catch (InterruptedException e) {
                 ok(Messages.FormFieldValidator_did_not_manage_to_validate_may_be_too_sl(value));
             }
@@ -435,7 +448,8 @@ public abstract class FormFieldValidator {
             this.expectingFile = expectingFile;
         }
 
-        protected void check() throws IOException, ServletException {
+        @Override
+		protected void check() throws IOException, ServletException {
             String value = fixEmpty(request.getParameter("value"));
             AbstractProject<?,?> p = (AbstractProject<?,?>)subject;
 
@@ -465,20 +479,26 @@ public abstract class FormFieldValidator {
 
                 if(ws.child(value).exists()) {
                     if (expectingFile) {
-                        if(!ws.child(value).isDirectory())
-                            ok();
-                        else
-                            error(value+" is not a file");
+                        if(!ws.child(value).isDirectory()) {
+							ok();
+						} else {
+							error(value+" is not a file");
+						}
                     } else {
-                        if(ws.child(value).isDirectory())
-                            ok();
-                        else
-                            error(value+" is not a directory");
+                        if(ws.child(value).isDirectory()) {
+							ok();
+						} else {
+							error(value+" is not a directory");
+						}
                     }
                 } else {
-                    String msg = "No such "+(expectingFile?"file":"directory")+": " + value;
-                    if(errorIfNotExist)     error(msg);
-                    else                    warning(msg);
+                    String msg = new StringBuilder().append("No such ").append(expectingFile?"file":"directory").append(": ").append(value)
+							.toString();
+                    if(errorIfNotExist) {
+						error(msg);
+					} else {
+						warning(msg);
+					}
                 }
             } catch (InterruptedException e) {
                 ok(); // couldn't check
@@ -515,7 +535,8 @@ public abstract class FormFieldValidator {
             super(request, response, true);
         }
 
-        protected void check() throws IOException, ServletException {
+        @Override
+		protected void check() throws IOException, ServletException {
             String exe = fixEmpty(request.getParameter("value"));
             if(exe==null) {
                 ok(); // nothing entered yet
@@ -576,7 +597,7 @@ public abstract class FormFieldValidator {
                 }
 
                 // didn't find it
-                error("There's no such executable "+exe+" in PATH: "+tokenizedPath);
+                error(new StringBuilder().append("There's no such executable ").append(exe).append(" in PATH: ").append(tokenizedPath).toString());
             }
         }
 
@@ -608,17 +629,17 @@ public abstract class FormFieldValidator {
             this.errorMessage = errorMessage;
         }
 
-        protected void check() throws IOException, ServletException {
+        @Override
+		protected void check() throws IOException, ServletException {
             try {
                 String v = request.getParameter("value");
-                if(!allowWhitespace) {
-                    if(v.indexOf(' ')>=0 || v.indexOf('\n')>=0) {
-                        fail();
-                        return;
-                    }
-                }
+                boolean condition = !allowWhitespace && (v.indexOf(' ')>=0 || v.indexOf('\n')>=0);
+				if(condition) {
+				    fail();
+				    return;
+				}
                 v=v.trim();
-                if(!allowEmpty && v.length()==0) {
+                if(!allowEmpty && v.isEmpty()) {
                     fail();
                     return;
                 }
@@ -648,13 +669,15 @@ public abstract class FormFieldValidator {
             super(null);
         }
 
-        protected void check() throws IOException, ServletException {
+        @Override
+		protected void check() throws IOException, ServletException {
             try {
                 String value = request.getParameter("value");
-                if(Integer.parseInt(value)<0)
-                    error(hudson.model.Messages.Hudson_NotAPositiveNumber());
-                else
-                    ok();
+                if(Integer.parseInt(value)<0) {
+					error(hudson.model.Messages.Hudson_NotAPositiveNumber());
+				} else {
+					ok();
+				}
             } catch (NumberFormatException e) {
                 error(hudson.model.Messages.Hudson_NotANumber());
             }

@@ -43,8 +43,7 @@ public class MissingDependencyException extends IOException {
     private List<Dependency> missingDependencies;
 
     public MissingDependencyException(String pluginShortName, List<Dependency> missingDependencies) {
-        super("One or more dependencies could not be resolved for " + pluginShortName + " : "
-                + Util.join(missingDependencies, ", "));
+        super(new StringBuilder().append("One or more dependencies could not be resolved for ").append(pluginShortName).append(" : ").append(Util.join(missingDependencies, ", ")).toString());
         this.pluginShortName = pluginShortName;
         this.missingDependencies = missingDependencies;
     }

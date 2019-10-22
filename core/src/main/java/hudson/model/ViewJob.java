@@ -51,34 +51,41 @@ public abstract class ViewJob<JobT extends ViewJob<JobT,RunT>, RunT extends Run<
 
     private static final Logger LOGGER = Logger.getLogger(ViewJob.class.getName());
 
+	private static ReloadThread reloadThread;
+
+	// private static final Logger logger = Logger.getLogger(ViewJob.class.getName());
+
     /**
+     * In the very old version of Hudson, an external job submission was just creating files on the file system,
+     * so we needed to periodically reload the jobs from a file system to pick up new records.
+     *
+     * <p>
+     * We then switched to submission via HTTP, so this reloading is no longer necessary, so only do this
+     * when explicitly requested.
+     * 
+     */
+    public static boolean reloadPeriodically = SystemProperties.getBoolean(ViewJob.class.getName()+".reloadPeriodically");
+
+	/**
      * We occasionally update the list of {@link Run}s from a file system.
      * The next scheduled update time.
      */
     private transient long nextUpdate = 0;
 
-    /**
+	/**
      * All {@link Run}s. Copy-on-write semantics.
      */
     protected transient /*almost final*/ RunMap<RunT> runs = new RunMap<>();
 
-    private transient boolean notLoaded = true;
+	private transient boolean notLoaded = true;
 
-    /**
+	/**
      * If the reloading of runs are in progress (in another thread,
      * set to true.)
      */
     private transient volatile boolean reloadingInProgress;
 
-    private static ReloadThread reloadThread;
-
-    static synchronized void interruptReloadThread() {
-        if (reloadThread != null) {
-            reloadThread.interrupt();
-        }
-    }
-
-    /**
+	/**
      * @deprecated as of 1.390
      */
     @Deprecated
@@ -86,62 +93,71 @@ public abstract class ViewJob<JobT extends ViewJob<JobT,RunT>, RunT extends Run<
         super(parent,name);
     }
 
-    protected ViewJob(ItemGroup parent, String name) {
+	protected ViewJob(ItemGroup parent, String name) {
         super(parent,name);
     }
 
-    public boolean isBuildable() {
+	static synchronized void interruptReloadThread() {
+        if (reloadThread != null) {
+            reloadThread.interrupt();
+        }
+    }
+
+	@Override
+	public boolean isBuildable() {
         return false;
     }
 
-    @Override
+	@Override
     public void onLoad(ItemGroup<? extends Item> parent, String name) throws IOException {
         super.onLoad(parent, name);
         notLoaded = true;
     }
 
-    protected SortedMap<Integer,RunT> _getRuns() {
+	@Override
+	protected SortedMap<Integer,RunT> _getRuns() {
         if(notLoaded || runs==null) {
             // if none is loaded yet, do so immediately.
             synchronized(this) {
-                if(runs==null)
-                    runs = new RunMap<>();
+                if(runs==null) {
+					runs = new RunMap<>();
+				}
                 if(notLoaded) {
                     notLoaded = false;
                     _reload();   
                 }
             }
         }
-        if(nextUpdate<System.currentTimeMillis()) {
-            if(!reloadingInProgress) {
-                // schedule a new reloading operation.
-                // we don't want to block the current thread,
-                // so reloading is done asynchronously.
-                reloadingInProgress = true;
-                Set<ViewJob> reloadQueue;
-                synchronized (ViewJob.class) {
-                    if (reloadThread == null) {
-                        reloadThread = new ReloadThread();
-                        reloadThread.start();
-                    }
-                    reloadQueue = reloadThread.reloadQueue;
-                }
-                synchronized(reloadQueue) {
-                    reloadQueue.add(this);
-                    reloadQueue.notify();
-                }
-            }
-        }
+        boolean condition = nextUpdate<System.currentTimeMillis() && !reloadingInProgress;
+		if(condition) {
+		    // schedule a new reloading operation.
+		    // we don't want to block the current thread,
+		    // so reloading is done asynchronously.
+		    reloadingInProgress = true;
+		    Set<ViewJob> reloadQueue;
+		    synchronized (ViewJob.class) {
+		        if (reloadThread == null) {
+		            reloadThread = new ReloadThread();
+		            reloadThread.start();
+		        }
+		        reloadQueue = reloadThread.reloadQueue;
+		    }
+		    synchronized(reloadQueue) {
+		        reloadQueue.add(this);
+		        reloadQueue.notify();
+		    }
+		}
         return runs;
     }
 
-    public void removeRun(RunT run) {
+	@Override
+	public void removeRun(RunT run) {
         if (runs != null && !runs.remove(run)) {
             LOGGER.log(Level.WARNING, "{0} did not contain {1} to begin with", new Object[] {this, run});
         }
     }
 
-    private void _reload() {
+	private void _reload() {
         try {
             reload();
         } finally {
@@ -150,7 +166,7 @@ public abstract class ViewJob<JobT extends ViewJob<JobT,RunT>, RunT extends Run<
         }
     }
 
-    /**
+	/**
      * Reloads the list of {@link Run}s. This operation can take a long time.
      *
      * <p>
@@ -158,13 +174,12 @@ public abstract class ViewJob<JobT extends ViewJob<JobT,RunT>, RunT extends Run<
      */
     protected abstract void reload();
 
-    @Override
+	@Override
     protected void submit( StaplerRequest req, StaplerResponse rsp ) throws IOException, ServletException, FormException {
         super.submit(req,rsp);
         // make sure to reload to reflect this config change.
         nextUpdate = 0;
     }
-
 
     /**
      * Thread that reloads the {@link Run}s.
@@ -187,10 +202,13 @@ public abstract class ViewJob<JobT extends ViewJob<JobT,RunT>, RunT extends Run<
             synchronized(reloadQueue) {
                 // reload operations might eat InterruptException,
                 // so check the status every so often
-                while(reloadQueue.isEmpty() && !terminating())
-                    reloadQueue.wait(TimeUnit.MINUTES.toMillis(1));
+                while(reloadQueue.isEmpty() && !terminating()) {
+					reloadQueue.wait(TimeUnit.MINUTES.toMillis(1));
+				}
                 if(terminating())
-                    throw new InterruptedException();   // terminate now
+				 {
+					throw new InterruptedException();   // terminate now
+				}
                 ViewJob job = reloadQueue.iterator().next();
                 reloadQueue.remove(job);
                 return job;
@@ -216,17 +234,4 @@ public abstract class ViewJob<JobT extends ViewJob<JobT,RunT>, RunT extends Run<
             }
         }
     }
-
-    // private static final Logger logger = Logger.getLogger(ViewJob.class.getName());
-
-    /**
-     * In the very old version of Hudson, an external job submission was just creating files on the file system,
-     * so we needed to periodically reload the jobs from a file system to pick up new records.
-     *
-     * <p>
-     * We then switched to submission via HTTP, so this reloading is no longer necessary, so only do this
-     * when explicitly requested.
-     * 
-     */
-    public static boolean reloadPeriodically = SystemProperties.getBoolean(ViewJob.class.getName()+".reloadPeriodically");
 }

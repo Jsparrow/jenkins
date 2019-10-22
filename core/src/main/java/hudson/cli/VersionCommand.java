@@ -38,7 +38,8 @@ public class VersionCommand extends CLICommand {
         return Messages.VersionCommand_ShortDescription();
     }
 
-    protected int run() {
+    @Override
+	protected int run() {
         // CLICommand.main checks Hudson.READ permission.. no other check needed.
         stdout.println(Jenkins.VERSION);
         return 0;

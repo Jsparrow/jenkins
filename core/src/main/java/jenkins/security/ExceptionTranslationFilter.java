@@ -97,12 +97,14 @@ public class ExceptionTranslationFilter implements Filter, InitializingBean {
 
 	//~ Methods ========================================================================================================
 
+	@Override
 	public void afterPropertiesSet() throws Exception {
 		Assert.notNull(authenticationEntryPoint, "authenticationEntryPoint must be specified");
 		Assert.notNull(portResolver, "portResolver must be specified");
 		Assert.notNull(authenticationTrustResolver, "authenticationTrustResolver must be specified");
 	}
 
+	@Override
 	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException,
             ServletException {
 		if (!(request instanceof HttpServletRequest)) {
@@ -229,9 +231,11 @@ public class ExceptionTranslationFilter implements Filter, InitializingBean {
 		this.portResolver = portResolver;
 	}
 
-    public void init(FilterConfig filterConfig) throws ServletException {
+    @Override
+	public void init(FilterConfig filterConfig) throws ServletException {
     }
 
-    public void destroy() {
+    @Override
+	public void destroy() {
     }
 }

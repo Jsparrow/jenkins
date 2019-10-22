@@ -40,7 +40,8 @@ public class ShutdownLink extends ManagementLink {
         return "system-log-out.png";
     }
 
-    public String getDisplayName() {
+    @Override
+	public String getDisplayName() {
         return Jenkins.get().isQuietingDown() ? Messages.ShutdownLink_DisplayName_cancel() : Messages.ShutdownLink_DisplayName_prepare();
     }
 

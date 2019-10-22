@@ -50,11 +50,7 @@ public final class EnvironmentList extends AbstractList<Environment> {
     }
 
     public <T extends Environment> T get(Class<T> type) {
-        for (Environment e : this) {
-            if (type.isInstance(e))
-                return type.cast(e);
-        }
-        return null;
+        return this.stream().filter(type::isInstance).findFirst().map(type::cast).orElse(null);
     }
 
     @Override

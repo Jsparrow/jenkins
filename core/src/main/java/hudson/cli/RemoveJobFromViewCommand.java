@@ -54,8 +54,9 @@ public class RemoveJobFromViewCommand extends CLICommand {
     protected int run() throws Exception {
         view.checkPermission(View.CONFIGURE);
 
-        if (!(view instanceof DirectlyModifiableView))
-            throw new IllegalStateException("'" + view.getDisplayName() + "' view can not be modified directly");
+        if (!(view instanceof DirectlyModifiableView)) {
+			throw new IllegalStateException(new StringBuilder().append("'").append(view.getDisplayName()).append("' view can not be modified directly").toString());
+		}
 
         for (TopLevelItem job: jobs) {
             ((DirectlyModifiableView) view).remove(job);

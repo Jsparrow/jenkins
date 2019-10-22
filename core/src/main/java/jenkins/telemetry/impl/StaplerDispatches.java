@@ -49,25 +49,27 @@ import java.util.concurrent.ConcurrentSkipListSet;
 @Extension
 @Restricted(NoExternalUse.class)
 public class StaplerDispatches extends Telemetry {
-    @Nonnull
+    private static final Set<String> traces = new ConcurrentSkipListSet<>();
+
+	@Nonnull
     @Override
     public LocalDate getStart() {
         return LocalDate.of(2018, 10, 10);
     }
 
-    @Nonnull
+	@Nonnull
     @Override
     public LocalDate getEnd() {
         return LocalDate.of(2019, 8, 1);
     }
 
-    @Nonnull
+	@Nonnull
     @Override
     public String getDisplayName() {
         return "Stapler request handling";
     }
 
-    @Override
+	@Override
     public JSONObject createContent() {
         if (traces.size() == 0) {
             return null;
@@ -79,26 +81,22 @@ public class StaplerDispatches extends Telemetry {
         return JSONObject.fromObject(info);
     }
 
-    private Object buildDispatches() {
+	private Object buildDispatches() {
         Set<String> currentTraces = new TreeSet<>(traces);
         traces.clear();
         return currentTraces;
     }
 
-    private Object buildComponentInformation() {
+	private Object buildComponentInformation() {
         Map<String, String> components = new TreeMap<>();
         VersionNumber core = Jenkins.getVersion();
         components.put("jenkins-core", core == null ? "" : core.toString());
 
-        for (PluginWrapper plugin : Jenkins.get().pluginManager.getPlugins()) {
-            if (plugin.isActive()) {
-                components.put(plugin.getShortName(), plugin.getVersion());
-            }
-        }
+        Jenkins.get().pluginManager.getPlugins().stream().filter(PluginWrapper::isActive).forEach(plugin -> components.put(plugin.getShortName(), plugin.getVersion()));
         return components;
     }
 
-    @MetaInfServices
+	@MetaInfServices
     public static class StaplerTrace extends EvaluationTrace.ApplicationTracer {
 
         @Override
@@ -110,6 +108,4 @@ public class StaplerDispatches extends Telemetry {
             traces.add(s);
         }
     }
-
-    private static final Set<String> traces = new ConcurrentSkipListSet<>();
 }

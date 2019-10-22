@@ -39,8 +39,9 @@ public abstract class RestartListener implements ExtensionPoint {
      */
     public static boolean isAllReady() throws IOException, InterruptedException {
         for (RestartListener listener : all()) {
-            if (!listener.isReadyToRestart())
-                return false;
+            if (!listener.isReadyToRestart()) {
+				return false;
+			}
         }
         return true;
     }

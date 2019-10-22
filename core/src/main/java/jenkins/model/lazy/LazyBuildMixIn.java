@@ -85,7 +85,7 @@ public abstract class LazyBuildMixIn<JobT extends Job<JobT,RunT> & Queue.Task & 
      * Same as {@link #getRunMap} but suitable for {@link Job#_getRuns}.
      */
     public final RunMap<RunT> _getRuns() {
-        assert builds.baseDirInitialized() : "neither onCreatedFromScratch nor onLoad called on " + asJob() + " yet";
+        assert builds.baseDirInitialized() : new StringBuilder().append("neither onCreatedFromScratch nor onLoad called on ").append(asJob()).append(" yet").toString();
         return builds;
     }
 
@@ -116,7 +116,7 @@ public abstract class LazyBuildMixIn<JobT extends Job<JobT,RunT> & Queue.Task & 
             try {
                 current = parent.getItem(name);
             } catch (RuntimeException x) {
-                LOGGER.log(Level.WARNING, "failed to look up " + name + " in " + parent, x);
+                LOGGER.log(Level.WARNING, new StringBuilder().append("failed to look up ").append(name).append(" in ").append(parent).toString(), x);
                 current = null;
             }
             if (current != null && current.getClass() == asJob().getClass()) {
@@ -125,13 +125,11 @@ public abstract class LazyBuildMixIn<JobT extends Job<JobT,RunT> & Queue.Task & 
         }
         if (currentBuilds != null) {
             // if we are reloading, keep all those that are still building intact
-            for (RunT r : currentBuilds.getLoadedBuilds().values()) {
-                if (r.isBuilding()) {
-                    // Do not use RunMap.put(Run):
-                    _builds.put(r.getNumber(), r);
-                    LOGGER.log(Level.FINE, "keeping reloaded {0}", r);
-                }
-            }
+			currentBuilds.getLoadedBuilds().values().stream().filter(Run::isBuilding).forEach(r -> {
+			    // Do not use RunMap.put(Run):
+			    _builds.put(r.getNumber(), r);
+			    LOGGER.log(Level.FINE, "keeping reloaded {0}", r);
+			});
         }
         this.builds = _builds;
     }
@@ -287,19 +285,7 @@ public abstract class LazyBuildMixIn<JobT extends Job<JobT,RunT> & Queue.Task & 
      * Accompanying helper for the run type.
      * Stateful but should be held in a {@code transient final} field.
      */
-    public static abstract class RunMixIn<JobT extends Job<JobT,RunT> & Queue.Task & LazyBuildMixIn.LazyLoadingJob<JobT,RunT>, RunT extends Run<JobT,RunT> & LazyLoadingRun<JobT,RunT>> {
-
-        /**
-         * Pointers to form bi-directional link between adjacent runs using
-         * {@link LazyBuildMixIn}.
-         *
-         * <p>
-         * Some {@link Run}s do lazy-loading, so we don't use
-         * {@link #previousBuildR} and {@link #nextBuildR}, and instead use these
-         * fields and point to {@link #selfReference} (or {@link #none}) of
-         * adjacent builds.
-         */
-        private volatile BuildReference<RunT> previousBuildR, nextBuildR;
+    public abstract static class RunMixIn<JobT extends Job<JobT,RunT> & Queue.Task & LazyBuildMixIn.LazyLoadingJob<JobT,RunT>, RunT extends Run<JobT,RunT> & LazyLoadingRun<JobT,RunT>> {
 
         /**
          * Used in {@link #previousBuildR} and {@link #nextBuildR} to indicate
@@ -310,18 +296,35 @@ public abstract class LazyBuildMixIn<JobT extends Job<JobT,RunT> & Queue.Task & 
         @SuppressWarnings({"unchecked", "rawtypes"})
         private static final BuildReference NONE = new BuildReference("NONE", null);
 
-        @SuppressWarnings("unchecked")
+		/**
+         * Pointers to form bi-directional link between adjacent runs using
+         * {@link LazyBuildMixIn}.
+         *
+         * <p>
+         * Some {@link Run}s do lazy-loading, so we don't use
+         * {@link #previousBuildR} and {@link #nextBuildR}, and instead use these
+         * fields and point to {@link #selfReference} (or {@link #none}) of
+         * adjacent builds.
+         */
+        private volatile BuildReference<RunT> previousBuildR;
+
+		/**
+		 * Pointers to form bi-directional link between adjacent runs using {@link LazyBuildMixIn} . <p> Some  {@link Run} s do lazy-loading, so we don't use {@link #previousBuildR}  and  {@link #nextBuildR} , and instead use these fields and point to  {@link #selfReference}  (or  {@link #none} ) of adjacent builds.
+		 */
+		private volatile BuildReference<RunT> nextBuildR;
+
+		private BuildReference<RunT> selfReference;
+
+		protected RunMixIn() {}
+
+		@SuppressWarnings("unchecked")
         private BuildReference<RunT> none() {
             return NONE;
         }
 
-        private BuildReference<RunT> selfReference;
+		protected abstract RunT asRun();
 
-        protected RunMixIn() {}
-
-        protected abstract RunT asRun();
-
-        /**
+		/**
          * To implement {@link Run#createReference}.
          */
         public final synchronized BuildReference<RunT> createReference() {
@@ -331,7 +334,7 @@ public abstract class LazyBuildMixIn<JobT extends Job<JobT,RunT> & Queue.Task & 
             return selfReference;
         }
 
-        /**
+		/**
          * To implement {@link Run#dropLinks}.
          */
         public final void dropLinks() {
@@ -352,7 +355,7 @@ public abstract class LazyBuildMixIn<JobT extends Job<JobT,RunT> & Queue.Task & 
             createReference().clear();
         }
 
-        /**
+		/**
          * To implement {@link Run#getPreviousBuild}.
          */
         public final RunT getPreviousBuild() {
@@ -390,7 +393,7 @@ public abstract class LazyBuildMixIn<JobT extends Job<JobT,RunT> & Queue.Task & 
             }
         }
 
-        /**
+		/**
          * To implement {@link Run#getNextBuild}.
          */
         public final RunT getNextBuild() {
@@ -429,10 +432,11 @@ public abstract class LazyBuildMixIn<JobT extends Job<JobT,RunT> & Queue.Task & 
     @Restricted(DoNotUse.class)
     @Extension public static final class ItemListenerImpl extends ItemListener {
         @Override public void onLocationChanged(Item item, String oldFullName, String newFullName) {
-            if (item instanceof LazyLoadingJob) {
-                RunMap<?> builds = ((LazyLoadingJob) item).getLazyBuildMixIn().builds;
-                builds.updateBaseDir(((Job) item).getBuildDir());
-            }
+            if (!(item instanceof LazyLoadingJob)) {
+				return;
+			}
+			RunMap<?> builds = ((LazyLoadingJob) item).getLazyBuildMixIn().builds;
+			builds.updateBaseDir(((Job) item).getBuildDir());
         }
     }
 

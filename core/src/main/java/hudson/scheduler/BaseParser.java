@@ -40,40 +40,51 @@ abstract class BaseParser extends LLkParser {
     // lower/upper bounds of fields (inclusive)
     static final int[] LOWER_BOUNDS = new int[] {0,0,1,1,0};
     static final int[] UPPER_BOUNDS = new int[] {59,23,31,12,7};
-
-    /**
+	/**
+     * This property hashes tokens in the cron tab tokens like @daily so that they spread evenly.
+     */
+    public static boolean HASH_TOKENS = !"false".equals(SystemProperties.getString(BaseParser.class.getName()+".hash"));
+	/**
+     * Constant that indicates no step value.
+     */
+    public static final int NO_STEP = 1;
+	/**
      * Used to pick a value from within the range
      */
     protected Hash hash = Hash.zero();
-    
-    protected BaseParser(int i) {
+
+	protected BaseParser(int i) {
         super(i);
     }
 
-    protected BaseParser(ParserSharedInputState parserSharedInputState, int i) {
+	protected BaseParser(ParserSharedInputState parserSharedInputState, int i) {
         super(parserSharedInputState, i);
     }
 
-    protected BaseParser(TokenBuffer tokenBuffer, int i) {
+	protected BaseParser(TokenBuffer tokenBuffer, int i) {
         super(tokenBuffer, i);
     }
 
-    protected BaseParser(TokenStream tokenStream, int i) {
+	protected BaseParser(TokenStream tokenStream, int i) {
         super(tokenStream, i);
     }
 
-    public void setHash(Hash hash) {
-        if (hash==null)     hash = Hash.zero();
+	public void setHash(Hash hash) {
+        if (hash==null) {
+			hash = Hash.zero();
+		}
         this.hash = hash;
     }
 
-    protected long doRange(int start, int end, int step, int field) throws ANTLRException {
+	protected long doRange(int start, int end, int step, int field) throws ANTLRException {
         rangeCheck(start, field);
         rangeCheck(end, field);
-        if (step <= 0)
-            error(Messages.BaseParser_MustBePositive(step));
-        if (start>end)
-            error(Messages.BaseParser_StartEndReversed(end,start));
+        if (step <= 0) {
+			error(Messages.BaseParser_MustBePositive(step));
+		}
+        if (start>end) {
+			error(Messages.BaseParser_StartEndReversed(end,start));
+		}
 
         long bits = 0;
         for (int i = start; i <= end; i += step) {
@@ -82,11 +93,11 @@ abstract class BaseParser extends LLkParser {
         return bits;
     }
 
-    protected long doRange( int step, int field ) throws ANTLRException {
+	protected long doRange( int step, int field ) throws ANTLRException {
         return doRange( LOWER_BOUNDS[field], UPPER_BOUNDS[field], step, field );
     }
 
-    /**
+	/**
      * Uses {@link Hash} to choose a random (but stable) value from within this field.
      *
      * @param step
@@ -95,12 +106,18 @@ abstract class BaseParser extends LLkParser {
      */
     protected long doHash(int step, int field) throws ANTLRException {
         int u = UPPER_BOUNDS[field];
-        if (field==2) u = 28;   // day of month can vary depending on month, so to make life simpler, just use [1,28] that's always safe
-        if (field==4) u = 6;   // Both 0 and 7 of day of week are Sunday. For better distribution, limit upper bound to 6
+        if (field==2)
+		 {
+			u = 28;   // day of month can vary depending on month, so to make life simpler, just use [1,28] that's always safe
+		}
+        if (field==4)
+		 {
+			u = 6;   // Both 0 and 7 of day of week are Sunday. For better distribution, limit upper bound to 6
+		}
         return doHash(LOWER_BOUNDS[field], u, step, field);
     }
 
-    protected long doHash(int s, int e, int step, int field) throws ANTLRException {
+	protected long doHash(int s, int e, int step, int field) throws ANTLRException {
         rangeCheck(s, field);
         rangeCheck(e, field);
         if (step > e - s + 1) {
@@ -122,14 +139,14 @@ abstract class BaseParser extends LLkParser {
             return 1L << (s+hash.next(e+1-s));
         }
     }
-    
-    protected void rangeCheck(int value, int field) throws ANTLRException {
+
+	protected void rangeCheck(int value, int field) throws ANTLRException {
         if( value<LOWER_BOUNDS[field] || UPPER_BOUNDS[field]<value ) {
             error(Messages.BaseParser_OutOfRange(value,LOWER_BOUNDS[field],UPPER_BOUNDS[field]));
         }
     }
 
-    private void error(String msg) throws TokenStreamException, SemanticException {
+	private void error(String msg) throws TokenStreamException, SemanticException {
         Token token = LT(0);
         throw new SemanticException(
             msg,
@@ -138,18 +155,8 @@ abstract class BaseParser extends LLkParser {
             token.getColumn()
         );
     }
-    
-    protected Hash getHashForTokens() {
+
+	protected Hash getHashForTokens() {
         return HASH_TOKENS ? hash : Hash.zero();
     }
-
-    /**
-     * This property hashes tokens in the cron tab tokens like @daily so that they spread evenly.
-     */
-    public static boolean HASH_TOKENS = !"false".equals(SystemProperties.getString(BaseParser.class.getName()+".hash"));
-
-    /**
-     * Constant that indicates no step value.
-     */
-    public static final int NO_STEP = 1;
 }

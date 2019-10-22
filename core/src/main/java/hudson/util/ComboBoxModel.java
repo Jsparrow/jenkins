@@ -58,7 +58,8 @@ public class ComboBoxModel extends ArrayList<String> implements HttpResponse {
         this(asList(values));
     }
 
-    public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object node) throws IOException, ServletException {
+    @Override
+	public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object node) throws IOException, ServletException {
         rsp.setContentType(Flavor.JSON.contentType);
         PrintWriter w = rsp.getWriter();
         JSONArray.fromObject(this).write(w);

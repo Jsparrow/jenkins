@@ -56,8 +56,9 @@ public final class BuildAuthorizationToken {
     public static BuildAuthorizationToken create(StaplerRequest req) {
         if (req.getParameter("pseudoRemoteTrigger") != null) {
             String token = Util.fixEmpty(req.getParameter("authToken"));
-            if(token!=null)
-                return new BuildAuthorizationToken(token);
+            if(token!=null) {
+				return new BuildAuthorizationToken(token);
+			}
         }
         
         return null;
@@ -69,20 +70,24 @@ public final class BuildAuthorizationToken {
 
     public static void checkPermission(Job<?,?> project, BuildAuthorizationToken token, StaplerRequest req, StaplerResponse rsp) throws IOException {
         if (!Jenkins.get().isUseSecurity())
-            return;    // everyone is authorized
+		 {
+			return;    // everyone is authorized
+		}
 
         if(token!=null && token.token != null) {
             //check the provided token
             String providedToken = req.getParameter("token");
-            if (providedToken != null && providedToken.equals(token.token))
-                return;
-            if (providedToken != null)
-                throw new AccessDeniedException(Messages.BuildAuthorizationToken_InvalidTokenProvided());
+            if (providedToken != null && providedToken.equals(token.token)) {
+				return;
+			}
+            if (providedToken != null) {
+				throw new AccessDeniedException(Messages.BuildAuthorizationToken_InvalidTokenProvided());
+			}
         }
 
         project.checkPermission(Item.BUILD);
 
-        if (req.getMethod().equals("POST")) {
+        if ("POST".equals(req.getMethod())) {
             return;
         }
 
@@ -100,11 +105,13 @@ public final class BuildAuthorizationToken {
     }
 
     public static final class ConverterImpl extends AbstractSingleValueConverter {
-        public boolean canConvert(Class type) {
+        @Override
+		public boolean canConvert(Class type) {
             return type== BuildAuthorizationToken.class;
         }
 
-        public Object fromString(String str) {
+        @Override
+		public Object fromString(String str) {
             return new BuildAuthorizationToken(str);
         }
 

@@ -51,8 +51,9 @@ public class HeadBufferingStream extends FilterInputStream {
     @Override
     public int read() throws IOException {
         int i = in.read();
-        if(i>=0 && space()>0)
-            side.write(i);
+        if(i>=0 && space()>0) {
+			side.write(i);
+		}
         return i;
     }
 
@@ -61,8 +62,9 @@ public class HeadBufferingStream extends FilterInputStream {
         int r = in.read(b, off, len);
         if(r>0) {
             int sp = space();
-            if(sp>0)
-                side.write(b,off,Math.min(r, sp));
+            if(sp>0) {
+				side.write(b,off,Math.min(r, sp));
+			}
         }
         return r;
     }
@@ -80,8 +82,9 @@ public class HeadBufferingStream extends FilterInputStream {
     public void fillSide() throws IOException {
         byte[] buf = new byte[space()];
         while(space()>0) {
-            if(read(buf)<0)
-                return;
+            if(read(buf)<0) {
+				return;
+			}
         }
     }
 

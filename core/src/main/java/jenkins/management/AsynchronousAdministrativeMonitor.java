@@ -31,19 +31,20 @@ import javax.annotation.Nonnull;
  * @author Kohsuke Kawaguchi
  */
 public abstract class AsynchronousAdministrativeMonitor extends AdministrativeMonitor {
-    /**
+    private static final Logger LOGGER = Logger.getLogger(AsynchronousAdministrativeMonitor.class.getName());
+	/**
      * Set to non-null once the background activity starts running.
      */
     private volatile FixThread fixThread;
 
-    /**
+	/**
      * Is there an active execution process going on?
      */
     public boolean isFixingActive() {
         return fixThread !=null && fixThread.isAlive();
     }
 
-    /**
+	/**
      * Used to URL-bind {@link AnnotatedLargeText}.
      */
     public AnnotatedLargeText getLogText() {
@@ -52,7 +53,7 @@ public abstract class AsynchronousAdministrativeMonitor extends AdministrativeMo
                 !isFixingActive(), this);
     }
 
-    /**
+	/**
      * Rewrite log file.
      */
     protected File getLogFile() {
@@ -61,13 +62,14 @@ public abstract class AsynchronousAdministrativeMonitor extends AdministrativeMo
         return new File(base,"log");
     }
 
-    protected File getBaseDir() {
+	protected File getBaseDir() {
         return new File(Jenkins.get().getRootDir(),getClass().getName());
     }
 
-    public abstract String getDisplayName();
+	@Override
+	public abstract String getDisplayName();
 
-    /**
+	/**
      * Starts the background fixing activity.
      *
      * @param forceRestart
@@ -85,12 +87,12 @@ public abstract class AsynchronousAdministrativeMonitor extends AdministrativeMo
         return fixThread;
     }
 
-    /**
+	/**
      * Run on a separate thread in the background to fix up stuff.
      */
     protected abstract void fix(TaskListener listener) throws Exception;
 
-    protected class FixThread extends Thread {
+	protected class FixThread extends Thread {
         FixThread() {
             super(getDisplayName());
         }
@@ -131,6 +133,4 @@ public abstract class AsynchronousAdministrativeMonitor extends AdministrativeMo
             }
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(AsynchronousAdministrativeMonitor.class.getName());
 }

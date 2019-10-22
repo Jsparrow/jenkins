@@ -46,10 +46,11 @@ public class FormApply {
      */
     public static HttpResponseException success(final String destination) {
         return new HttpResponseException() {
-            public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object node) throws IOException, ServletException {
+            @Override
+			public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object node) throws IOException, ServletException {
                 if (isApply(req)) {
                     // if the submission is via 'apply', show a response in the notification bar
-                    applyResponse("notificationBar.show('"+Messages.HttpResponses_Saved()+"',notificationBar.OK)")
+                    applyResponse(new StringBuilder().append("notificationBar.show('").append(Messages.HttpResponses_Saved()).append("',notificationBar.OK)").toString())
                             .generateResponse(req,rsp,node);
                 } else {
                     rsp.sendRedirect(destination);
@@ -73,15 +74,11 @@ public class FormApply {
      */
     public static HttpResponseException applyResponse(final String script) {
         return new HttpResponseException() {
-            public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object node) throws IOException, ServletException {
+            @Override
+			public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object node) throws IOException, ServletException {
                 rsp.setContentType("text/html;charset=UTF-8");
-                rsp.getWriter().println("<html><body><script>" +
-                        "window.applyCompletionHandler = function (w) {" +
-                        "  with(w) {" +
-                        script +
-                        "  }" +
-                        "};" +
-                        "</script></body></html>");
+                rsp.getWriter().println(new StringBuilder().append("<html><body><script>").append("window.applyCompletionHandler = function (w) {").append("  with(w) {").append(script).append("  }").append("};").append("</script></body></html>")
+						.toString());
             }
         };
     }

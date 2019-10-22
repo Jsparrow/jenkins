@@ -252,12 +252,12 @@ public class HealthReport implements Serializable, Comparable<HealthReport> {
      */
     public String getIconUrl(String size) {
         if (iconUrl == null) {
-            return Jenkins.RESOURCE_PATH + "/images/" + size + "/" + HEALTH_UNKNOWN_IMG;
+            return new StringBuilder().append(Jenkins.RESOURCE_PATH).append("/images/").append(size).append("/").append(HEALTH_UNKNOWN_IMG).toString();
         }
         if (iconUrl.startsWith("/")) {
-            return iconUrl.replace("/32x32/", "/" + size + "/");
+            return iconUrl.replace("/32x32/", new StringBuilder().append("/").append(size).append("/").toString());
         }
-        return Jenkins.RESOURCE_PATH + "/images/" + size + "/" + iconUrl;
+        return new StringBuilder().append(Jenkins.RESOURCE_PATH).append("/images/").append(size).append("/").append(iconUrl).toString();
     }
 
     /**
@@ -336,10 +336,18 @@ public class HealthReport implements Serializable, Comparable<HealthReport> {
      * Utility method to find the report with the lowest health.
      */
     public static HealthReport min(HealthReport a, HealthReport b) {
-        if (a == null && b == null) return null;
-        if (a == null) return b;
-        if (b == null) return a;
-        if (a.compareTo(b) <= 0) return a;
+        if (a == null && b == null) {
+			return null;
+		}
+        if (a == null) {
+			return b;
+		}
+        if (b == null) {
+			return a;
+		}
+        if (a.compareTo(b) <= 0) {
+			return a;
+		}
         return b;
     }
 
@@ -347,10 +355,18 @@ public class HealthReport implements Serializable, Comparable<HealthReport> {
      * Utility method to find the report with the highest health.
      */
     public static HealthReport max(HealthReport a, HealthReport b) {
-        if (a == null && b == null) return null;
-        if (a == null) return b;
-        if (b == null) return a;
-        if (a.compareTo(b) >= 0) return a;
+        if (a == null && b == null) {
+			return null;
+		}
+        if (a == null) {
+			return b;
+		}
+        if (b == null) {
+			return a;
+		}
+        if (a.compareTo(b) >= 0) {
+			return a;
+		}
         return b;
     }
 

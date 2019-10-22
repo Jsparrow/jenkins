@@ -59,27 +59,26 @@ typedef struct _SHELLEXECUTEINFO {
  */
 @SuppressFBWarnings(value = "UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD", justification = "JNA Data Structure")
 public class SHELLEXECUTEINFO extends Structure {
-    public int cbSize = size();
-    public int fMask;
-    public Pointer hwnd;
-    public String lpVerb;
-    public String lpFile;
-    public String lpParameters;
-    public String lpDirectory;
-    public int nShow = 1;
-    public Pointer hInstApp;
-    public Pointer lpIDList;
-    public String lpClass;
-    public Pointer hkeyClass;
-    public int dwHotKey;
-    public DUMMYUNIONNAME_union DUMMYUNIONNAME;
-    public Pointer hProcess;
-
     public static final int SEE_MASK_NOCLOSEPROCESS = 0x40;
-    public static final int SW_HIDE = 0;
-    public static final int SW_SHOW = 0;
+	public static final int SW_HIDE = 0;
+	public static final int SW_SHOW = 0;
+	public int cbSize = size();
+	public int fMask;
+	public Pointer hwnd;
+	public String lpVerb;
+	public String lpFile;
+	public String lpParameters;
+	public String lpDirectory;
+	public int nShow = 1;
+	public Pointer hInstApp;
+	public Pointer lpIDList;
+	public String lpClass;
+	public Pointer hkeyClass;
+	public int dwHotKey;
+	public DUMMYUNIONNAME_union DUMMYUNIONNAME;
+	public Pointer hProcess;
 
-    @Override
+	@Override
     protected List getFieldOrder() {
         return Arrays.asList("cbSize", "fMask", "hwnd", "lpVerb",
                 "lpFile", "lpParameters", "lpDirectory", "nShow", "hInstApp",
@@ -87,17 +86,15 @@ public class SHELLEXECUTEINFO extends Structure {
                 "hProcess");
     }
 
-    @SuppressFBWarnings(value = "UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD", justification = "JNA Data Structure")
+	@SuppressFBWarnings(value = "UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD", justification = "JNA Data Structure")
     public static class DUMMYUNIONNAME_union extends Union {
         public Pointer hIcon;
         public Pointer hMonitor;
 
         public DUMMYUNIONNAME_union() {
-            super();
         }
 
         public DUMMYUNIONNAME_union(Pointer hIcon_or_hMonitor) {
-            super();
             this.hMonitor = this.hIcon = hIcon_or_hMonitor;
             setType(Pointer.class);
         }

@@ -72,65 +72,73 @@ public class ArtifactArchiver extends Recorder implements SimpleBuildStep {
 
     private static final Logger LOG = Logger.getLogger(ArtifactArchiver.class.getName());
 
-    /**
+	/**
+     * @deprecated as of 1.286
+     *      Some plugin depends on this, so this field is left here and points to the last created instance.
+     *      Use {@link jenkins.model.Jenkins#getDescriptorByType(Class)} instead.
+     */
+    @Deprecated
+    public static volatile DescriptorImpl DESCRIPTOR;
+
+	/**
      * Comma- or space-separated list of patterns of files/directories to be archived.
      */
     private String artifacts;
 
-    /**
+	/**
      * Possibly null 'excludes' pattern as in Ant.
      */
     private String excludes;
 
-    @Deprecated
+	@Deprecated
     private Boolean latestOnly;
 
-    /**
+	/**
      * Fail (or not) the build if archiving returns nothing.
      */
     @Nonnull
     private Boolean allowEmptyArchive;
 
-    /**
+	/**
      * Archive only if build is successful, skip archiving on failed builds.
      */
     private boolean onlyIfSuccessful;
 
-    private boolean fingerprint;
+	private boolean fingerprint;
 
-    /**
+	/**
      * Default ant exclusion
      */
     @Nonnull
     private Boolean defaultExcludes = true;
-    
-    /**
+
+	/**
      * Indicate whether include and exclude patterns should be considered as case sensitive
      */
     @Nonnull
     private Boolean caseSensitive = true;
 
-    @DataBoundConstructor public ArtifactArchiver(String artifacts) {
+	@DataBoundConstructor public ArtifactArchiver(String artifacts) {
         this.artifacts = artifacts.trim();
         allowEmptyArchive = false;
     }
 
-    @Deprecated
+	@Deprecated
     public ArtifactArchiver(String artifacts, String excludes, boolean latestOnly) {
         this(artifacts, excludes, latestOnly, false, false);
     }
 
-    @Deprecated
+	@Deprecated
     public ArtifactArchiver(String artifacts, String excludes, boolean latestOnly, boolean allowEmptyArchive) {
         this(artifacts, excludes, latestOnly, allowEmptyArchive, false);
     }
 
-    @Deprecated
+	@Deprecated
     public ArtifactArchiver(String artifacts, String excludes, boolean latestOnly, boolean allowEmptyArchive, boolean onlyIfSuccessful) {
         this(artifacts, excludes , latestOnly , allowEmptyArchive, onlyIfSuccessful , true);
     }
 
-    @Deprecated
+	@Deprecated
     public ArtifactArchiver(String artifacts, String excludes, boolean latestOnly, boolean allowEmptyArchive, boolean onlyIfSuccessful, Boolean defaultExcludes) {
         this(artifacts);
         setExcludes(excludes);
@@ -140,7 +148,7 @@ public class ArtifactArchiver extends Recorder implements SimpleBuildStep {
         setDefaultExcludes(defaultExcludes);
     }
 
-    // Backwards compatibility for older builds
+	// Backwards compatibility for older builds
     @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE",
             justification = "Null checks in readResolve are valid since we deserialize and upgrade objects")
     protected Object readResolve() {
@@ -156,67 +164,67 @@ public class ArtifactArchiver extends Recorder implements SimpleBuildStep {
         return this;
     }
 
-    public String getArtifacts() {
+	public String getArtifacts() {
         return artifacts;
     }
 
-    public @CheckForNull String getExcludes() {
+	public @CheckForNull String getExcludes() {
         return excludes;
     }
 
-    @DataBoundSetter public final void setExcludes(@CheckForNull String excludes) {
+	@DataBoundSetter public final void setExcludes(@CheckForNull String excludes) {
         this.excludes = Util.fixEmptyAndTrim(excludes);
     }
 
-    @Deprecated
+	@Deprecated
     public boolean isLatestOnly() {
         return latestOnly != null ? latestOnly : false;
     }
 
-    public boolean isOnlyIfSuccessful() {
+	public boolean isOnlyIfSuccessful() {
         return onlyIfSuccessful;
     }
 
-    @DataBoundSetter public final void setOnlyIfSuccessful(boolean onlyIfSuccessful) {
+	@DataBoundSetter public final void setOnlyIfSuccessful(boolean onlyIfSuccessful) {
         this.onlyIfSuccessful = onlyIfSuccessful;
     }
 
-    public boolean isFingerprint() {
+	public boolean isFingerprint() {
         return fingerprint;
     }
 
-    /** Whether to fingerprint the artifacts after we archive them. */
+	/** Whether to fingerprint the artifacts after we archive them. */
     @DataBoundSetter public void setFingerprint(boolean fingerprint) {
         this.fingerprint = fingerprint;
     }
 
-    public boolean getAllowEmptyArchive() {
+	public boolean getAllowEmptyArchive() {
         return allowEmptyArchive;
     }
 
-    @DataBoundSetter public final void setAllowEmptyArchive(boolean allowEmptyArchive) {
+	@DataBoundSetter public final void setAllowEmptyArchive(boolean allowEmptyArchive) {
         this.allowEmptyArchive = allowEmptyArchive;
     }
 
-    public boolean isDefaultExcludes() {
+	public boolean isDefaultExcludes() {
         return defaultExcludes;
     }
 
-    @DataBoundSetter public final void setDefaultExcludes(boolean defaultExcludes) {
+	@DataBoundSetter public final void setDefaultExcludes(boolean defaultExcludes) {
         this.defaultExcludes = defaultExcludes;
     }
-    
-    public boolean isCaseSensitive() {
+
+	public boolean isCaseSensitive() {
         return caseSensitive;
     }
 
-    @DataBoundSetter public final void setCaseSensitive(boolean caseSensitive) {
+	@DataBoundSetter public final void setCaseSensitive(boolean caseSensitive) {
         this.caseSensitive = caseSensitive;
     }
 
-    @Override
+	@Override
     public void perform(Run<?,?> build, FilePath ws, Launcher launcher, TaskListener listener) throws IOException, InterruptedException {
-        if(artifacts.length()==0) {
+        if(artifacts.isEmpty()) {
             throw new AbortException(Messages.ArtifactArchiver_NoIncludes());
         }
 
@@ -270,9 +278,15 @@ public class ArtifactArchiver extends Recorder implements SimpleBuildStep {
         }
     }
 
+	@Override
+	public BuildStepMonitor getRequiredMonitorService() {
+        return BuildStepMonitor.NONE;
+    }
+
     private static final class ListFiles extends MasterToSlaveFileCallable<Map<String,String>> {
         private static final long serialVersionUID = 1;
-        private final String includes, excludes;
+        private final String includes;
+		private final String excludes;
         private final boolean defaultExcludes;
         private final boolean caseSensitive;
 
@@ -298,25 +312,14 @@ public class ArtifactArchiver extends Recorder implements SimpleBuildStep {
         }
     }
 
-    public BuildStepMonitor getRequiredMonitorService() {
-        return BuildStepMonitor.NONE;
-    }
-    
-    /**
-     * @deprecated as of 1.286
-     *      Some plugin depends on this, so this field is left here and points to the last created instance.
-     *      Use {@link jenkins.model.Jenkins#getDescriptorByType(Class)} instead.
-     */
-    @Deprecated
-    public static volatile DescriptorImpl DESCRIPTOR;
-
     @Extension @Symbol("archiveArtifacts")
     public static class DescriptorImpl extends BuildStepDescriptor<Publisher> {
         public DescriptorImpl() {
             DESCRIPTOR = this; // backward compatibility
         }
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.ArtifactArchiver_DisplayName();
         }
 
@@ -341,7 +344,8 @@ public class ArtifactArchiver extends Recorder implements SimpleBuildStep {
             return req.bindJSON(ArtifactArchiver.class,formData);
         }
 
-        public boolean isApplicable(Class<? extends AbstractProject> jobType) {
+        @Override
+		public boolean isApplicable(Class<? extends AbstractProject> jobType) {
             return true;
         }
     }

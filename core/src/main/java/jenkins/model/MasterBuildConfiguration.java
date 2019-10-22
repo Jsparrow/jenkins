@@ -57,10 +57,11 @@ public class MasterBuildConfiguration extends GlobalConfiguration {
             }
             
             j.setNumExecutors(json.getInt("numExecutors"));
-            if (req.hasParameter("master.mode"))
-                j.setMode(Mode.valueOf(req.getParameter("master.mode")));
-            else
-                j.setMode(Mode.NORMAL);
+            if (req.hasParameter("master.mode")) {
+				j.setMode(Mode.valueOf(req.getParameter("master.mode")));
+			} else {
+				j.setMode(Mode.NORMAL);
+			}
 
             j.setLabelString(json.optString("labelString", ""));
 

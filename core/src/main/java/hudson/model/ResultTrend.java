@@ -151,7 +151,7 @@ public enum ResultTrend {
             }
         }
         
-        throw new IllegalArgumentException("Unknown result: '" + result + "' for build: " + run);
+        throw new IllegalArgumentException(new StringBuilder().append("Unknown result: '").append(result).append("' for build: ").append(run).toString());
     }
     
     /**

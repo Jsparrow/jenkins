@@ -80,11 +80,15 @@ public class ConsistentHashTest {
         hash.add("odd",100);
 
         Random r = new Random(0);
-        int even=0,odd=0;
+        int even=0;
+		int odd=0;
         for(int i=0; i<1000; i++) {
             String v = hash.lookup(r.nextInt());
-            if(v.equals("even"))    even++;
-            else                    odd++;
+            if("even".equals(v)) {
+				even++;
+			} else {
+				odd++;
+			}
         }
 
         // again, there's a small chance tha this test fails.
@@ -98,8 +102,9 @@ public class ConsistentHashTest {
     @Test
     public void removal() {
         ConsistentHash<Integer> hash = new ConsistentHash<>();
-        for( int i=0; i<10; i++ )
-            hash.add(i);
+        for( int i=0; i<10; i++ ) {
+			hash.add(i);
+		}
 
         // what was the mapping before the mutation?
         Map<Integer,Integer> before = new HashMap<>();
@@ -113,10 +118,10 @@ public class ConsistentHashTest {
         hash.remove(0);
 
         // verify that the mapping remains consistent
-        for (Entry<Integer,Integer> e : before.entrySet()) {
+		before.entrySet().forEach(e -> {
             int m = hash.lookup(e.getKey());
             assertTrue(e.getValue()==0 || e.getValue()==m);
-        }
+        });
     }
 
     @Test
@@ -159,11 +164,9 @@ public class ConsistentHashTest {
     @Test
     public void usesCustomHash() {
         final RuntimeException exception = new RuntimeException();
-        ConsistentHash.Hash<String> hashFunction = new ConsistentHash.Hash<String>() {
-            public String hash(String str) {
-                throw exception;
-            }
-        };
+        ConsistentHash.Hash<String> hashFunction = (String str) -> {
+		    throw exception;
+		};
 
         try {
             ConsistentHash<String> hash = new ConsistentHash<>(hashFunction);
@@ -180,8 +183,9 @@ public class ConsistentHashTest {
     @Test
     public void speed() {
         Map<String,Integer> data = new Hash<>();
-        for (int i = 0; i < 1000; i++)
-            data.put("node" + i,100);
+        for (int i = 0; i < 1000; i++) {
+			data.put("node" + i,100);
+		}
         data.put("tail",100);
 
         long start = System.currentTimeMillis();

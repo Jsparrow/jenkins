@@ -27,7 +27,13 @@ public class TypedFilter implements FieldRef.Filter, FunctionList.Filter {
 
     private static final Map<Class<?>, Boolean> staplerCache = new HashMap<>();
 
-    private boolean isClassAcceptable(Class<?> clazz) {
+	@Restricted(NoExternalUse.class)
+    public static boolean SKIP_TYPE_CHECK = SystemProperties.getBoolean(TypedFilter.class.getName() + ".skipTypeCheck");
+
+	@Restricted(NoExternalUse.class)
+    public static boolean PROHIBIT_STATIC_ACCESS = SystemProperties.getBoolean(TypedFilter.class.getName() + ".prohibitStaticAccess", true);
+
+	private boolean isClassAcceptable(Class<?> clazz) {
         if (clazz.isArray()) {
             // special case to allow klass.isArray() dispatcher
             Class<?> elementClazz = clazz.getComponentType();
@@ -49,7 +55,7 @@ public class TypedFilter implements FieldRef.Filter, FunctionList.Filter {
         return SKIP_TYPE_CHECK || isStaplerRelevantCached(clazz);
     }
 
-    private static boolean isStaplerRelevantCached(@Nonnull Class<?> clazz) {
+	private static boolean isStaplerRelevantCached(@Nonnull Class<?> clazz) {
         if (staplerCache.containsKey(clazz)) {
             return staplerCache.get(clazz);
         }
@@ -59,12 +65,12 @@ public class TypedFilter implements FieldRef.Filter, FunctionList.Filter {
         return ret;
     }
 
-    @Restricted(NoExternalUse.class)
+	@Restricted(NoExternalUse.class)
     public static boolean isStaplerRelevant(@Nonnull Class<?> clazz) {
         return isSpecificClassStaplerRelevant(clazz) || isSuperTypesStaplerRelevant(clazz);
     }
 
-    private static boolean isSuperTypesStaplerRelevant(@Nonnull Class<?> clazz) {
+	private static boolean isSuperTypesStaplerRelevant(@Nonnull Class<?> clazz) {
         Class<?> superclass = clazz.getSuperclass();
         if (superclass != null && isStaplerRelevantCached(superclass)) {
             return true;
@@ -77,7 +83,7 @@ public class TypedFilter implements FieldRef.Filter, FunctionList.Filter {
         return false;
     }
 
-    private static boolean isSpecificClassStaplerRelevant(@Nonnull Class<?> clazz) {
+	private static boolean isSpecificClassStaplerRelevant(@Nonnull Class<?> clazz) {
         if (clazz.isAnnotationPresent(StaplerAccessibleType.class)) {
             return true;
         }
@@ -102,7 +108,7 @@ public class TypedFilter implements FieldRef.Filter, FunctionList.Filter {
         return false;
     }
 
-    private static boolean isRoutableMethod(@Nonnull Method m) {
+	private static boolean isRoutableMethod(@Nonnull Method m) {
         for (Annotation a : m.getDeclaredAnnotations()) {
             if (WebMethodConstants.WEB_METHOD_ANNOTATION_NAMES.contains(a.annotationType().getName())) {
                 return true;
@@ -130,7 +136,7 @@ public class TypedFilter implements FieldRef.Filter, FunctionList.Filter {
         return WebApp.getCurrent().getFilterForDoActions().keep(new Function.InstanceFunction(m));
     }
 
-    @Override
+	@Override
     public boolean keep(@Nonnull FieldRef fieldRef) {
 
         if (fieldRef.getAnnotation(StaplerNotDispatchable.class) != null) {
@@ -187,7 +193,7 @@ public class TypedFilter implements FieldRef.Filter, FunctionList.Filter {
         return isOk;
     }
 
-    @Override
+	@Override
     public boolean keep(@Nonnull Function function) {
 
         if (function.getAnnotation(StaplerNotDispatchable.class) != null) {
@@ -237,7 +243,7 @@ public class TypedFilter implements FieldRef.Filter, FunctionList.Filter {
             return false;
         }
 
-        if (function.getName().equals("getDynamic")) {
+        if ("getDynamic".equals(function.getName())) {
             Class[] parameterTypes = function.getParameterTypes();
             if (parameterTypes.length > 0 && parameterTypes[0] == String.class) {
                 // While this is more general than what Stapler can invoke on these types,
@@ -247,14 +253,14 @@ public class TypedFilter implements FieldRef.Filter, FunctionList.Filter {
             }
         }
 
-        if (function.getName().equals("getStaplerFallback") && function.getParameterTypes().length == 0) {
+        if ("getStaplerFallback".equals(function.getName()) && function.getParameterTypes().length == 0) {
             // A parameter-less #getStaplerFallback() implements special fallback behavior for the
             // StaplerFallback interface. We do not check for the presence of the interface on the current
             // class, or the return type, as that could change since the implementing component was last built.
             return false;
         }
 
-        if (function.getName().equals("getTarget") && function.getParameterTypes().length == 0) {
+        if ("getTarget".equals(function.getName()) && function.getParameterTypes().length == 0) {
             // A parameter-less #getTarget() implements special redirection behavior for the
             // StaplerProxy interface. We do not check for the presence of the interface on the current
             // class, or the return type, as that could change since the implementing component was last built.
@@ -267,10 +273,4 @@ public class TypedFilter implements FieldRef.Filter, FunctionList.Filter {
         LOGGER.log(Level.FINE, "Function analyzed: {0} => {1}", new Object[]{signature, isOk});
         return isOk;
     }
-
-    @Restricted(NoExternalUse.class)
-    public static boolean SKIP_TYPE_CHECK = SystemProperties.getBoolean(TypedFilter.class.getName() + ".skipTypeCheck");
-
-    @Restricted(NoExternalUse.class)
-    public static boolean PROHIBIT_STATIC_ACCESS = SystemProperties.getBoolean(TypedFilter.class.getName() + ".prohibitStaticAccess", true);
 }

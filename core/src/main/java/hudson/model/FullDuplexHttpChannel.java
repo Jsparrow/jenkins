@@ -41,16 +41,17 @@ import jenkins.util.FullDuplexHttpService;
  * @deprecated Unused.
  */
 @Deprecated
-abstract public class FullDuplexHttpChannel extends FullDuplexHttpService {
-    private Channel channel;
-    private final boolean restricted;
+public abstract class FullDuplexHttpChannel extends FullDuplexHttpService {
+    private static final Logger LOGGER = Logger.getLogger(FullDuplexHttpChannel.class.getName());
+	private Channel channel;
+	private final boolean restricted;
 
-    public FullDuplexHttpChannel(UUID uuid, boolean restricted) throws IOException {
+	public FullDuplexHttpChannel(UUID uuid, boolean restricted) throws IOException {
         super(uuid);
         this.restricted = restricted;
     }
 
-    @Override
+	@Override
     protected void run(final InputStream upload, OutputStream download) throws IOException, InterruptedException {
         channel = new Channel("HTTP full-duplex channel " + uuid,
                 Computer.threadPoolForRemoting, Mode.BINARY, upload, download, null, restricted);
@@ -59,7 +60,7 @@ abstract public class FullDuplexHttpChannel extends FullDuplexHttpService {
         PingThread ping = new PingThread(channel) {
             @Override
             protected void onDead(Throwable diagnosis) {
-                LOGGER.log(Level.INFO, "Duplex-HTTP session " + uuid + " is terminated", diagnosis);
+                LOGGER.log(Level.INFO, new StringBuilder().append("Duplex-HTTP session ").append(uuid).append(" is terminated").toString(), diagnosis);
                 // this will cause the channel to abort and subsequently clean up
                 try {
                     upload.close();
@@ -80,12 +81,10 @@ abstract public class FullDuplexHttpChannel extends FullDuplexHttpService {
         ping.interrupt();
     }
 
-    protected abstract void main(Channel channel) throws IOException, InterruptedException;
+	protected abstract void main(Channel channel) throws IOException, InterruptedException;
 
-    public Channel getChannel() {
+	public Channel getChannel() {
         return channel;
     }
-
-    private static final Logger LOGGER = Logger.getLogger(FullDuplexHttpChannel.class.getName());
 
 }

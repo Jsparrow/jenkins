@@ -36,10 +36,24 @@ import org.junit.Test;
  */
 public class ResourceListTest {
 
-    private Resource a1, a2, a3, a4, a;
-    private Resource b1, b2, b3, b4, b;
-    private Resource c1, c2, c3, c4, c;
-    private Resource d, e, f;
+    private Resource a1;
+	private Resource a2;
+	private Resource a3;
+	private Resource a4;
+	private Resource a;
+    private Resource b1;
+	private Resource b2;
+	private Resource b3;
+	private Resource b4;
+	private Resource b;
+    private Resource c1;
+	private Resource c2;
+	private Resource c3;
+	private Resource c4;
+	private Resource c;
+    private Resource d;
+	private Resource e;
+	private Resource f;
     private int fWriteCount;
     private Random entropy;
     private ResourceList x;
@@ -221,13 +235,13 @@ public class ResourceListTest {
 
         for (int i = 0; i < fWriteCount; i++) {
             x.w(e);
-            assertTrue("Total = W" + (i + 1) + ", Limit = W1", x.isCollidingWith(y));
-            assertTrue("Total = W" + (i + 1) + ", Limit = W1", y.isCollidingWith(x));
+            assertTrue(new StringBuilder().append("Total = W").append(i + 1).append(", Limit = W1").toString(), x.isCollidingWith(y));
+            assertTrue(new StringBuilder().append("Total = W").append(i + 1).append(", Limit = W1").toString(), y.isCollidingWith(x));
         }
         int j = entropy.nextInt(50) + 3;
         for (int i = 1; i < j; i++) {
-            assertTrue("Total = W" + (i + fWriteCount) + ", Limit = W1", x.isCollidingWith(y));
-            assertTrue("Total = W" + (i + fWriteCount) + ", Limit = W1", y.isCollidingWith(x));
+            assertTrue(new StringBuilder().append("Total = W").append(i + fWriteCount).append(", Limit = W1").toString(), x.isCollidingWith(y));
+            assertTrue(new StringBuilder().append("Total = W").append(i + fWriteCount).append(", Limit = W1").toString(), y.isCollidingWith(x));
             x.w(e);
         }
     }
@@ -236,14 +250,14 @@ public class ResourceListTest {
     public void multiWriteN() {
         y.w(f);
         for (int i=0; i<f.numConcurrentWrite; i++) {
-            assertFalse("Total = W" + i + ", Limit = W" + f.numConcurrentWrite, x.isCollidingWith(y));
-            assertFalse("Total = W" + i + ", Limit = W" + f.numConcurrentWrite, y.isCollidingWith(x));
+            assertFalse(new StringBuilder().append("Total = W").append(i).append(", Limit = W").append(f.numConcurrentWrite).toString(), x.isCollidingWith(y));
+            assertFalse(new StringBuilder().append("Total = W").append(i).append(", Limit = W").append(f.numConcurrentWrite).toString(), y.isCollidingWith(x));
             x.w(f);
         }
         int j = entropy.nextInt(50) + 3;
         for (int i = 1; i < j; i++) {
-            assertTrue("Total = W" + (fWriteCount + i) + ", Limit = W" + fWriteCount, x.isCollidingWith(y));
-            assertTrue("Total = W" + (fWriteCount + i) + ", Limit = W" + fWriteCount, y.isCollidingWith(x));
+            assertTrue(new StringBuilder().append("Total = W").append(fWriteCount + i).append(", Limit = W").append(fWriteCount).toString(), x.isCollidingWith(y));
+            assertTrue(new StringBuilder().append("Total = W").append(fWriteCount + i).append(", Limit = W").append(fWriteCount).toString(), y.isCollidingWith(x));
             x.w(f);
         }
     }
@@ -252,14 +266,14 @@ public class ResourceListTest {
     public void multiRead1() {
         y.r(e);
         for (int i = 0; i < fWriteCount; i++) {
-            assertFalse("Total = R" + (i + 1) + ", Limit = W1", x.isCollidingWith(y));
-            assertFalse("Total = R" + (i + 1) + ", Limit = W1", y.isCollidingWith(x));
+            assertFalse(new StringBuilder().append("Total = R").append(i + 1).append(", Limit = W1").toString(), x.isCollidingWith(y));
+            assertFalse(new StringBuilder().append("Total = R").append(i + 1).append(", Limit = W1").toString(), y.isCollidingWith(x));
             x.r(e);
         }
         int j = entropy.nextInt(50) + 3;
         for (int i = 1; i < j; i++) {
-            assertFalse("Total = R" + (i + fWriteCount) + ", Limit = W1", x.isCollidingWith(y));
-            assertFalse("Total = R" + (i + fWriteCount) + ", Limit = W1", y.isCollidingWith(x));
+            assertFalse(new StringBuilder().append("Total = R").append(i + fWriteCount).append(", Limit = W1").toString(), x.isCollidingWith(y));
+            assertFalse(new StringBuilder().append("Total = R").append(i + fWriteCount).append(", Limit = W1").toString(), y.isCollidingWith(x));
             x.r(e);
         }
     }
@@ -268,14 +282,14 @@ public class ResourceListTest {
     public void multiReadN() {
         y.r(f);
         for (int i = 0; i < fWriteCount; i++) {
-            assertFalse("Total = R" + (i + 1) + ", Limit = W" + fWriteCount, x.isCollidingWith(y));
-            assertFalse("Total = R" + (i + 1) + ", Limit = W" + fWriteCount, y.isCollidingWith(x));
+            assertFalse(new StringBuilder().append("Total = R").append(i + 1).append(", Limit = W").append(fWriteCount).toString(), x.isCollidingWith(y));
+            assertFalse(new StringBuilder().append("Total = R").append(i + 1).append(", Limit = W").append(fWriteCount).toString(), y.isCollidingWith(x));
             x.r(f);
         }
         int j = entropy.nextInt(50) + 3;
         for (int i = 1; i < j; i++) {
-            assertFalse("Total = R" + (fWriteCount + i) + ", Limit = W" + fWriteCount, x.isCollidingWith(y));
-            assertFalse("Total = R" + (fWriteCount + i) + ", Limit = W" + fWriteCount, y.isCollidingWith(x));
+            assertFalse(new StringBuilder().append("Total = R").append(fWriteCount + i).append(", Limit = W").append(fWriteCount).toString(), x.isCollidingWith(y));
+            assertFalse(new StringBuilder().append("Total = R").append(fWriteCount + i).append(", Limit = W").append(fWriteCount).toString(), y.isCollidingWith(x));
             x.r(f);
         }
     }

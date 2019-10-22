@@ -36,48 +36,46 @@ import java.util.regex.Pattern;
  */
 public class MarkupTextTest {
 
-    @Test
+    private static final Pattern pattern = Pattern.compile("issue #([0-9]+)");
+
+	@Test
     public void test1() {
         MarkupText t = new MarkupText("I fixed issue #155. The rest is trick text: xissue #155 issue #123x");
-        for (SubText st : t.findTokens(pattern)) {
+        t.findTokens(pattern).forEach(st -> {
             assertEquals(1, st.groupCount());
             st.surroundWith("<$1>","<$1>");
-        }
+        });
 
         assertEquals("I fixed <155>issue #155<155>. The rest is trick text: xissue #155 issue #123x", t.toString(false));
     }
 
-    @Test
+	@Test
     public void boundary() {
         MarkupText t = new MarkupText("issue #155---issue #123");
-        for (SubText st : t.findTokens(pattern))
-            st.surroundWith("<$1>","<$1>");
+        t.findTokens(pattern).forEach(st -> st.surroundWith("<$1>", "<$1>"));
 
         assertEquals("<155>issue #155<155>---<123>issue #123<123>", t.toString(false));
     }
 
-    @Test
+	@Test
     public void findTokensOnSubText() {
         MarkupText t = new MarkupText("Fixed 2 issues in this commit, fixing issue 155, 145");
         List<SubText> tokens = t.findTokens(Pattern.compile("issue .*"));
         assertEquals("Expected one token", 1, tokens.size());
         assertEquals("Expected single token was incorrect", "issue 155, 145", tokens.get(0).group(0));
-        for (SubText st : tokens.get(0).findTokens(Pattern.compile("([0-9]+)")))
-            st.surroundWith("<$1>","<$1>");
+        tokens.get(0).findTokens(Pattern.compile("([0-9]+)")).forEach(st -> st.surroundWith("<$1>", "<$1>"));
 
         assertEquals("Fixed 2 issues in this commit, fixing issue <155>155<155>, <145>145<145>", t.toString(false));
     }
 
-    @Test
+	@Test
     public void literalTextSurround() {
         MarkupText text = new MarkupText("AAA test AAA");
-        for(SubText token : text.findTokens(Pattern.compile("AAA"))) {
-            token.surroundWithLiteral("$9","$9");
-        }
+        text.findTokens(Pattern.compile("AAA")).forEach(token -> token.surroundWithLiteral("$9", "$9"));
         assertEquals("$9AAA$9 test $9AAA$9",text.toString(false));
     }
 
-    /**
+	/**
      * Start/end tag nesting should be correct regardless of the order tags are added.
      */
     @Test
@@ -93,7 +91,7 @@ public class MarkupTextTest {
         assertEquals("$abc$#def#",text.toString(false));
     }
 
-    @Test
+	@Test
     public void escape() {
         MarkupText text = new MarkupText("&&&");
         assertEquals("&amp;&amp;&amp;",text.toString(false));
@@ -103,7 +101,7 @@ public class MarkupTextTest {
         assertEquals("&amp;<foo>&amp;&nbsp;&amp;",text.toString(false));
     }
 
-    @Test
+	@Test
     public void preEscape() {
         MarkupText text = new MarkupText("Line\n2   & 3\n<End>\n");
         assertEquals("Line\n2   &amp; 3\n&lt;End&gt;\n", text.toString(true));
@@ -111,7 +109,7 @@ public class MarkupTextTest {
         assertEquals("Line<hr/>\n2   &amp; 3\n&lt;End&gt;\n", text.toString(true));
     }
 
-    /* @Issue("JENKINS-6252") */
+	/* @Issue("JENKINS-6252") */
     @Test
     public void subTextSubText() {
         MarkupText text = new MarkupText("abcdefgh");
@@ -126,6 +124,4 @@ public class MarkupTextTest {
         sub = sub.subText(1, -2);
         assertEquals("de", sub.getText());
     }
-
-    private static final Pattern pattern = Pattern.compile("issue #([0-9]+)");
 }

@@ -204,9 +204,7 @@ public class HistoryPageFilter<T> {
                         }
                     }
                     hasDownPage = iter.hasNext();
-                    for (Object item : itemsToAdd) {
-                        add(item);
-                    }
+                    itemsToAdd.forEach(item -> add(item));
                 }
             }
         } else {
@@ -273,12 +271,11 @@ public class HistoryPageFilter<T> {
 
     private void addRun(Run run) {
         HistoryPageEntry<Run> entry = new HistoryPageEntry<>(run);
-        // Assert that runs have been added in descending order
-        if (runs.size() > 0) {
-            if (entry.getEntryId() > runs.get(runs.size() - 1).getEntryId()) {
-                throw new IllegalStateException("Runs were out of order");
-            }
-        }
+        boolean condition = runs.size() > 0 && entry.getEntryId() > runs.get(runs.size() - 1).getEntryId();
+		// Assert that runs have been added in descending order
+        if (condition) {
+		    throw new IllegalStateException("Runs were out of order");
+		}
         runs.add(entry);
         updateNewestOldest(entry.getEntryId());
     }
@@ -382,21 +379,11 @@ public class HistoryPageFilter<T> {
 
     private boolean fitsSearchBuildVariables(AbstractBuild<?, ?> runAsBuild) {
         Map<String, String> buildVariables = runAsBuild.getBuildVariables();
-        for (String paramsValues : buildVariables.values()) {
-            if (fitsSearchString(paramsValues)) {
-                return true;
-            }
-        }
-        return false;
+        return buildVariables.values().stream().anyMatch(paramsValues -> fitsSearchString(paramsValues));
     }
 
     private boolean fitsSearchBuildParameters(ParametersAction parametersAction) {
         List<ParameterValue> parameters = parametersAction.getParameters();
-        for (ParameterValue parameter : parameters) {
-            if (!parameter.isSensitive() && fitsSearchString(parameter.getValue())) {
-                return true;
-            }
-        }
-        return false;
+        return parameters.stream().anyMatch(parameter -> !parameter.isSensitive() && fitsSearchString(parameter.getValue()));
     }
 }

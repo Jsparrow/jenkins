@@ -24,18 +24,6 @@ import hudson.model.TaskListener;
  * @since 1.345
  */
 public abstract class SCMRevisionState implements Action {
-    public String getIconFileName() {
-        return null;
-    }
-
-    public String getDisplayName() {
-        return null;
-    }
-
-    public String getUrlName() {
-        return null;
-    }
-
     /*
       I can't really make this comparable because comparing two revision states often requires
       non-trivial computation and conversations with the repository (mainly to figure out
@@ -47,5 +35,20 @@ public abstract class SCMRevisionState implements Action {
 
     public static SCMRevisionState NONE = new None();
 
-    private static final class None extends SCMRevisionState {}
+	@Override
+	public String getIconFileName() {
+        return null;
+    }
+
+	@Override
+	public String getDisplayName() {
+        return null;
+    }
+
+	@Override
+	public String getUrlName() {
+        return null;
+    }
+
+	private static final class None extends SCMRevisionState {}
 }

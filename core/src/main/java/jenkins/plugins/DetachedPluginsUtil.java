@@ -87,13 +87,13 @@ public class DetachedPluginsUtil {
             if (detached.shortName.equals(pluginName)) {
                 continue;
             }
-            if (BREAK_CYCLES.contains(pluginName + ' ' + detached.shortName)) {
+            if (BREAK_CYCLES.contains(new StringBuilder().append(pluginName).append(' ').append(detached.shortName).toString())) {
                 LOGGER.log(Level.FINE, "skipping implicit dependency {0} → {1}", new Object[]{pluginName, detached.shortName});
                 continue;
             }
             // some earlier versions of maven-hpi-plugin apparently puts "null" as a literal in Hudson-Version. watch out for them.
-            if (jenkinsVersion == null || jenkinsVersion.equals("null") || new VersionNumber(jenkinsVersion).compareTo(detached.splitWhen) <= 0) {
-                out.add(new PluginWrapper.Dependency(detached.shortName + ':' + detached.requiredVersion + ";resolution:=optional"));
+            if (jenkinsVersion == null || "null".equals(jenkinsVersion) || new VersionNumber(jenkinsVersion).compareTo(detached.splitWhen) <= 0) {
+                out.add(new PluginWrapper.Dependency(new StringBuilder().append(detached.shortName).append(':').append(detached.requiredVersion).append(";resolution:=optional").toString()));
                 LOGGER.log(Level.FINE, "adding implicit dependency {0} → {1} because of {2}",
                            new Object[]{pluginName, detached.shortName, jenkinsVersion});
             }
@@ -136,13 +136,7 @@ public class DetachedPluginsUtil {
      * point in the past, otherwise {@code false}.
      */
     public static boolean isDetachedPlugin(@Nonnull String pluginId) {
-        for (DetachedPlugin detachedPlugin : getDetachedPlugins()) {
-            if (detachedPlugin.getShortName().equals(pluginId)) {
-                return true;
-            }
-        }
-
-        return false;
+        return getDetachedPlugins().stream().anyMatch(detachedPlugin -> detachedPlugin.getShortName().equals(pluginId));
     }
 
     private static Stream<String> configLines(InputStream is) throws IOException {
@@ -214,7 +208,7 @@ public class DetachedPluginsUtil {
 
         @Override
         public String toString() {
-            return shortName + " " + splitWhen.toString().replace(".*", "") + " " + requiredVersion;
+            return new StringBuilder().append(shortName).append(" ").append(splitWhen.toString().replace(".*", "")).append(" ").append(requiredVersion).toString();
         }
 
         @Nonnull

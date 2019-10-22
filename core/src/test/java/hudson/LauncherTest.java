@@ -55,15 +55,16 @@ public class LauncherTest {
 
             FilePath f = new FilePath(channels.french, tmp.getPath());
             Launcher l = f.createLauncher(StreamTaskListener.fromStderr());
-            Proc p = l.launch().cmds("sh", "-c", "echo $$$$ > "+tmp+"; sleep 30").stdout(System.out).stderr(System.err).start();
-            while (!tmp.exists())
-                Thread.sleep(100);
+            Proc p = l.launch().cmds("sh", "-c", new StringBuilder().append("echo $$$$ > ").append(tmp).append("; sleep 30").toString()).stdout(System.out).stderr(System.err).start();
+            while (!tmp.exists()) {
+				Thread.sleep(100);
+			}
             long start = System.currentTimeMillis();
             p.kill();
             assertTrue(p.join()!=0);
             long end = System.currentTimeMillis();
             long terminationTime = end - start;
-            assertTrue("Join did not finish promptly. The completion time (" + terminationTime + "ms) is longer than expected 15s", terminationTime < 15000);
+            assertTrue(new StringBuilder().append("Join did not finish promptly. The completion time (").append(terminationTime).append("ms) is longer than expected 15s").toString(), terminationTime < 15000);
             channels.french.call(new NoopCallable()); // this only returns after the other side of the channel has finished executing cancellation
             Thread.sleep(2000); // more delay to make sure it's gone
             assertNull("process should be gone",ProcessTree.get().get(Integer.parseInt(FileUtils.readFileToString(tmp, Charset.defaultCharset()).trim())));
@@ -75,12 +76,6 @@ public class LauncherTest {
             // hudson.model.Hudson.instance.nodes[0].rootPath.createLauncher(new hudson.util.StreamTaskListener(System.err)).
             //   launch().cmds("sleep", "1d").stdout(System.out).stderr(System.err).start().kill()
             // hangs and on agent machine pgrep sleep => one process; after manual kill, script returns.
-    }
-
-    private static class NoopCallable extends MasterToSlaveCallable<Object,RuntimeException> {
-        public Object call() throws RuntimeException {
-            return null;
-        }
     }
 
     @Issue("JENKINS-15733")
@@ -96,7 +91,7 @@ public class LauncherTest {
         assertTrue(log, log.contains("val1 val2"));
     }
 
-    @Issue("JENKINS-18368")
+	@Issue("JENKINS-18368")
     @Test public void decoratedByEnvMaintainsIsUnix() throws Exception {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         TaskListener listener = new StreamBuildListener(output);
@@ -108,7 +103,7 @@ public class LauncherTest {
         assertTrue(decorated.isUnix());
     }
 
-    @Issue("JENKINS-18368")
+	@Issue("JENKINS-18368")
     @Test public void decoratedByPrefixMaintainsIsUnix() throws Exception {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         TaskListener listener = new StreamBuildListener(output);
@@ -118,6 +113,13 @@ public class LauncherTest {
         remoteLauncher = new Launcher.RemoteLauncher(listener, FilePath.localChannel, true);
         decorated = remoteLauncher.decorateByPrefix("test");
         assertTrue(decorated.isUnix());
+    }
+
+	private static class NoopCallable extends MasterToSlaveCallable<Object,RuntimeException> {
+        @Override
+		public Object call() {
+            return null;
+        }
     }
 
 }

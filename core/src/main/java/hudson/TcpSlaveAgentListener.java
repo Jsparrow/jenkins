@@ -89,12 +89,36 @@ import org.kohsuke.accmod.restrictions.NoExternalUse;
 @StaplerAccessibleType
 public final class TcpSlaveAgentListener extends Thread {
 
-    private final ServerSocketChannel serverSocket;
-    private volatile boolean shuttingDown;
+    private static int iotaGen=1;
+	private static final Logger LOGGER = Logger.getLogger(TcpSlaveAgentListener.class.getName());
+	/**
+     * Host name that we advertise protocol clients to connect to.
+     * This is primarily for those who have reverse proxies in place such that the HTTP host name
+     * and the TCP/IP connection host names are different.
+     * (Note: despite the name, this is used for any client, not only deprecated Remoting-based CLI.)
+     * TODO: think about how to expose this (including whether this needs to be exposed at all.)
+     */
+    @SuppressFBWarnings(value = "MS_SHOULD_BE_FINAL", justification = "Accessible via System Groovy Scripts")
+    @Restricted(NoExternalUse.class)
+    public static String CLI_HOST_NAME = SystemProperties.getString(TcpSlaveAgentListener.class.getName()+".hostName");
+	/**
+     * Port number that we advertise protocol clients to connect to.
+     * This is primarily for the case where the port that Jenkins runs is different from the port
+     * that external world should connect to, because of the presence of NAT / port-forwarding / TCP reverse
+     * proxy.
+     * (Note: despite the name, this is used for any client, not only deprecated Remoting-based CLI.)
+     * If left to null, fall back to {@link #getPort()}
+     *
+     * @since 1.611
+     */
+    @SuppressFBWarnings(value = "MS_SHOULD_BE_FINAL", justification = "Accessible via System Groovy Scripts")
+    @Restricted(NoExternalUse.class)
+    public static Integer CLI_PORT = SystemProperties.getInteger(TcpSlaveAgentListener.class.getName()+".port");
+	private final ServerSocketChannel serverSocket;
+	private volatile boolean shuttingDown;
+	public final int configuredPort;
 
-    public final int configuredPort;
-
-    /**
+	/**
      * @param port
      *      Use 0 to choose a random port.
      */
@@ -104,11 +128,11 @@ public final class TcpSlaveAgentListener extends Thread {
             serverSocket = ServerSocketChannel.open();
             serverSocket.socket().bind(new InetSocketAddress(port));
         } catch (BindException e) {
-            throw (BindException)new BindException("Failed to listen on port "+port+" because it's already in use.").initCause(e);
+            throw (BindException)new BindException(new StringBuilder().append("Failed to listen on port ").append(port).append(" because it's already in use.").toString()).initCause(e);
         }
         this.configuredPort = port;
         setUncaughtExceptionHandler((t, e) -> {
-            LOGGER.log(Level.SEVERE, "Uncaught exception in TcpSlaveAgentListener " + t + ", attempting to reschedule thread", e);
+            LOGGER.log(Level.SEVERE, new StringBuilder().append("Uncaught exception in TcpSlaveAgentListener ").append(t).append(", attempting to reschedule thread").toString(), e);
             shutdown();
             TcpSlaveAgentListenerRescheduler.schedule(t, e);
         });
@@ -118,14 +142,14 @@ public final class TcpSlaveAgentListener extends Thread {
         start();
     }
 
-    /**
+	/**
      * Gets the TCP port number in which we are listening.
      */
     public int getPort() {
         return serverSocket.socket().getLocalPort();
     }
 
-    /**
+	/**
      * Gets the TCP port number in which we are advertising.
      * @since 1.656
      */
@@ -133,7 +157,7 @@ public final class TcpSlaveAgentListener extends Thread {
         return CLI_PORT != null ? CLI_PORT : getPort();
     }
 
-    /**
+	/**
      * Gets the host name that we advertise protocol clients to connect to.
      * @since 2.198
      */
@@ -148,7 +172,7 @@ public final class TcpSlaveAgentListener extends Thread {
         }
     }
 
-    /**
+	/**
      * Gets the Base64 encoded public key that forms part of this instance's identity keypair.
      * @return the Base64 encoded public key
      * @since 2.16
@@ -159,7 +183,7 @@ public final class TcpSlaveAgentListener extends Thread {
         return key == null ? null : Base64.getEncoder().encodeToString(key.getEncoded());
     }
 
-    /**
+	/**
      * Returns a comma separated list of the enabled {@link AgentProtocol#getName()} implementations so that
      * clients can avoid creating additional work for the server attempting to connect with unsupported protocols.
      *
@@ -170,7 +194,7 @@ public final class TcpSlaveAgentListener extends Thread {
         return StringUtils.join(Jenkins.get().getAgentProtocols(), ", ");
     }
 
-    /**
+	/**
      * Gets Remoting minimum supported version to prevent unsupported agents from connecting
      * @since 2.171
      */
@@ -178,7 +202,7 @@ public final class TcpSlaveAgentListener extends Thread {
         return RemotingVersionInfo.getMinimumSupportedVersion();
     }
 
-    @Override
+	@Override
     public void run() {
         try {
             // the loop eventually terminates when the socket is closed.
@@ -208,7 +232,7 @@ public final class TcpSlaveAgentListener extends Thread {
         }
     }
 
-    /**
+	/**
      * Initiates the shuts down of the listener.
      */
     public void shutdown() {
@@ -231,7 +255,7 @@ public final class TcpSlaveAgentListener extends Thread {
         }
     }
 
-    private final class ConnectionHandler extends Thread {
+	private final class ConnectionHandler extends Thread {
         private final Socket s;
         /**
          * Unique number to identify this connection. Used in the log.
@@ -243,7 +267,7 @@ public final class TcpSlaveAgentListener extends Thread {
             synchronized(getClass()) {
                 id = iotaGen++;
             }
-            setName("TCP agent connection handler #"+id+" with "+s.getRemoteSocketAddress());
+            setName(new StringBuilder().append("TCP agent connection handler #").append(id).append(" with ").append(s.getRemoteSocketAddress()).toString());
             setUncaughtExceptionHandler((t, e) -> {
                 LOGGER.log(Level.SEVERE, "Uncaught exception in TcpSlaveAgentListener ConnectionHandler " + t, e);
                 try {
@@ -289,13 +313,14 @@ public final class TcpSlaveAgentListener extends Thread {
                         } else {
                             error(out, "Disabled protocol:" + s);
                         }
-                    } else
-                        error(out, "Unknown protocol:" + s);
+                    } else {
+						error(out, "Unknown protocol:" + s);
+					}
                 } else {
                     error(out, "Unrecognized protocol: "+s);
                 }
             } catch (InterruptedException e) {
-                LOGGER.log(Level.WARNING,"Connection #"+id+" aborted",e);
+                LOGGER.log(Level.WARNING,new StringBuilder().append("Connection #").append(id).append(" aborted").toString(),e);
                 try {
                     s.close();
                 } catch (IOException ex) {
@@ -305,7 +330,7 @@ public final class TcpSlaveAgentListener extends Thread {
                 if (e instanceof EOFException) {
                     LOGGER.log(Level.INFO, "Connection #{0} failed: {1}", new Object[] {id, e});
                 } else {
-                    LOGGER.log(Level.WARNING, "Connection #" + id + " failed", e);
+                    LOGGER.log(Level.WARNING, new StringBuilder().append("Connection #").append(id).append(" failed").toString(), e);
                 }
                 try {
                     s.close();
@@ -327,12 +352,12 @@ public final class TcpSlaveAgentListener extends Thread {
                     o.write("HTTP/1.0 200 OK\r\n");
                     o.write("Content-Type: text/plain;charset=UTF-8\r\n");
                     o.write("\r\n");
-                    o.write("Jenkins-Agent-Protocols: " + getAgentProtocolNames()+"\r\n");
-                    o.write("Jenkins-Version: " + Jenkins.VERSION + "\r\n");
-                    o.write("Jenkins-Session: " + Jenkins.SESSION_HASH + "\r\n");
-                    o.write("Client: " + s.getInetAddress().getHostAddress() + "\r\n");
-                    o.write("Server: " + s.getLocalAddress().getHostAddress() + "\r\n");
-                    o.write("Remoting-Minimum-Version: " + getRemotingMinimumVersion() + "\r\n");
+                    o.write(new StringBuilder().append("Jenkins-Agent-Protocols: ").append(getAgentProtocolNames()).append("\r\n").toString());
+                    o.write(new StringBuilder().append("Jenkins-Version: ").append(Jenkins.VERSION).append("\r\n").toString());
+                    o.write(new StringBuilder().append("Jenkins-Session: ").append(Jenkins.SESSION_HASH).append("\r\n").toString());
+                    o.write(new StringBuilder().append("Client: ").append(s.getInetAddress().getHostAddress()).append("\r\n").toString());
+                    o.write(new StringBuilder().append("Server: ").append(s.getLocalAddress().getHostAddress()).append("\r\n").toString());
+                    o.write(new StringBuilder().append("Remoting-Minimum-Version: ").append(getRemotingMinimumVersion()).append("\r\n").toString());
                     o.flush();
                     s.shutdownOutput();
                 } else {
@@ -509,7 +534,7 @@ public final class TcpSlaveAgentListener extends Thread {
                         new TcpSlaveAgentListener(port).start();
                         LOGGER.log(Level.INFO, "Restarted TcpSlaveAgentListener");
                     } else {
-                        LOGGER.log(Level.SEVERE, "Uncaught exception in TcpSlaveAgentListener " + originThread + ". Port is disabled, not rescheduling", cause);
+                        LOGGER.log(Level.SEVERE, new StringBuilder().append("Uncaught exception in TcpSlaveAgentListener ").append(originThread).append(". Port is disabled, not rescheduling").toString(), cause);
                     }
                     isActive = false;
                 } catch (IOException e) {
@@ -536,37 +561,9 @@ public final class TcpSlaveAgentListener extends Thread {
      * Connection terminated because we are reconnected from the current peer.
      */
     public static class ConnectionFromCurrentPeer extends OfflineCause {
-        public String toString() {
+        @Override
+		public String toString() {
             return "The current peer is reconnecting";
         }
     }
-
-    private static int iotaGen=1;
-
-    private static final Logger LOGGER = Logger.getLogger(TcpSlaveAgentListener.class.getName());
-
-    /**
-     * Host name that we advertise protocol clients to connect to.
-     * This is primarily for those who have reverse proxies in place such that the HTTP host name
-     * and the TCP/IP connection host names are different.
-     * (Note: despite the name, this is used for any client, not only deprecated Remoting-based CLI.)
-     * TODO: think about how to expose this (including whether this needs to be exposed at all.)
-     */
-    @SuppressFBWarnings(value = "MS_SHOULD_BE_FINAL", justification = "Accessible via System Groovy Scripts")
-    @Restricted(NoExternalUse.class)
-    public static String CLI_HOST_NAME = SystemProperties.getString(TcpSlaveAgentListener.class.getName()+".hostName");
-
-    /**
-     * Port number that we advertise protocol clients to connect to.
-     * This is primarily for the case where the port that Jenkins runs is different from the port
-     * that external world should connect to, because of the presence of NAT / port-forwarding / TCP reverse
-     * proxy.
-     * (Note: despite the name, this is used for any client, not only deprecated Remoting-based CLI.)
-     * If left to null, fall back to {@link #getPort()}
-     *
-     * @since 1.611
-     */
-    @SuppressFBWarnings(value = "MS_SHOULD_BE_FINAL", justification = "Accessible via System Groovy Scripts")
-    @Restricted(NoExternalUse.class)
-    public static Integer CLI_PORT = SystemProperties.getInteger(TcpSlaveAgentListener.class.getName()+".port");
 }

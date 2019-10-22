@@ -206,7 +206,7 @@ public class ApiTokenStore {
         try {
             digest = MessageDigest.getInstance(HASH_ALGORITHM);
         } catch (NoSuchAlgorithmException e) {
-            throw new AssertionError("There is no " + HASH_ALGORITHM + " available in this system");
+            throw new AssertionError(new StringBuilder().append("There is no ").append(HASH_ALGORITHM).append(" available in this system").toString());
         }
         return digest.digest(tokenBytes);
     }
@@ -254,13 +254,7 @@ public class ApiTokenStore {
      */
     private @CheckForNull HashedToken searchMatch(@Nonnull String plainSecret) {
         byte[] hashedBytes = plainSecretToHashBytes(plainSecret);
-        for (HashedToken token : tokenList) {
-            if (token.match(hashedBytes)) {
-                return token;
-            }
-        }
-        
-        return null;
+        return tokenList.stream().filter(token -> token.match(hashedBytes)).findFirst().orElse(null);
     }
     
     /**

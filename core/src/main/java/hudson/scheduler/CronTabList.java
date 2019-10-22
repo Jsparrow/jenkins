@@ -43,24 +43,21 @@ import java.util.logging.Logger;
  * @author Kohsuke Kawaguchi
  */
 public final class CronTabList {
-    private final Vector<CronTab> tabs;
+    private static final Logger LOGGER = Logger.getLogger(CronTabList.class.getName());
+	private final Vector<CronTab> tabs;
 
-    public CronTabList(Collection<CronTab> tabs) {
+	public CronTabList(Collection<CronTab> tabs) {
         this.tabs = new Vector<>(tabs);
     }
 
-    /**
+	/**
      * Returns true if the given calendar matches
      */
     public synchronized boolean check(Calendar cal) {
-        for (CronTab tab : tabs) {
-            if(tab.check(cal))
-                return true;
-        }
-        return false;
+        return tabs.stream().anyMatch(tab -> tab.check(cal));
     }
 
-    /**
+	/**
      * Checks if this crontab entry looks reasonable,
      * and if not, return an warning message.
      *
@@ -72,12 +69,14 @@ public final class CronTabList {
     public String checkSanity() {
         for (CronTab tab : tabs) {
             String s = tab.checkSanity();
-            if(s!=null)     return s;
+            if(s!=null) {
+				return s;
+			}
         }
         return null;
     }
 
-    /**
+	/**
      * Checks if given timezone string is supported by TimeZone and returns
      * the same string if valid, null otherwise
      * @since 1.615
@@ -92,11 +91,11 @@ public final class CronTabList {
         return null;
     }
 
-    public static CronTabList create(@Nonnull String format) throws ANTLRException {
+	public static CronTabList create(@Nonnull String format) throws ANTLRException {
         return create(format,null);
     }
 
-    public static CronTabList create(@Nonnull String format, Hash hash) throws ANTLRException {
+	public static CronTabList create(@Nonnull String format, Hash hash) throws ANTLRException {
         Vector<CronTab> r = new Vector<>();
         int lineNumber = 0;
         String timezone = null;
@@ -110,13 +109,15 @@ public final class CronTabList {
                 if(timezone != null) {
                     LOGGER.log(Level.CONFIG, "CRON with timezone {0}", timezone);
                 } else {
-                    throw new ANTLRException("Invalid or unsupported timezone '" + timezone + "'");
+                    throw new ANTLRException(new StringBuilder().append("Invalid or unsupported timezone '").append(timezone).append("'").toString());
                 }
                 continue;
             }
 
-            if(line.length()==0 || line.startsWith("#"))
-                continue;   // ignorable line
+            if(line.isEmpty() || line.startsWith("#"))
+			 {
+				continue;   // ignorable line
+			}
             try {
                 r.add(new CronTab(line,lineNumber,hash,timezone));
             } catch (ANTLRException e) {
@@ -127,7 +128,7 @@ public final class CronTabList {
         return new CronTabList(r);
     }
 
-    @Restricted(NoExternalUse.class) // just for form validation
+	@Restricted(NoExternalUse.class) // just for form validation
     public @CheckForNull Calendar previous() {
         Calendar nearest = null;
         for (CronTab tab : tabs) {
@@ -139,7 +140,7 @@ public final class CronTabList {
         return nearest;
     }
 
-    @Restricted(NoExternalUse.class) // just for form validation
+	@Restricted(NoExternalUse.class) // just for form validation
     public @CheckForNull Calendar next() {
         Calendar nearest = null;
         for (CronTab tab : tabs) {
@@ -150,6 +151,4 @@ public final class CronTabList {
         }
         return nearest;
     }
-    
-    private static final Logger LOGGER = Logger.getLogger(CronTabList.class.getName());
 }

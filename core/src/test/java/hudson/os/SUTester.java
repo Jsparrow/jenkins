@@ -14,7 +14,8 @@ public class SUTester {
     }
 
     private static class TouchingCallable extends MasterToSlaveCallable<Object, Throwable> {
-        public Object call() throws Throwable {
+        @Override
+		public Object call() throws Throwable {
             System.out.println("Touching /tmp/x");
             Files.newOutputStream(new File("/tmp/x").toPath()).close();
             return null;

@@ -35,8 +35,9 @@ public class URICheckEncodingMonitor extends AdministrativeMonitor {
         // expected is non-ASCII String
         final String expected = "\u57f7\u4e8b";
         final String value = fixEmpty(request.getParameter("value"));
-        if (!expected.equals(value))
-            return FormValidation.warningWithMarkup(hudson.model.Messages.Hudson_NotUsesUTF8ToDecodeURL());
+        if (!expected.equals(value)) {
+			return FormValidation.warningWithMarkup(hudson.model.Messages.Hudson_NotUsesUTF8ToDecodeURL());
+		}
         return FormValidation.ok();
     }
 }

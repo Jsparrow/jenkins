@@ -54,9 +54,276 @@ public class Iterators {
     }
 
     /**
+     * Returns the {@link Iterable} that lists items in the reverse order.
+     *
+     * @since 1.150
+     */
+    public static <T> Iterable<T> reverse(final List<T> lst) {
+        return () -> {
+		    final ListIterator<T> itr = lst.listIterator(lst.size());
+		    return new Iterator<T>() {
+		        @Override
+				public boolean hasNext() {
+		            return itr.hasPrevious();
+		        }
+
+		        @Override
+				public T next() {
+		            return itr.previous();
+		        }
+
+		        @Override
+				public void remove() {
+		            itr.remove();
+		        }
+		    };
+		};
+    }
+
+	/**
+     * Returns an {@link Iterable} that lists items in the normal order
+     * but which hides the base iterator implementation details.
+     *
+     * @since 1.492
+     */
+    public static <T> Iterable<T> wrap(final Iterable<T> base) {
+        return () -> {
+		    final Iterator<T> itr = base.iterator();
+		    return new Iterator<T>() {
+		        @Override
+				public boolean hasNext() {
+		            return itr.hasNext();
+		        }
+
+		        @Override
+				public T next() {
+		            return itr.next();
+		        }
+
+		        @Override
+				public void remove() {
+		            itr.remove();
+		        }
+		    };
+		};
+    }
+
+	/**
+     * Returns a list that represents [start,end).
+     *
+     * For example sequence(1,5,1)={1,2,3,4}, and sequence(7,1,-2)={7.5,3}
+     *
+     * @since 1.150
+     */
+    public static List<Integer> sequence(final int start, int end, final int step) {
+
+        final int size = (end-start)/step;
+        if(size<0) {
+			throw new IllegalArgumentException("List size is negative");
+		}
+
+        return new AbstractList<Integer>() {
+            @Override
+			public Integer get(int index) {
+                if(index<0 || index>=size) {
+					throw new IndexOutOfBoundsException();
+				}
+                return start+index*step;
+            }
+
+            @Override
+			public int size() {
+                return size;
+            }
+        };
+    }
+
+	public static List<Integer> sequence(int start, int end) {
+        return sequence(start,end,1);
+    }
+
+	/**
+     * The short cut for {@code reverse(sequence(start,end,step))}.
+     *
+     * @since 1.150
+     */
+    public static List<Integer> reverseSequence(int start, int end, int step) {
+        return sequence(end-1,start-1,-step);
+    }
+
+	public static List<Integer> reverseSequence(int start, int end) {
+        return reverseSequence(start,end,1);
+    }
+
+	/**
+     * Casts {@link Iterator} by taking advantage of its covariant-ness.
+     */
+    @SuppressWarnings({"unchecked"})
+    public static <T> Iterator<T> cast(Iterator<? extends T> itr) {
+        return (Iterator)itr;
+    }
+
+	/**
+     * Casts {@link Iterable} by taking advantage of its covariant-ness.
+     */
+    @SuppressWarnings({"unchecked"})
+    public static <T> Iterable<T> cast(Iterable<? extends T> itr) {
+        return (Iterable)itr;
+    }
+
+	/**
+     * Returns an {@link Iterator} that only returns items of the given subtype.
+     */
+    @SuppressWarnings({"unchecked"})
+    public static <U,T extends U> Iterator<T> subType(Iterator<U> itr, final Class<T> type) {
+        return (Iterator)new FilterIterator<U>(itr) {
+            @Override
+			protected boolean filter(U u) {
+                return type.isInstance(u);
+            }
+        };
+    }
+
+	/**
+     * Creates a read-only mutator that disallows {@link Iterator#remove()}.
+     */
+    public static <T> Iterator<T> readOnly(final Iterator<T> itr) {
+        return new Iterator<T>() {
+            @Override
+			public boolean hasNext() {
+                return itr.hasNext();
+            }
+
+            @Override
+			public T next() {
+                return itr.next();
+            }
+
+            @Override
+			public void remove() {
+                throw new UnsupportedOperationException();
+            }
+        };
+    }
+
+	/**
+     * Wraps another iterator and throws away nulls.
+     */
+    public static <T> Iterator<T> removeNull(final Iterator<T> itr) {
+        return com.google.common.collect.Iterators.filter(itr, Predicates.notNull());
+    }
+
+	/**
+     * Returns an {@link Iterable} that iterates over all the given {@link Iterable}s.
+     *
+     * <p>
+     * That is, this creates {A,B,C,D} from {A,B},{C,D}.
+     */
+    @SafeVarargs
+    public static <T> Iterable<T> sequence( final Iterable<? extends T>... iterables ) {
+        return new Iterable<T>() {
+            @Override
+			public Iterator<T> iterator() {
+                return new FlattenIterator<T,Iterable<? extends T>>(ImmutableList.copyOf(iterables)) {
+                    @Override
+					protected Iterator<T> expand(Iterable<? extends T> iterable) {
+                        return Iterators.<T>cast(iterable).iterator();
+                    }
+                };
+            }
+        };
+    }
+
+	/**
+     * Filters another iterator by eliminating duplicates.
+     */
+    public static <T> Iterator<T> removeDups(Iterator<T> iterator) {
+        return new FilterIterator<T>(iterator) {
+            final Set<T> found = new HashSet<>();
+            @Override
+            protected boolean filter(T t) {
+                return found.add(t);
+            }
+        };
+    }
+
+	/**
+     * Filters another iterator by eliminating duplicates.
+     */
+    public static <T> Iterable<T> removeDups(final Iterable<T> base) {
+        return () -> removeDups(base.iterator());
+    }
+
+	@SafeVarargs
+    public static <T> Iterator<T> sequence(Iterator<? extends T>... iterators) {
+        return com.google.common.collect.Iterators.concat(iterators);
+    }
+
+	/**
+     * Returns the elements in the base iterator until it hits any element that doesn't satisfy the filter.
+     * Then the rest of the elements in the base iterator gets ignored.
+     *
+     * @since 1.485
+     */
+    public static <T> Iterator<T> limit(final Iterator<? extends T> base, final CountingPredicate<? super T> filter) {
+        return new Iterator<T>() {
+            private T next;
+            private boolean end;
+            private int index=0;
+            @Override
+			public boolean hasNext() {
+                fetch();
+                return next!=null;
+            }
+
+            @Override
+			public T next() {
+                fetch();
+                T r = next;
+                next = null;
+                return r;
+            }
+
+            private void fetch() {
+                if (next==null && !end) {
+                    if (base.hasNext()) {
+                        next = base.next();
+                        if (!filter.apply(index++,next)) {
+                            next = null;
+                            end = true;
+                        }
+                    } else {
+                        end = true;
+                    }
+                }
+            }
+
+            @Override
+			public void remove() {
+                throw new UnsupportedOperationException();
+            }
+        };
+    }
+
+	/**
+     * Similar to {@link com.google.common.collect.Iterators#skip} except not {@link Beta}.
+     * @param iterator some iterator
+     * @param count a nonnegative count
+     */
+    @Restricted(NoExternalUse.class)
+    public static void skip(@Nonnull Iterator<?> iterator, int count) {
+        if (count < 0) {
+            throw new IllegalArgumentException();
+        }
+        while (iterator.hasNext() && count-- > 0) {
+            iterator.next();
+        }
+    }
+
+	/**
      * Produces {A,B,C,D,E,F} from {{A,B},{C},{},{D,E,F}}.
      */
-    public static abstract class FlattenIterator<U,T> implements Iterator<U> {
+    public abstract static class FlattenIterator<U,T> implements Iterator<U> {
         private final Iterator<? extends T> core;
         private Iterator<U> cur;
 
@@ -71,21 +338,27 @@ public class Iterators {
 
         protected abstract Iterator<U> expand(T t);
 
-        public boolean hasNext() {
+        @Override
+		public boolean hasNext() {
             while(!cur.hasNext()) {
-                if(!core.hasNext())
-                    return false;
+                if(!core.hasNext()) {
+					return false;
+				}
                 cur = expand(core.next());
             }
             return true;
         }
 
-        public U next() {
-            if(!hasNext())  throw new NoSuchElementException();
+        @Override
+		public U next() {
+            if(!hasNext()) {
+				throw new NoSuchElementException();
+			}
             return cur.next();
         }
 
-        public void remove() {
+        @Override
+		public void remove() {
             throw new UnsupportedOperationException();
         }
     }
@@ -95,7 +368,7 @@ public class Iterators {
      *
      * @since 1.150
      */
-    public static abstract class FilterIterator<T> implements Iterator<T> {
+    public abstract static class FilterIterator<T> implements Iterator<T> {
         private final Iterator<? extends T> core;
         private T next;
         private boolean fetched;
@@ -127,19 +400,24 @@ public class Iterators {
          */
         protected abstract boolean filter(T t);
 
-        public boolean hasNext() {
+        @Override
+		public boolean hasNext() {
             fetch();
             return fetched;
         }
 
-        public T next() {
+        @Override
+		public T next() {
             fetch();
-            if(!fetched)  throw new NoSuchElementException();
+            if(!fetched) {
+				throw new NoSuchElementException();
+			}
             fetched = false;
             return next;
         }
 
-        public void remove() {
+        @Override
+		public void remove() {
             core.remove();
         }
     }
@@ -158,268 +436,14 @@ public class Iterators {
             super(core);
         }
 
-        protected boolean filter(T t) {
+        @Override
+		protected boolean filter(T t) {
             return seen.add(t);
         }
     }
 
-    /**
-     * Returns the {@link Iterable} that lists items in the reverse order.
-     *
-     * @since 1.150
-     */
-    public static <T> Iterable<T> reverse(final List<T> lst) {
-        return new Iterable<T>() {
-            public Iterator<T> iterator() {
-                final ListIterator<T> itr = lst.listIterator(lst.size());
-                return new Iterator<T>() {
-                    public boolean hasNext() {
-                        return itr.hasPrevious();
-                    }
-
-                    public T next() {
-                        return itr.previous();
-                    }
-
-                    public void remove() {
-                        itr.remove();
-                    }
-                };
-            }
-        };
-    }
-
-    /**
-     * Returns an {@link Iterable} that lists items in the normal order
-     * but which hides the base iterator implementation details.
-     *
-     * @since 1.492
-     */
-    public static <T> Iterable<T> wrap(final Iterable<T> base) {
-        return new Iterable<T>() {
-            public Iterator<T> iterator() {
-                final Iterator<T> itr = base.iterator();
-                return new Iterator<T>() {
-                    public boolean hasNext() {
-                        return itr.hasNext();
-                    }
-
-                    public T next() {
-                        return itr.next();
-                    }
-
-                    public void remove() {
-                        itr.remove();
-                    }
-                };
-            }
-        };
-    }
-
-    /**
-     * Returns a list that represents [start,end).
-     *
-     * For example sequence(1,5,1)={1,2,3,4}, and sequence(7,1,-2)={7.5,3}
-     *
-     * @since 1.150
-     */
-    public static List<Integer> sequence(final int start, int end, final int step) {
-
-        final int size = (end-start)/step;
-        if(size<0)  throw new IllegalArgumentException("List size is negative");
-
-        return new AbstractList<Integer>() {
-            public Integer get(int index) {
-                if(index<0 || index>=size)
-                    throw new IndexOutOfBoundsException();
-                return start+index*step;
-            }
-
-            public int size() {
-                return size;
-            }
-        };
-    }
-
-    public static List<Integer> sequence(int start, int end) {
-        return sequence(start,end,1);
-    }
-
-    /**
-     * The short cut for {@code reverse(sequence(start,end,step))}.
-     *
-     * @since 1.150
-     */
-    public static List<Integer> reverseSequence(int start, int end, int step) {
-        return sequence(end-1,start-1,-step);
-    }
-
-    public static List<Integer> reverseSequence(int start, int end) {
-        return reverseSequence(start,end,1);
-    }
-
-    /**
-     * Casts {@link Iterator} by taking advantage of its covariant-ness.
-     */
-    @SuppressWarnings({"unchecked"})
-    public static <T> Iterator<T> cast(Iterator<? extends T> itr) {
-        return (Iterator)itr;
-    }
-
-    /**
-     * Casts {@link Iterable} by taking advantage of its covariant-ness.
-     */
-    @SuppressWarnings({"unchecked"})
-    public static <T> Iterable<T> cast(Iterable<? extends T> itr) {
-        return (Iterable)itr;
-    }
-
-    /**
-     * Returns an {@link Iterator} that only returns items of the given subtype.
-     */
-    @SuppressWarnings({"unchecked"})
-    public static <U,T extends U> Iterator<T> subType(Iterator<U> itr, final Class<T> type) {
-        return (Iterator)new FilterIterator<U>(itr) {
-            protected boolean filter(U u) {
-                return type.isInstance(u);
-            }
-        };
-    }
-
-    /**
-     * Creates a read-only mutator that disallows {@link Iterator#remove()}.
-     */
-    public static <T> Iterator<T> readOnly(final Iterator<T> itr) {
-        return new Iterator<T>() {
-            public boolean hasNext() {
-                return itr.hasNext();
-            }
-
-            public T next() {
-                return itr.next();
-            }
-
-            public void remove() {
-                throw new UnsupportedOperationException();
-            }
-        };
-    }
-
-    /**
-     * Wraps another iterator and throws away nulls.
-     */
-    public static <T> Iterator<T> removeNull(final Iterator<T> itr) {
-        return com.google.common.collect.Iterators.filter(itr, Predicates.notNull());
-    }
-
-    /**
-     * Returns an {@link Iterable} that iterates over all the given {@link Iterable}s.
-     *
-     * <p>
-     * That is, this creates {A,B,C,D} from {A,B},{C,D}.
-     */
-    @SafeVarargs
-    public static <T> Iterable<T> sequence( final Iterable<? extends T>... iterables ) {
-        return new Iterable<T>() {
-            public Iterator<T> iterator() {
-                return new FlattenIterator<T,Iterable<? extends T>>(ImmutableList.copyOf(iterables)) {
-                    protected Iterator<T> expand(Iterable<? extends T> iterable) {
-                        return Iterators.<T>cast(iterable).iterator();
-                    }
-                };
-            }
-        };
-    }
-
-    /**
-     * Filters another iterator by eliminating duplicates.
-     */
-    public static <T> Iterator<T> removeDups(Iterator<T> iterator) {
-        return new FilterIterator<T>(iterator) {
-            final Set<T> found = new HashSet<>();
-            @Override
-            protected boolean filter(T t) {
-                return found.add(t);
-            }
-        };
-    }
-
-    /**
-     * Filters another iterator by eliminating duplicates.
-     */
-    public static <T> Iterable<T> removeDups(final Iterable<T> base) {
-        return new Iterable<T>() {
-            public Iterator<T> iterator() {
-                return removeDups(base.iterator());
-            }
-        };
-    }
-
-    @SafeVarargs
-    public static <T> Iterator<T> sequence(Iterator<? extends T>... iterators) {
-        return com.google.common.collect.Iterators.concat(iterators);
-    }
-
-    /**
-     * Returns the elements in the base iterator until it hits any element that doesn't satisfy the filter.
-     * Then the rest of the elements in the base iterator gets ignored.
-     *
-     * @since 1.485
-     */
-    public static <T> Iterator<T> limit(final Iterator<? extends T> base, final CountingPredicate<? super T> filter) {
-        return new Iterator<T>() {
-            private T next;
-            private boolean end;
-            private int index=0;
-            public boolean hasNext() {
-                fetch();
-                return next!=null;
-            }
-
-            public T next() {
-                fetch();
-                T r = next;
-                next = null;
-                return r;
-            }
-
-            private void fetch() {
-                if (next==null && !end) {
-                    if (base.hasNext()) {
-                        next = base.next();
-                        if (!filter.apply(index++,next)) {
-                            next = null;
-                            end = true;
-                        }
-                    } else {
-                        end = true;
-                    }
-                }
-            }
-
-            public void remove() {
-                throw new UnsupportedOperationException();
-            }
-        };
-    }
-
     public interface CountingPredicate<T> {
         boolean apply(int index, T input);
-    }
-
-    /**
-     * Similar to {@link com.google.common.collect.Iterators#skip} except not {@link Beta}.
-     * @param iterator some iterator
-     * @param count a nonnegative count
-     */
-    @Restricted(NoExternalUse.class)
-    public static void skip(@Nonnull Iterator<?> iterator, int count) {
-        if (count < 0) {
-            throw new IllegalArgumentException();
-        }
-        while (iterator.hasNext() && count-- > 0) {
-            iterator.next();
-        }
     }
 
 }

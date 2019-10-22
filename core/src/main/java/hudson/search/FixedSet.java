@@ -46,23 +46,25 @@ public class FixedSet implements SearchIndex {
         this(Arrays.asList(items));
     }
 
-    public void find(String token, List<SearchItem> result) {
+    @Override
+	public void find(String token, List<SearchItem> result) {
         boolean caseInsensitive = UserSearchProperty.isCaseInsensitive();
-        for (SearchItem i : items) {
+        items.forEach(i -> {
             String name = i.getSearchName();
             if (name != null && (name.equals(token) || (caseInsensitive && name.equalsIgnoreCase(token)))) {
                 result.add(i);
             }
-        }
+        });
     }
 
-    public void suggest(String token, List<SearchItem> result) {
+    @Override
+	public void suggest(String token, List<SearchItem> result) {
         boolean caseInsensitive = UserSearchProperty.isCaseInsensitive();
-        for (SearchItem i : items) {
+        items.forEach(i -> {
             String name = i.getSearchName();
             if (name != null && (name.contains(token) || (caseInsensitive && StringUtils.containsIgnoreCase(name, token)))) {
                 result.add(i);
             }
-        }
+        });
     }
 }

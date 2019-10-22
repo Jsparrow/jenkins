@@ -53,13 +53,13 @@ public class BuildDiscarderProperty extends OptionalJobProperty<Job<?,?>> {
     @Symbol("buildDiscarder")
     public static class DescriptorImpl extends OptionalJobPropertyDescriptor {
 
-        @Override
-        public String getDisplayName() {
-            return Messages.BuildDiscarderProperty_displayName();
-        }
-
         static {
             Items.XSTREAM2.addCompatibilityAlias("org.jenkinsci.plugins.workflow.job.properties.BuildDiscarderProperty", BuildDiscarderProperty.class);
+        }
+
+		@Override
+        public String getDisplayName() {
+            return Messages.BuildDiscarderProperty_displayName();
         }
 
     }

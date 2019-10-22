@@ -21,18 +21,23 @@ import java.io.File;
  */
 public class AdminFilePathFilter extends ReflectiveFilePathFilter {
 
-    private final AdminWhitelistRule rule;
+    /**
+     * Local user preference should have higher priority than random FilePathFilters that
+     * plugins might provide.
+     */
+    public static final double ORDINAL = 100;
+	private final AdminWhitelistRule rule;
 
-    public AdminFilePathFilter(AdminWhitelistRule rule) {
+	public AdminFilePathFilter(AdminWhitelistRule rule) {
         this.rule = rule;
     }
 
-    @Override
-    protected boolean op(String op, File path) throws SecurityException {
+	@Override
+    protected boolean op(String op, File path) {
         return rule.checkFileAccess(op,path);
     }
 
-    @Extension
+	@Extension
     public static class ChannelConfiguratorImpl extends ChannelConfigurator {
         @Inject
         AdminWhitelistRule rule;
@@ -42,10 +47,4 @@ public class AdminFilePathFilter extends ReflectiveFilePathFilter {
             new AdminFilePathFilter(rule).installTo(builder,ORDINAL);
         }
     }
-
-    /**
-     * Local user preference should have higher priority than random FilePathFilters that
-     * plugins might provide.
-     */
-    public static final double ORDINAL = 100;
 }

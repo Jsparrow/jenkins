@@ -61,16 +61,184 @@ import hudson.util.Iterators.DuplicateFilterIterator;
  * @since 1.302
  */
 public class ConsistentHash<T> {
-    /**
+    static final Hash<?> DEFAULT_HASH = new Hash<Object>() {
+        @Override
+		public String hash(Object o) {
+            return o.toString();
+        }
+    };
+	/**
      * All the items in the hash, to their replication factors.
      */
     private final Map<T,Point[]> items = new HashMap<>();
-    private int numPoints;
+	private int numPoints;
+	private final int defaultReplication;
+	private final Hash<T> hash;
+	/**
+     * Table that gets atomically replaced for concurrency safe operation.
+     */
+    private volatile Table table;
 
-    private final int defaultReplication;
-    private final Hash<T> hash;
+	public ConsistentHash() {
+        this((Hash<T>) DEFAULT_HASH);
+    }
 
-    /**
+	public ConsistentHash(int defaultReplication) {
+        this((Hash<T>) DEFAULT_HASH,defaultReplication);
+    }
+
+	public ConsistentHash(Hash<T> hash) {
+        this(hash, 100);
+    }
+
+	public ConsistentHash(Hash<T> hash, int defaultReplication) {
+        this.hash = hash;
+        this.defaultReplication = defaultReplication;
+        refreshTable();
+    }
+
+	public int countAllPoints() {
+        return numPoints;
+    }
+
+	/**
+     * Adds a new node with the default number of replica.
+     */
+    public synchronized void add(T node) {
+        add(node,defaultReplication);
+    }
+
+	/**
+     * Calls {@link #add(Object)} with all the arguments.
+     */
+    public synchronized void addAll(T... nodes) {
+        for (T node : nodes) {
+			addInternal(node,defaultReplication);
+		}
+        refreshTable();
+    }
+
+	/**
+     * Calls {@link #add(Object)} with all the arguments.
+     */
+    public synchronized void addAll(Collection<? extends T> nodes) {
+        nodes.forEach(node -> addInternal(node, defaultReplication));
+        refreshTable();
+    }
+
+	/**
+     * Calls {@link #add(Object,int)} with all the arguments.
+     */
+    public synchronized void addAll(Map<? extends T,Integer> nodes) {
+        for (Map.Entry<? extends T,Integer> node : nodes.entrySet()) {
+			addInternal(node.getKey(),node.getValue());
+		}
+        refreshTable();
+    }
+
+	/**
+     * Removes the node entirely. This is the same as {@code add(node,0)}
+     */
+    public synchronized void remove(T node) {
+        add(node, 0);
+    }
+
+	/**
+     * Adds a new node with the given number of replica.
+     */
+    public synchronized void add(T node, int replica) {
+        addInternal(node, replica);
+        refreshTable();
+    }
+
+	private synchronized void addInternal(T node, int replica) {
+        if (replica==0) {
+            items.remove(node);
+        } else {
+            Point[] points = new Point[replica];
+            String seed = hash.hash(node);
+            for (int i=0; i<replica; i++) {
+				points[i] = new Point(md5(new StringBuilder().append(seed).append(':').append(i).toString()),node);
+			}
+            items.put(node,points);
+        }
+    }
+
+	private synchronized void refreshTable() {
+        table = new Table();
+    }
+
+	/**
+     * Compresses a string into an integer with MD5.
+     */
+    private int md5(String s) {
+        try {
+            MessageDigest md5 = MessageDigest.getInstance("MD5");
+            md5.update(s.getBytes());
+            byte[] digest = md5.digest();
+
+            // 16 bytes -> 4 bytes
+            for (int i=0; i<4; i++) {
+				digest[i] ^= digest[i+4]+digest[i+8]+digest[i+12];
+			}
+            return (b2i(digest[0])<< 24)|(b2i(digest[1])<<16)|(b2i(digest[2])<< 8)|b2i(digest[3]);
+        } catch (GeneralSecurityException e) {
+            throw new RuntimeException("Could not generate MD5 hash", e);
+        }
+    }
+
+	/**
+     * unsigned byte->int.
+     */
+    private int b2i(byte b) {
+        return ((int)b)&0xFF;
+    }
+
+	/**
+     * Looks up a consistent hash with the given data point.
+     *
+     * <p>
+     * The whole point of this class is that if the same query point is given,
+     * it's likely to return the same result even when other nodes are added/removed,
+     * or the # of replicas for the given node is changed.
+     *
+     * @return
+     *      null if the consistent hash is empty. Otherwise always non-null.
+     */
+    public T lookup(int queryPoint) {
+        return table.lookup(queryPoint);
+    }
+
+	/**
+     * Takes a string, hash it with MD5, then calls {@link #lookup(int)}. 
+     */
+    public T lookup(String queryPoint) {
+        return lookup(md5(queryPoint));
+    }
+
+	/**
+     * Creates a permutation of all the nodes for the given data point.
+     *
+     * <p>
+     * The returned permutation is consistent, in the sense that small change
+     * to the consistent hash (like addition/removal/change of replicas) only
+     * creates a small change in the permutation.
+     *
+     * <p>
+     * Nodes with more replicas are more likely to show up early in the list
+     */
+    public Iterable<T> list(final int queryPoint) {
+        return () -> table.list(queryPoint);
+    }
+
+	/**
+     * Takes a string, hash it with MD5, then calls {@link #list(int)}.
+     */
+    public Iterable<T> list(String queryPoint) {
+        return list(md5(queryPoint));
+    }
+
+	/**
      * Used for remembering the computed MD5 hash, since it's bit expensive to do it all over again.
      */
     private static final class Point implements Comparable<Point> {
@@ -82,17 +250,17 @@ public class ConsistentHash<T> {
             this.item = item;
         }
 
-        public int compareTo(Point that) {
-            if(this.hash<that.hash) return -1;
-            if(this.hash==that.hash) return 0;
+        @Override
+		public int compareTo(Point that) {
+            if(this.hash<that.hash) {
+				return -1;
+			}
+            if(this.hash==that.hash) {
+				return 0;
+			}
             return 1;
         }
     }
-
-    /**
-     * Table that gets atomically replaced for concurrency safe operation.
-     */
-    private volatile Table table;
 
     /**
      * Immutable consistent hash table.
@@ -103,8 +271,9 @@ public class ConsistentHash<T> {
 
         private Table() {
             int r=0;
-            for (Point[] v : items.values())
-                r+=v.length;
+            for (Point[] v : items.values()) {
+				r+=v.length;
+			}
             numPoints = r;
 
             // merge all points from all nodes and sort them into a single array
@@ -128,7 +297,9 @@ public class ConsistentHash<T> {
 
         T lookup(int queryPoint) {
             int i = index(queryPoint);
-            if(i<0) return null;
+            if(i<0) {
+				return null;
+			}
             return (T)owner[i];
         }
 
@@ -144,16 +315,21 @@ public class ConsistentHash<T> {
             return new DuplicateFilterIterator<>(new Iterator<T>() {
                 int pos = 0;
 
-                public boolean hasNext() {
+                @Override
+				public boolean hasNext() {
                     return pos < owner.length;
                 }
 
-                public T next() {
-                    if (!hasNext()) throw new NoSuchElementException();
+                @Override
+				public T next() {
+                    if (!hasNext()) {
+						throw new NoSuchElementException();
+					}
                     return (T) owner[(start + (pos++)) % owner.length];
                 }
 
-                public void remove() {
+                @Override
+				public void remove() {
                     throw new UnsupportedOperationException();
                 }
             });
@@ -163,7 +339,9 @@ public class ConsistentHash<T> {
             int idx = Arrays.binarySearch(hash, queryPoint);
             if(idx<0) {
                 idx = -idx-1; // idx is now 'insertion point'
-                if(hash.length==0)  return -1;
+                if(hash.length==0) {
+					return -1;
+				}
                 idx %= hash.length; // make it a circle
             }
             return idx;
@@ -192,171 +370,5 @@ public class ConsistentHash<T> {
          *      The hash value.
          */
         String hash(T t);
-    }
-
-    static final Hash<?> DEFAULT_HASH = new Hash<Object>() {
-        public String hash(Object o) {
-            return o.toString();
-        }
-    };
-
-    public ConsistentHash() {
-        this((Hash<T>) DEFAULT_HASH);
-    }
-
-    public ConsistentHash(int defaultReplication) {
-        this((Hash<T>) DEFAULT_HASH,defaultReplication);
-    }
-
-    public ConsistentHash(Hash<T> hash) {
-        this(hash, 100);
-    }
-
-    public ConsistentHash(Hash<T> hash, int defaultReplication) {
-        this.hash = hash;
-        this.defaultReplication = defaultReplication;
-        refreshTable();
-    }
-
-    public int countAllPoints() {
-        return numPoints;
-    }
-
-    /**
-     * Adds a new node with the default number of replica.
-     */
-    public synchronized void add(T node) {
-        add(node,defaultReplication);
-    }
-
-    /**
-     * Calls {@link #add(Object)} with all the arguments.
-     */
-    public synchronized void addAll(T... nodes) {
-        for (T node : nodes)
-            addInternal(node,defaultReplication);
-        refreshTable();
-    }
-
-    /**
-     * Calls {@link #add(Object)} with all the arguments.
-     */
-    public synchronized void addAll(Collection<? extends T> nodes) {
-        for (T node : nodes)
-            addInternal(node,defaultReplication);
-        refreshTable();
-    }
-
-    /**
-     * Calls {@link #add(Object,int)} with all the arguments.
-     */
-    public synchronized void addAll(Map<? extends T,Integer> nodes) {
-        for (Map.Entry<? extends T,Integer> node : nodes.entrySet())
-            addInternal(node.getKey(),node.getValue());
-        refreshTable();
-    }
-
-    /**
-     * Removes the node entirely. This is the same as {@code add(node,0)}
-     */
-    public synchronized void remove(T node) {
-        add(node, 0);
-    }
-
-    /**
-     * Adds a new node with the given number of replica.
-     */
-    public synchronized void add(T node, int replica) {
-        addInternal(node, replica);
-        refreshTable();
-    }
-
-    private synchronized void addInternal(T node, int replica) {
-        if (replica==0) {
-            items.remove(node);
-        } else {
-            Point[] points = new Point[replica];
-            String seed = hash.hash(node);
-            for (int i=0; i<replica; i++)
-                points[i] = new Point(md5(seed+':'+i),node);
-            items.put(node,points);
-        }
-    }
-
-    private synchronized void refreshTable() {
-        table = new Table();
-    }
-
-    /**
-     * Compresses a string into an integer with MD5.
-     */
-    private int md5(String s) {
-        try {
-            MessageDigest md5 = MessageDigest.getInstance("MD5");
-            md5.update(s.getBytes());
-            byte[] digest = md5.digest();
-
-            // 16 bytes -> 4 bytes
-            for (int i=0; i<4; i++)
-                digest[i] ^= digest[i+4]+digest[i+8]+digest[i+12];
-            return (b2i(digest[0])<< 24)|(b2i(digest[1])<<16)|(b2i(digest[2])<< 8)|b2i(digest[3]);
-        } catch (GeneralSecurityException e) {
-            throw new RuntimeException("Could not generate MD5 hash", e);
-        }
-    }
-
-    /**
-     * unsigned byte->int.
-     */
-    private int b2i(byte b) {
-        return ((int)b)&0xFF;
-    }
-
-    /**
-     * Looks up a consistent hash with the given data point.
-     *
-     * <p>
-     * The whole point of this class is that if the same query point is given,
-     * it's likely to return the same result even when other nodes are added/removed,
-     * or the # of replicas for the given node is changed.
-     *
-     * @return
-     *      null if the consistent hash is empty. Otherwise always non-null.
-     */
-    public T lookup(int queryPoint) {
-        return table.lookup(queryPoint);
-    }
-
-    /**
-     * Takes a string, hash it with MD5, then calls {@link #lookup(int)}. 
-     */
-    public T lookup(String queryPoint) {
-        return lookup(md5(queryPoint));
-    }
-
-    /**
-     * Creates a permutation of all the nodes for the given data point.
-     *
-     * <p>
-     * The returned permutation is consistent, in the sense that small change
-     * to the consistent hash (like addition/removal/change of replicas) only
-     * creates a small change in the permutation.
-     *
-     * <p>
-     * Nodes with more replicas are more likely to show up early in the list
-     */
-    public Iterable<T> list(final int queryPoint) {
-        return new Iterable<T>() {
-            public Iterator<T> iterator() {
-                return table.list(queryPoint);
-            }
-        };
-    }
-
-    /**
-     * Takes a string, hash it with MD5, then calls {@link #list(int)}.
-     */
-    public Iterable<T> list(String queryPoint) {
-        return list(md5(queryPoint));
     }
 }

@@ -59,109 +59,6 @@ import java.util.logging.Logger;
  */
 public class CompressedFile {
     /**
-     * The name of the raw file.
-     */
-    private final File file;
-
-    /**
-     * The name of the compressed file.
-     */
-    private final File gz;
-
-    public CompressedFile(File file) {
-        this.file = file;
-        this.gz = new File(file.getParentFile(),file.getName()+".gz");
-    }
-
-    /**
-     * Gets the OutputStream to write to the file.
-     */
-    public OutputStream write() throws IOException {
-        if(gz.exists())
-            gz.delete();
-        try {
-            return Files.newOutputStream(file.toPath());
-        } catch (InvalidPathException e) {
-            throw new IOException(e);
-        }
-    }
-
-    /**
-     * Reads the contents of a file.
-     */
-    public InputStream read() throws IOException {
-        if(file.exists())
-            try {
-                return Files.newInputStream(file.toPath());
-            } catch (InvalidPathException e) {
-                throw new IOException(e);
-            }
-
-        // check if the compressed file exists
-        if(gz.exists())
-            try {
-                return new GZIPInputStream(Files.newInputStream(gz.toPath()));
-            } catch (InvalidPathException e) {
-                throw new IOException(e);
-            }
-
-        // no such file
-        throw new FileNotFoundException(file.getName());
-    }
-
-    /**
-     * Loads the file content as a string.
-     */
-    public String loadAsString() throws IOException {
-        long sizeGuess;
-        if(file.exists())
-            sizeGuess = file.length();
-        else
-        if(gz.exists())
-            sizeGuess = gz.length()*2;
-        else
-            return "";
-
-        StringBuilder str = new StringBuilder((int)sizeGuess);
-
-        try (InputStream is = read();
-             Reader r = new InputStreamReader(is)) {
-            char[] buf = new char[8192];
-            int len;
-            while((len=r.read(buf,0,buf.length))>0)
-                str.append(buf,0,len);
-        }
-
-        return str.toString();
-    }
-
-    /**
-     * Asynchronously schedules the compression of this file.
-     *
-     * <p>
-     * Once the file is compressed, the original will be removed and
-     * the further reading will be done from the compressed stream.
-     */
-    public void compress() {
-        compressionThread.submit(new Runnable() {
-            public void run() {
-                try {
-                    try (InputStream in = read();
-                         OutputStream os = Files.newOutputStream(gz.toPath());
-                         OutputStream out = new GZIPOutputStream(os)) {
-                        org.apache.commons.io.IOUtils.copy(in, out);
-                    }
-                    // if the compressed file is created successfully, remove the original
-                    file.delete();
-                } catch (IOException e) {
-                    LOGGER.log(Level.WARNING, "Failed to compress "+file,e);
-                    gz.delete(); // in case a processing is left in the middle
-                }
-            }
-        });
-    }
-
-    /**
      * Executor used for compression. Limited up to one thread since
      * this should be a fairly low-priority task.
      */
@@ -169,5 +66,111 @@ public class CompressedFile {
         0, 1, 5L, TimeUnit.SECONDS, new LinkedBlockingQueue<>(),
         new ExceptionCatchingThreadFactory(new NamingThreadFactory(new DaemonThreadFactory(), "CompressedFile")));
 
-    private static final Logger LOGGER = Logger.getLogger(CompressedFile.class.getName());
+	private static final Logger LOGGER = Logger.getLogger(CompressedFile.class.getName());
+
+	/**
+     * The name of the raw file.
+     */
+    private final File file;
+
+	/**
+     * The name of the compressed file.
+     */
+    private final File gz;
+
+	public CompressedFile(File file) {
+        this.file = file;
+        this.gz = new File(file.getParentFile(),file.getName()+".gz");
+    }
+
+	/**
+     * Gets the OutputStream to write to the file.
+     */
+    public OutputStream write() throws IOException {
+        if(gz.exists()) {
+			gz.delete();
+		}
+        try {
+            return Files.newOutputStream(file.toPath());
+        } catch (InvalidPathException e) {
+            throw new IOException(e);
+        }
+    }
+
+	/**
+     * Reads the contents of a file.
+     */
+    public InputStream read() throws IOException {
+        if(file.exists()) {
+			try {
+                return Files.newInputStream(file.toPath());
+            } catch (InvalidPathException e) {
+                throw new IOException(e);
+            }
+		}
+
+        // check if the compressed file exists
+        if(gz.exists()) {
+			try {
+                return new GZIPInputStream(Files.newInputStream(gz.toPath()));
+            } catch (InvalidPathException e) {
+                throw new IOException(e);
+            }
+		}
+
+        // no such file
+        throw new FileNotFoundException(file.getName());
+    }
+
+	/**
+     * Loads the file content as a string.
+     */
+    public String loadAsString() throws IOException {
+        long sizeGuess;
+        if(file.exists()) {
+			sizeGuess = file.length();
+		} else
+        if(gz.exists()) {
+			sizeGuess = gz.length()*2;
+		} else {
+			return "";
+		}
+
+        StringBuilder str = new StringBuilder((int)sizeGuess);
+
+        try (InputStream is = read();
+             Reader r = new InputStreamReader(is)) {
+            char[] buf = new char[8192];
+            int len;
+            while((len=r.read(buf,0,buf.length))>0) {
+				str.append(buf,0,len);
+			}
+        }
+
+        return str.toString();
+    }
+
+	/**
+     * Asynchronously schedules the compression of this file.
+     *
+     * <p>
+     * Once the file is compressed, the original will be removed and
+     * the further reading will be done from the compressed stream.
+     */
+    public void compress() {
+        compressionThread.submit(() -> {
+		    try {
+		        try (InputStream in = read();
+		             OutputStream os = Files.newOutputStream(gz.toPath());
+		             OutputStream out = new GZIPOutputStream(os)) {
+		            org.apache.commons.io.IOUtils.copy(in, out);
+		        }
+		        // if the compressed file is created successfully, remove the original
+		        file.delete();
+		    } catch (IOException e) {
+		        LOGGER.log(Level.WARNING, "Failed to compress "+file,e);
+		        gz.delete(); // in case a processing is left in the middle
+		    }
+		});
+    }
 }

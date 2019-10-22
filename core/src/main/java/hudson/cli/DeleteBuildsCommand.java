@@ -66,7 +66,7 @@ public class DeleteBuildsCommand extends RunRangeCommand {
             }
         }
 
-        stdout.println("Deleted "+hsBuilds.size()+" builds");
+        stdout.println(new StringBuilder().append("Deleted ").append(hsBuilds.size()).append(" builds").toString());
 
         return 0;
     }

@@ -23,14 +23,16 @@ import java.util.logging.Logger;
  * @see WebAppMain#recordBootAttempt(File)
  */
 public abstract class BootFailure extends ErrorObject {
-    protected BootFailure() {
+    private static final Logger LOGGER = Logger.getLogger(BootFailure.class.getName());
+
+	protected BootFailure() {
     }
 
-    protected BootFailure(Throwable cause) {
+	protected BootFailure(Throwable cause) {
         super(cause);
     }
 
-    /**
+	/**
      * Exposes this failure to UI and invoke the hook.
      *
      * @param home
@@ -51,7 +53,7 @@ public abstract class BootFailure extends ErrorObject {
                 .run();
     }
 
-    /**
+	/**
      * Parses the boot attempt file carefully so as not to cause the entire hook script to fail to execute.
      */
     protected List<Date> loadAttempts(File home) {
@@ -61,14 +63,13 @@ public abstract class BootFailure extends ErrorObject {
             try {
                 if (f.exists()) {
                     try (BufferedReader failureFileReader = new BufferedReader(new FileReader(f))) {
-                        String line;
-                        while ((line=failureFileReader.readLine())!=null) {
+                        failureFileReader.lines().forEach(line -> {
                             try {
                                 dates.add(new Date(line));
                             } catch (Exception e) {
                                 // ignore any parse error
                             }
-                        }
+                        });
                     }
                 }
             } catch (IOException e) {
@@ -78,9 +79,7 @@ public abstract class BootFailure extends ErrorObject {
         return dates;
     }
 
-    private static final Logger LOGGER = Logger.getLogger(BootFailure.class.getName());
-
-    /**
+	/**
      * This file captures failed boot attempts.
      * Every time we try to boot, we add the timestamp to this file,
      * then when we boot, the file gets deleted.

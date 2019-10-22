@@ -76,7 +76,46 @@ import org.jenkinsci.Symbol;
  */
 public abstract class Trigger<J extends Item> implements Describable<Trigger<?>>, ExtensionPoint {
 
-    /**
+    private static Future previousSynchronousPolling;
+	public static long CRON_THRESHOLD = 1000*30;    // Default threshold 30s
+	private static final Logger LOGGER = Logger.getLogger(Trigger.class.getName());
+	/**
+     * This timer is available for all the components inside Hudson to schedule
+     * some work.
+     *
+     * Initialized and cleaned up by {@link jenkins.model.Jenkins}, but value kept here for compatibility.
+     *
+     * If plugins want to run periodic jobs, they should implement {@link PeriodicWork}.
+     *
+     * @deprecated Use {@link jenkins.util.Timer#get()} instead.
+     */
+    @SuppressWarnings("MS_SHOULD_BE_FINAL")
+    @Deprecated
+    public static @CheckForNull java.util.Timer timer;
+	protected final String spec;
+	protected transient CronTabList tabs;
+	@CheckForNull
+    protected transient J job;
+
+	/**
+     * Creates a new {@link Trigger} that gets {@link #run() run}
+     * periodically. This is useful when your trigger does
+     * some polling work.
+     */
+    protected Trigger(@Nonnull String cronTabSpec) throws ANTLRException {
+        this.spec = cronTabSpec;
+        this.tabs = CronTabList.create(cronTabSpec);
+    }
+
+	/**
+     * Creates a new {@link Trigger} without using cron.
+     */
+    protected Trigger() {
+        this.spec = "";
+        this.tabs = new CronTabList(Collections.emptyList());
+    }
+
+	/**
      * Called when a {@link Trigger} is loaded into memory and started.
      *
      * @param project
@@ -102,7 +141,7 @@ public abstract class Trigger<J extends Item> implements Describable<Trigger<?>>
         }
     }
 
-    /**
+	/**
      * Executes the triggered task.
      *
      * This method is invoked when {@link #Trigger(String)} is used
@@ -112,7 +151,7 @@ public abstract class Trigger<J extends Item> implements Describable<Trigger<?>>
      */
     public void run() {}
 
-    /**
+	/**
      * Called before a {@link Trigger} is removed.
      * Under some circumstances, this may be invoked more than once for
      * a given {@link Trigger}, so be prepared for that.
@@ -123,7 +162,7 @@ public abstract class Trigger<J extends Item> implements Describable<Trigger<?>>
      */
     public void stop() {}
 
-    /**
+	/**
      * Returns an action object if this {@link Trigger} has an action
      * to contribute to a {@link Project}.
      *
@@ -135,7 +174,7 @@ public abstract class Trigger<J extends Item> implements Describable<Trigger<?>>
         return null;
     }
 
-    /**
+	/**
      * {@link Action}s to be displayed in the job page.
      *
      * @return
@@ -145,40 +184,18 @@ public abstract class Trigger<J extends Item> implements Describable<Trigger<?>>
     public Collection<? extends Action> getProjectActions() {
         // delegate to getJobAction (singular) for backward compatible behavior
         Action a = getProjectAction();
-        if (a==null)    return Collections.emptyList();
+        if (a==null) {
+			return Collections.emptyList();
+		}
         return Collections.singletonList(a);
     }
 
-    public TriggerDescriptor getDescriptor() {
+	@Override
+	public TriggerDescriptor getDescriptor() {
         return (TriggerDescriptor) Jenkins.get().getDescriptorOrDie(getClass());
     }
 
-
-
-    protected final String spec;
-    protected transient CronTabList tabs;
-    @CheckForNull
-    protected transient J job;
-
-    /**
-     * Creates a new {@link Trigger} that gets {@link #run() run}
-     * periodically. This is useful when your trigger does
-     * some polling work.
-     */
-    protected Trigger(@Nonnull String cronTabSpec) throws ANTLRException {
-        this.spec = cronTabSpec;
-        this.tabs = CronTabList.create(cronTabSpec);
-    }
-
-    /**
-     * Creates a new {@link Trigger} without using cron.
-     */
-    protected Trigger() {
-        this.spec = "";
-        this.tabs = new CronTabList(Collections.emptyList());
-    }
-
-    /**
+	/**
      * Gets the crontab specification.
      *
      * If you are not using cron service, just ignore it.
@@ -187,7 +204,7 @@ public abstract class Trigger<J extends Item> implements Describable<Trigger<?>>
         return spec;
     }
 
-    protected Object readResolve() throws ObjectStreamException {
+	protected Object readResolve() throws ObjectStreamException {
         try {
             tabs = CronTabList.create(spec);
         } catch (ANTLRException e) {
@@ -198,45 +215,7 @@ public abstract class Trigger<J extends Item> implements Describable<Trigger<?>>
         return this;
     }
 
-
-    /**
-     * Runs every minute to check {@link TimerTrigger} and schedules build.
-     */
-    @Extension @Symbol("cron")
-    public static class Cron extends PeriodicWork {
-        private final Calendar cal = new GregorianCalendar();
-
-        public Cron() {
-            cal.set(Calendar.SECOND, 0);
-            cal.set(Calendar.MILLISECOND, 0);
-        }
-
-        public long getRecurrencePeriod() {
-            return MIN;
-        }
-
-        public long getInitialDelay() {
-            return MIN - TimeUnit.SECONDS.toMillis(Calendar.getInstance().get(Calendar.SECOND));
-        }
-
-        public void doRun() {
-            while(new Date().getTime() >= cal.getTimeInMillis()) {
-                LOGGER.log(Level.FINE, "cron checking {0}", cal.getTime());
-                try {
-                    checkTriggers(cal);
-                } catch (Throwable e) {
-                    LOGGER.log(Level.WARNING,"Cron thread throw an exception",e);
-                    // SafeTimerTask.run would also catch this, but be sure to increment cal too.
-                }
-
-                cal.add(Calendar.MINUTE,1);
-            }
-        }
-    }
-
-    private static Future previousSynchronousPolling;
-
-    public static void checkTriggers(final Calendar cal) {
+	public static void checkTriggers(final Calendar cal) {
         Jenkins inst = Jenkins.get();
 
         // Are we using synchronous polling?
@@ -250,16 +229,14 @@ public abstract class Trigger<J extends Item> implements Describable<Trigger<?>>
                 // ignored, only the global setting is honored. The polling job is submitted only if the previous job has
                 // terminated.
                 // FIXME allow to set a global crontab spec
-                previousSynchronousPolling = scmd.getExecutor().submit(new DependencyRunner(new ProjectRunnable() {
-                    public void run(AbstractProject p) {
-                        for (Trigger t : (Collection<Trigger>) p.getTriggers().values()) {
-                            if (t instanceof SCMTrigger) {
-                                LOGGER.fine("synchronously triggering SCMTrigger for project " + t.job.getName());
-                                t.run();
-                            }
-                        }
-                    }
-                }));
+                previousSynchronousPolling = scmd.getExecutor().submit(new DependencyRunner((AbstractProject p) -> {
+				    for (Trigger t : (Collection<Trigger>) p.getTriggers().values()) {
+				        if (t instanceof SCMTrigger) {
+				            LOGGER.fine("synchronously triggering SCMTrigger for project " + t.job.getName());
+				            t.run();
+				        }
+				    }
+				}));
             } else {
                 LOGGER.fine("synchronous polling has detected unfinished jobs, will not trigger additional jobs.");
             }
@@ -288,7 +265,7 @@ public abstract class Trigger<J extends Item> implements Describable<Trigger<?>>
                             } catch (Throwable e) {
                                 // t.run() is a plugin, and some of them throw RuntimeException and other things.
                                 // don't let that cancel the polling activity. report and move on.
-                                LOGGER.log(Level.WARNING, t.getClass().getName() + ".run() failed for " + p, e);
+                                LOGGER.log(Level.WARNING, new StringBuilder().append(t.getClass().getName()).append(".run() failed for ").append(p).toString(), e);
                             }
                         } else {
                             LOGGER.log(Level.FINER, "did not trigger {0}", p);
@@ -301,48 +278,72 @@ public abstract class Trigger<J extends Item> implements Describable<Trigger<?>>
         }
     }
 
-    public static long CRON_THRESHOLD = 1000*30;    // Default threshold 30s
-
-    private static final Logger LOGGER = Logger.getLogger(Trigger.class.getName());
-
-    /**
-     * This timer is available for all the components inside Hudson to schedule
-     * some work.
-     *
-     * Initialized and cleaned up by {@link jenkins.model.Jenkins}, but value kept here for compatibility.
-     *
-     * If plugins want to run periodic jobs, they should implement {@link PeriodicWork}.
-     *
-     * @deprecated Use {@link jenkins.util.Timer#get()} instead.
-     */
-    @SuppressWarnings("MS_SHOULD_BE_FINAL")
-    @Deprecated
-    public static @CheckForNull java.util.Timer timer;
-
-    /**
+	/**
      * Returns all the registered {@link Trigger} descriptors.
      */
     public static DescriptorExtensionList<Trigger<?>,TriggerDescriptor> all() {
         return (DescriptorExtensionList) Jenkins.get().getDescriptorList(Trigger.class);
     }
 
-    /**
+	/**
      * Returns a subset of {@link TriggerDescriptor}s that applys to the given item.
      */
     public static List<TriggerDescriptor> for_(Item i) {
         List<TriggerDescriptor> r = new ArrayList<>();
         for (TriggerDescriptor t : all()) {
-            if(!t.isApplicable(i))  continue;
+            if(!t.isApplicable(i)) {
+				continue;
+			}
 
             if (i instanceof TopLevelItem) {// ugly
                 TopLevelItemDescriptor tld = ((TopLevelItem) i).getDescriptor();
                 // tld shouldn't be really null in contract, but we often write test Describables that
                 // doesn't have a Descriptor.
-                if(tld!=null && !tld.isApplicable(t))    continue;
+                if(tld!=null && !tld.isApplicable(t)) {
+					continue;
+				}
             }
 
             r.add(t);
         }
         return r;
+    }
+
+	/**
+     * Runs every minute to check {@link TimerTrigger} and schedules build.
+     */
+    @Extension @Symbol("cron")
+    public static class Cron extends PeriodicWork {
+        private final Calendar cal = new GregorianCalendar();
+
+        public Cron() {
+            cal.set(Calendar.SECOND, 0);
+            cal.set(Calendar.MILLISECOND, 0);
+        }
+
+        @Override
+		public long getRecurrencePeriod() {
+            return MIN;
+        }
+
+        @Override
+		public long getInitialDelay() {
+            return MIN - TimeUnit.SECONDS.toMillis(Calendar.getInstance().get(Calendar.SECOND));
+        }
+
+        @Override
+		public void doRun() {
+            while(new Date().getTime() >= cal.getTimeInMillis()) {
+                LOGGER.log(Level.FINE, "cron checking {0}", cal.getTime());
+                try {
+                    checkTriggers(cal);
+                } catch (Throwable e) {
+                    LOGGER.log(Level.WARNING,"Cron thread throw an exception",e);
+                    // SafeTimerTask.run would also catch this, but be sure to increment cal too.
+                }
+
+                cal.add(Calendar.MINUTE,1);
+            }
+        }
     }
 }

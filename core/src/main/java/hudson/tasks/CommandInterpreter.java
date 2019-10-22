@@ -48,25 +48,26 @@ import javax.annotation.Nonnull;
  * @author Kohsuke Kawaguchi
  */
 public abstract class CommandInterpreter extends Builder {
-    /**
+    private static final Logger LOGGER = Logger.getLogger(CommandInterpreter.class.getName());
+	/**
      * Command to execute. The format depends on the actual {@link CommandInterpreter} implementation.
      */
     protected final String command;
 
-    public CommandInterpreter(String command) {
+	public CommandInterpreter(String command) {
         this.command = command;
     }
 
-    public final String getCommand() {
+	public final String getCommand() {
         return command;
     }
 
-    @Override
+	@Override
     public boolean perform(AbstractBuild<?,?> build, Launcher launcher, BuildListener listener) throws InterruptedException {
         return perform(build,launcher,(TaskListener)listener);
     }
 
-    /**
+	/**
      * Determines whether a non-zero exit code from the process should change the build
      * status to {@link Result#UNSTABLE} instead of default {@link Result#FAILURE}.
      *
@@ -78,14 +79,15 @@ public abstract class CommandInterpreter extends Builder {
         return false;
     }
 
-    public boolean perform(AbstractBuild<?,?> build, Launcher launcher, TaskListener listener) throws InterruptedException {
+	public boolean perform(AbstractBuild<?,?> build, Launcher launcher, TaskListener listener) throws InterruptedException {
         FilePath ws = build.getWorkspace();
         if (ws == null) {
             Node node = build.getBuiltOn();
             if (node == null) {
                 throw new NullPointerException("no such build node: " + build.getBuiltOnStr());
             }
-            throw new NullPointerException("no workspace from node " + node + " which is computer " + node.toComputer() + " and has channel " + node.getChannel());
+            throw new NullPointerException(new StringBuilder().append("no workspace from node ").append(node).append(" which is computer ").append(node.toComputer()).append(" and has channel ").append(node.getChannel())
+					.toString());
         }
         FilePath script=null;
         int r = -1;
@@ -101,10 +103,9 @@ public abstract class CommandInterpreter extends Builder {
             try {
                 EnvVars envVars = build.getEnvironment(listener);
                 // on Windows environment variables are converted to all upper case,
-                // but no such conversions are done on Unix, so to make this cross-platform,
-                // convert variables to all upper cases.
-                for(Map.Entry<String,String> e : build.getBuildVariables().entrySet())
-                    envVars.put(e.getKey(),e.getValue());
+				// but no such conversions are done on Unix, so to make this cross-platform,
+				// convert variables to all upper cases.
+				build.getBuildVariables().entrySet().forEach(e -> envVars.put(e.getKey(), e.getValue()));
 
                 r = join(launcher.launch().cmds(buildCommandLine(script)).envs(envVars).stdout(listener).pwd(ws).start());
 
@@ -119,8 +120,9 @@ public abstract class CommandInterpreter extends Builder {
             return r==0;
         } finally {
             try {
-                if(script!=null)
-                    script.delete();
+                if(script!=null) {
+					script.delete();
+				}
             } catch (IOException e) {
                 if (r==-1 && e.getCause() instanceof ChannelClosedException) {
                     // JENKINS-5073
@@ -141,7 +143,7 @@ public abstract class CommandInterpreter extends Builder {
         }
     }
 
-    /**
+	/**
      * Reports the exit code from the process.
      *
      * This allows subtypes to treat the exit code differently (for example by treating non-zero exit code
@@ -155,18 +157,16 @@ public abstract class CommandInterpreter extends Builder {
         return p.join();
     }
 
-    /**
+	/**
      * Creates a script file in a temporary name in the specified directory.
      */
     public FilePath createScriptFile(@Nonnull FilePath dir) throws IOException, InterruptedException {
         return dir.createTextTempFile("jenkins", getFileExtension(), getContents(), false);
     }
 
-    public abstract String[] buildCommandLine(FilePath script);
+	public abstract String[] buildCommandLine(FilePath script);
 
-    protected abstract String getContents();
+	protected abstract String getContents();
 
-    protected abstract String getFileExtension();
-
-    private static final Logger LOGGER = Logger.getLogger(CommandInterpreter.class.getName());
+	protected abstract String getFileExtension();
 }

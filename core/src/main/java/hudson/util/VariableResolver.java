@@ -34,6 +34,11 @@ import java.util.Map;
  */
 public interface VariableResolver<V> {
     /**
+     * Empty resolver that always returns null.
+     */
+    VariableResolver NONE = (String name) -> null;
+
+	/**
      * Receives a variable name and obtains the value associated with the name.
      *
      * <p>
@@ -52,16 +57,7 @@ public interface VariableResolver<V> {
      */
     V resolve(String name);
 
-    /**
-     * Empty resolver that always returns null.
-     */
-    VariableResolver NONE = new VariableResolver() {
-        public Object resolve(String name) {
-            return null;
-        }
-    };
-
-    /**
+	/**
      * {@link VariableResolver} backed by a {@link Map}.
      */
     final class ByMap<V> implements VariableResolver<V> {
@@ -71,7 +67,8 @@ public interface VariableResolver<V> {
             this.data = data;
         }
 
-        public V resolve(String name) {
+        @Override
+		public V resolve(String name) {
             return data.get(name);
         }
     }
@@ -90,10 +87,13 @@ public interface VariableResolver<V> {
             this.resolvers = resolvers.toArray(new VariableResolver[0]);
         }
 
-        public V resolve(String name) {
+        @Override
+		public V resolve(String name) {
             for (VariableResolver<? extends V> r : resolvers) {
                 V v = r.resolve(name);
-                if(v!=null) return v;
+                if(v!=null) {
+					return v;
+				}
             }
             return null;
         }

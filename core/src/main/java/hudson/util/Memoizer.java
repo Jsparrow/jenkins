@@ -42,13 +42,17 @@ public abstract class Memoizer<K,V> {
 
     public V get(K key) {
         V v = store.get(key);
-        if(v!=null)     return v;
+        if(v!=null) {
+			return v;
+		}
 
         // TODO: if we want to, we can avoid locking altogether by putting a sentinel value
         // that represents "the value is being computed". FingerprintMap does this.
         synchronized (this) {
             v = store.get(key);
-            if(v!=null)     return v;
+            if(v!=null) {
+				return v;
+			}
 
             v = compute(key);
             store.put(key,v);

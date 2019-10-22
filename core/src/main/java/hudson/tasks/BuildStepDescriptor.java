@@ -76,12 +76,15 @@ public abstract class BuildStepDescriptor<T extends BuildStep & Describable<T>> 
 
         List<Descriptor<T>> r = new ArrayList<>(base.size());
         for (Descriptor<T> d : base) {
-            if (pd instanceof AbstractProjectDescriptor && !((AbstractProjectDescriptor)pd).isApplicable(d))
-                continue;
+            if (pd instanceof AbstractProjectDescriptor && !((AbstractProjectDescriptor)pd).isApplicable(d)) {
+				continue;
+			}
 
             if (d instanceof BuildStepDescriptor) {
                 BuildStepDescriptor<T> bd = (BuildStepDescriptor<T>) d;
-                if(!bd.isApplicable(type))  continue;
+                if(!bd.isApplicable(type)) {
+					continue;
+				}
                 r.add(bd);
             } else {
                 // old plugins built before 1.150 may not implement BuildStepDescriptor

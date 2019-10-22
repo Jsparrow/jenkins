@@ -25,40 +25,40 @@ import java.util.logging.Logger;
 @Extension
 public class SlowTriggerAdminMonitor extends AdministrativeMonitor {
 
-    @Nonnull
-    private final Map<String, Value> errors = new ConcurrentHashMap<>();
-
     public static int MAX_ENTRIES = 10;
 
-    @Nonnull
+	@Nonnull
     private static final Logger LOGGER = Logger.getLogger(SlowTriggerAdminMonitor.class.getName());
 
-    @Nonnull
+	@Nonnull
+    private final Map<String, Value> errors = new ConcurrentHashMap<>();
+
+	public SlowTriggerAdminMonitor() {
+    }
+
+	@Nonnull
     public static SlowTriggerAdminMonitor getInstance() {
         return ExtensionList.lookup(SlowTriggerAdminMonitor.class).get(0);
     }
 
-    public SlowTriggerAdminMonitor() {
-    }
-
-    @Override
+	@Override
     public boolean isActivated() {
         return !errors.isEmpty();
     }
 
-    @Override
+	@Override
     @Nonnull
     public String getDisplayName() {
         return Messages.SlowTriggerAdminMonitor_DisplayName();
     }
 
-    public void clear() {
+	public void clear() {
         synchronized (errors) {
             errors.clear();
         }
     }
 
-    public void report(@Nonnull final String trigger, @Nonnull final String msg) {
+	public void report(@Nonnull final String trigger, @Nonnull final String msg) {
 
         synchronized (errors) {
             if (errors.size() >= MAX_ENTRIES && !errors.containsKey(trigger)) {
@@ -77,12 +77,12 @@ public class SlowTriggerAdminMonitor extends AdministrativeMonitor {
         errors.put(trigger, new Value(msg));
     }
 
-    @Nonnull
+	@Nonnull
     public Map<String, Value> getErrors() {
         return new HashMap<>(errors);
     }
 
-    @Restricted(DoNotUse.class)
+	@Restricted(DoNotUse.class)
     @RequirePOST
     @Nonnull
     public HttpResponse doClear() throws IOException {
@@ -91,7 +91,7 @@ public class SlowTriggerAdminMonitor extends AdministrativeMonitor {
         return HttpResponses.redirectViaContextPath("/manage");
     }
 
-    public class Value {
+	public class Value {
 
         private final LocalDateTime time;
         private final String msg;

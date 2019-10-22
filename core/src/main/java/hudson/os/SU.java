@@ -71,17 +71,21 @@ public abstract class SU {
      *      Close this channel and the SU environment will be shut down.
      */
     public static VirtualChannel start(final TaskListener listener, final String rootUsername, final String rootPassword) throws IOException, InterruptedException {
-        if(File.pathSeparatorChar==';') // on Windows
-            return newLocalChannel();  // TODO: perhaps use RunAs to run as an Administrator?
+        if(File.pathSeparatorChar==';')
+		 {
+			return newLocalChannel();  // TODO: perhaps use RunAs to run as an Administrator?
+		}
 
         String os = Util.fixNull(System.getProperty("os.name"));
-        if(os.equals("Linux"))
-            return new UnixSu() {
-                protected String sudoExe() {
+        if("Linux".equals(os)) {
+			return new UnixSu() {
+                @Override
+				protected String sudoExe() {
                     return "sudo";
                 }
 
-                protected Process sudoWithPass(ArgumentListBuilder args) throws IOException {
+                @Override
+				protected Process sudoWithPass(ArgumentListBuilder args) throws IOException {
                     args.prepend(sudoExe(),"-S");
                     listener.getLogger().println("$ "+Util.join(args.toList()," "));
                     ProcessBuilder pb = new ProcessBuilder(args.toCommandArray());
@@ -95,14 +99,17 @@ public abstract class SU {
                     return p;
                 }
             }.start(listener,rootPassword);
+		}
 
-        if(os.equals("SunOS"))
-            return new UnixSu() {
-                protected String sudoExe() {
+        if("SunOS".equals(os)) {
+			return new UnixSu() {
+                @Override
+				protected String sudoExe() {
                     return "/usr/bin/pfexec";
                 }
 
-                protected Process sudoWithPass(ArgumentListBuilder args) throws IOException {
+                @Override
+				protected Process sudoWithPass(ArgumentListBuilder args) throws IOException {
                     listener.getLogger().println("Running with embedded_su");
                     ProcessBuilder pb = new ProcessBuilder(args.prepend(sudoExe()).toCommandArray());
                     return EmbeddedSu.startWithSu(rootUsername, rootPassword, pb);
@@ -110,6 +117,7 @@ public abstract class SU {
             // in solaris, pfexec never asks for a password, so username==null means
             // we won't be using password. this helps disambiguate empty password
             }.start(listener,rootUsername==null?null:rootPassword);
+		}
 
         // TODO: Mac?
 
@@ -134,7 +142,7 @@ public abstract class SU {
         }
     }
 
-    private static abstract class UnixSu {
+    private abstract static class UnixSu {
 
         protected abstract String sudoExe();
 
@@ -143,17 +151,19 @@ public abstract class SU {
         VirtualChannel start(TaskListener listener, String rootPassword) throws IOException, InterruptedException {
             final int uid = LIBC.geteuid();
 
-            if(uid==0)  // already running as root
-                return newLocalChannel();
+            if(uid==0) {
+				return newLocalChannel();
+			}
 
             String javaExe = System.getProperty("java.home") + "/bin/java";
             File slaveJar = Which.jarFile(Launcher.class);
 
             ArgumentListBuilder args = new ArgumentListBuilder().add(javaExe);
-            if(slaveJar.isFile())
-                args.add("-jar").add(slaveJar);
-            else // in production code this never happens, but during debugging this is convenient    
-                args.add("-cp").add(slaveJar).add(hudson.remoting.Launcher.class.getName());
+            if(slaveJar.isFile()) {
+				args.add("-jar").add(slaveJar);
+			} else {
+				args.add("-cp").add(slaveJar).add(hudson.remoting.Launcher.class.getName());
+			}
 
             if (Util.fixEmptyAndTrim(rootPassword) == null) {
                 // try sudo, in the hope that the user has the permission to do so without password

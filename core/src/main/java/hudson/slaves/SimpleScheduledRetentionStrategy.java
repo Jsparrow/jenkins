@@ -121,26 +121,26 @@ public class SimpleScheduledRetentionStrategy extends RetentionStrategy<SlaveCom
             nextStart = lastStart;
             nextStop = lastStop;
         }
-        if (nextStop < System.currentTimeMillis()) {
-            // next stop is in the past
-            lastStart = nextStart;
-            lastStop = nextStop;
-
-            // we don't want to look too far into the future
-            Calendar time = new GregorianCalendar();
-            time.add(Calendar.MINUTE, Math.min(15, upTimeMins));
-            long stopLooking = time.getTimeInMillis();
-            time.setTimeInMillis(nextStop);
-            while (stopLooking > time.getTimeInMillis()) {
-                if (tabs.check(time)) {
-                    nextStart = time.getTimeInMillis();
-                    time.add(Calendar.MINUTE, upTimeMins);
-                    nextStop = time.getTimeInMillis();
-                    break;
-                }
-                time.add(Calendar.MINUTE, 1);
-            }
-        }
+        if (nextStop >= System.currentTimeMillis()) {
+			return;
+		}
+		// next stop is in the past
+		lastStart = nextStart;
+		lastStop = nextStop;
+		// we don't want to look too far into the future
+		Calendar time = new GregorianCalendar();
+		time.add(Calendar.MINUTE, Math.min(15, upTimeMins));
+		long stopLooking = time.getTimeInMillis();
+		time.setTimeInMillis(nextStop);
+		while (stopLooking > time.getTimeInMillis()) {
+		    if (tabs.check(time)) {
+		        nextStart = time.getTimeInMillis();
+		        time.add(Calendar.MINUTE, upTimeMins);
+		        nextStop = time.getTimeInMillis();
+		        break;
+		    }
+		    time.add(Calendar.MINUTE, 1);
+		}
     }
 
     protected synchronized Object readResolve() throws ObjectStreamException {
@@ -165,7 +165,8 @@ public class SimpleScheduledRetentionStrategy extends RetentionStrategy<SlaveCom
         return isOnlineScheduled();
     }
 
-    @GuardedBy("hudson.model.Queue.lock")
+    @Override
+	@GuardedBy("hudson.model.Queue.lock")
     public synchronized long check(final SlaveComputer c) {
         boolean shouldBeOnline = isOnlineScheduled();
         LOGGER.log(Level.FINE, "Checking computer {0} against schedule. online = {1}, shouldBeOnline = {2}",
@@ -174,23 +175,21 @@ public class SimpleScheduledRetentionStrategy extends RetentionStrategy<SlaveCom
             LOGGER.log(INFO, "Trying to launch computer {0} as schedule says it should be on-line at "
                     + "this point in time", new Object[]{c.getName()});
             if (c.isLaunchSupported()) {
-                Computer.threadPoolForRemoting.submit(new Runnable() {
-                    public void run() {
-                        try {
-                            c.connect(true).get();
-                            if (c.isOnline()) {
-                                LOGGER.log(INFO, "Launched computer {0} per schedule", new Object[]{c.getName()});
-                            }
-                            if (keepUpWhenActive && c.isOnline() && !c.isAcceptingTasks()) {
-                                LOGGER.log(INFO,
-                                        "Enabling new jobs for computer {0} as it has started its scheduled uptime",
-                                        new Object[]{c.getName()});
-                                c.setAcceptingTasks(true);
-                            }
-                        } catch (InterruptedException | ExecutionException e) {
-                        }
-                    }
-                });
+                Computer.threadPoolForRemoting.submit(() -> {
+				    try {
+				        c.connect(true).get();
+				        if (c.isOnline()) {
+				            LOGGER.log(INFO, "Launched computer {0} per schedule", new Object[]{c.getName()});
+				        }
+				        if (keepUpWhenActive && c.isOnline() && !c.isAcceptingTasks()) {
+				            LOGGER.log(INFO,
+				                    "Enabling new jobs for computer {0} as it has started its scheduled uptime",
+				                    new Object[]{c.getName()});
+				            c.setAcceptingTasks(true);
+				        }
+				    } catch (InterruptedException | ExecutionException e) {
+				    }
+				});
             }
         } else if (!shouldBeOnline && c.isOnline()) {
             if (keepUpWhenActive) {
@@ -201,31 +200,25 @@ public class SimpleScheduledRetentionStrategy extends RetentionStrategy<SlaveCom
                             new Object[]{c.getName()});
                     return 1;
                 } else if (c.isIdle() && c.isAcceptingTasks()) {
-                    Queue.withLock(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (c.isIdle()) {
-                                LOGGER.log(INFO, "Disconnecting computer {0} as it has finished its scheduled uptime",
-                                        new Object[]{c.getName()});
-                                c.disconnect(OfflineCause
-                                        .create(Messages._SimpleScheduledRetentionStrategy_FinishedUpTime()));
-                            } else {
-                                c.setAcceptingTasks(false);
-                            }
-                        }
-                    });
+                    Queue.withLock(() -> {
+					    if (c.isIdle()) {
+					        LOGGER.log(INFO, "Disconnecting computer {0} as it has finished its scheduled uptime",
+					                new Object[]{c.getName()});
+					        c.disconnect(OfflineCause
+					                .create(Messages._SimpleScheduledRetentionStrategy_FinishedUpTime()));
+					    } else {
+					        c.setAcceptingTasks(false);
+					    }
+					});
                 } else if (c.isIdle() && !c.isAcceptingTasks()) {
-                    Queue.withLock(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (c.isIdle()) {
-                                LOGGER.log(INFO, "Disconnecting computer {0} as it has finished all jobs running when "
-                                        + "it completed its scheduled uptime", new Object[]{c.getName()});
-                                c.disconnect(OfflineCause
-                                        .create(Messages._SimpleScheduledRetentionStrategy_FinishedUpTime()));
-                            }
-                        }
-                    });
+                    Queue.withLock(() -> {
+					    if (c.isIdle()) {
+					        LOGGER.log(INFO, "Disconnecting computer {0} as it has finished all jobs running when "
+					                + "it completed its scheduled uptime", new Object[]{c.getName()});
+					        c.disconnect(OfflineCause
+					                .create(Messages._SimpleScheduledRetentionStrategy_FinishedUpTime()));
+					    }
+					});
                 }
             } else {
                 // no need to get the queue lock as the user has selected the break builds option!
@@ -245,7 +238,8 @@ public class SimpleScheduledRetentionStrategy extends RetentionStrategy<SlaveCom
 
     @Extension @Symbol("schedule")
     public static class DescriptorImpl extends Descriptor<RetentionStrategy<?>> {
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.SimpleScheduledRetentionStrategy_displayName();
         }
 
@@ -255,8 +249,9 @@ public class SimpleScheduledRetentionStrategy extends RetentionStrategy<SlaveCom
         public FormValidation doCheck(@QueryParameter String value) {
             try {
                 String msg = CronTabList.create(fixNull(value)).checkSanity();
-                if (msg != null)
-                    return FormValidation.warning(msg);
+                if (msg != null) {
+					return FormValidation.warning(msg);
+				}
                 return FormValidation.ok();
             } catch (ANTLRException e) {
                 return FormValidation.error(e.getMessage());

@@ -82,24 +82,32 @@ public final class DirectoryBrowserSupport implements HttpResponse {
     @SuppressFBWarnings(value = "MS_SHOULD_BE_FINAL", justification = "Accessible via System Groovy Scripts")
     public static boolean ALLOW_SYMLINK_ESCAPE = SystemProperties.getBoolean(DirectoryBrowserSupport.class.getName() + ".allowSymlinkEscape");
 
-    public final ModelObject owner;
-    
-    public final String title;
-
-    private final VirtualFile base;
-    private final String icon;
-    private final boolean serveDirIndex;
-    private String indexFileName = "index.html";
-
-    @Restricted(NoExternalUse.class)
+	@Restricted(NoExternalUse.class)
     public static final String CSP_PROPERTY_NAME = DirectoryBrowserSupport.class.getName() + ".CSP";
 
-    /**
+	private static final Logger LOGGER = Logger.getLogger(DirectoryBrowserSupport.class.getName());
+
+	@Restricted(NoExternalUse.class)
+    public static final String DEFAULT_CSP_VALUE = "sandbox; default-src 'none'; img-src 'self'; style-src 'self';";
+
+	public final ModelObject owner;
+
+	public final String title;
+
+	private final VirtualFile base;
+
+	private final String icon;
+
+	private final boolean serveDirIndex;
+
+	private String indexFileName = "index.html";
+
+	/**
      * Keeps track of whether this has been registered from use via {@link ResourceDomainRootAction}.
      */
     private ResourceDomainRootAction.Token resourceToken;
 
-    /**
+	/**
      * @deprecated as of 1.297
      *      Use {@link #DirectoryBrowserSupport(ModelObject, FilePath, String, String, boolean)}
      */
@@ -108,7 +116,7 @@ public final class DirectoryBrowserSupport implements HttpResponse {
         this(owner, (VirtualFile) null, title, null, false);
     }
 
-    /**
+	/**
      * @param owner
      *      The parent model object under which the directory browsing is added.
      * @param base
@@ -125,7 +133,7 @@ public final class DirectoryBrowserSupport implements HttpResponse {
         this(owner, base.toVirtualFile(), title, icon, serveDirIndex);
     }
 
-    /**
+	/**
      * @param owner
      *      The parent model object under which the directory browsing is added.
      * @param base
@@ -147,7 +155,8 @@ public final class DirectoryBrowserSupport implements HttpResponse {
         this.serveDirIndex = serveDirIndex;
     }
 
-    public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object node) throws IOException, ServletException {
+	@Override
+	public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object node) throws IOException, ServletException {
         if (!ResourceDomainConfiguration.isResourceRequest(req) && ResourceDomainConfiguration.isResourceDomainConfigured()) {
             resourceToken = ResourceDomainRootAction.get().getToken(this, req);
         }
@@ -159,7 +168,7 @@ public final class DirectoryBrowserSupport implements HttpResponse {
         }
     }
 
-    /**
+	/**
      * If the directory is requested but the directory listing is disabled, a file of this name
      * is served. By default it's "index.html".
      * @since 1.312
@@ -168,7 +177,7 @@ public final class DirectoryBrowserSupport implements HttpResponse {
         this.indexFileName = fileName;
     }
 
-    /**
+	/**
      * Serves a file from the file system (Maps the URL to a directory in a file system.)
      *
      * @param icon
@@ -185,11 +194,13 @@ public final class DirectoryBrowserSupport implements HttpResponse {
         serveFile(req, rsp, root.toVirtualFile(), icon, serveDirIndex);
     }
 
-    private void serveFile(StaplerRequest req, StaplerResponse rsp, VirtualFile root, String icon, boolean serveDirIndex) throws IOException, ServletException, InterruptedException {
+	private void serveFile(StaplerRequest req, StaplerResponse rsp, VirtualFile root, String icon, boolean serveDirIndex) throws IOException, ServletException, InterruptedException {
         // handle form submission
         String pattern = req.getParameter("pattern");
         if(pattern==null)
-            pattern = req.getParameter("path"); // compatibility with Hudson<1.129
+		 {
+			pattern = req.getParameter("path"); // compatibility with Hudson<1.129
+		}
         if(pattern!=null && Util.isSafeToRedirectTo(pattern)) {// avoid open redirect
             rsp.sendRedirect2(pattern);
             return;
@@ -216,25 +227,29 @@ public final class DirectoryBrowserSupport implements HttpResponse {
                 String pathElement = pathTokens.nextToken();
                 // Treat * and ? as wildcard unless they match a literal filename
                 if((pathElement.contains("?") || pathElement.contains("*"))
-                        && inBase && !root.child((_base.length() > 0 ? _base + "/" : "") + pathElement).exists())
-                    inBase = false;
-                if(pathElement.equals("*zip*")) {
+                        && inBase && !root.child((_base.length() > 0 ? _base + "/" : "") + pathElement).exists()) {
+					inBase = false;
+				}
+                if("*zip*".equals(pathElement)) {
                     // the expected syntax is foo/bar/*zip*/bar.zip
                     // the last 'bar.zip' portion is to causes browses to set a good default file name.
                     // so the 'rest' portion ends here.
                     zip=true;
                     break;
                 }
-                if(pathElement.equals("*plain*")) {
+                if("*plain*".equals(pathElement)) {
                     plain = true;
                     break;
                 }
 
                 StringBuilder sb = inBase?_base:_rest;
-                if(sb.length()>0)   sb.append('/');
+                if(sb.length()>0) {
+					sb.append('/');
+				}
                 sb.append(pathElement);
-                if(!inBase)
-                    restSize++;
+                if(!inBase) {
+					restSize++;
+				}
             }
         }
         restSize = Math.max(restSize,0);
@@ -271,7 +286,7 @@ public final class DirectoryBrowserSupport implements HttpResponse {
                 return;
             }
 
-            if(rest.length()==0) {
+            if(rest.isEmpty()) {
                 // if the target page to be displayed is a directory and the path doesn't end with '/', redirect
                 StringBuffer reqUrl = req.getRequestURL();
                 if(reqUrl.charAt(reqUrl.length()-1)!='/') {
@@ -324,9 +339,9 @@ public final class DirectoryBrowserSupport implements HttpResponse {
             return;
         }
 
-        boolean view = rest.equals("*view*");
+        boolean view = "*view*".equals(rest);
 
-        if(rest.equals("*fingerprint*")) {
+        if("*fingerprint*".equals(rest)) {
             InputStream fingerprintInput = baseFile.open();
             try {
                 rsp.forward(Jenkins.get().getFingerprint(Util.getDigestOf(fingerprintInput)), "/", req);
@@ -347,8 +362,10 @@ public final class DirectoryBrowserSupport implements HttpResponse {
         long lastModified = baseFile.lastModified();
         long length = baseFile.length();
 
-        if(LOGGER.isLoggable(Level.FINE))
-            LOGGER.fine("Serving "+baseFile+" with lastModified=" + lastModified + ", length=" + length);
+        if(LOGGER.isLoggable(Level.FINE)) {
+			LOGGER.fine(new StringBuilder().append("Serving ").append(baseFile).append(" with lastModified=").append(lastModified).append(", length=").append(length)
+					.toString());
+		}
 
         InputStream in = baseFile.open();
         if (view) {
@@ -365,7 +382,7 @@ public final class DirectoryBrowserSupport implements HttpResponse {
                 if (!ResourceDomainConfiguration.isResourceRequest(req)) {
                     // if we're serving this from the main domain, set CSP headers
                     String csp = SystemProperties.getString(CSP_PROPERTY_NAME, DEFAULT_CSP_VALUE);
-                    if (!csp.trim().equals("")) {
+                    if (!"".equals(csp.trim())) {
                         // allow users to prevent sending this header by setting empty system property
                         for (String header : new String[]{"Content-Security-Policy", "X-WebKit-CSP", "X-Content-Security-Policy"}) {
                             rsp.setHeader(header, csp);
@@ -377,7 +394,7 @@ public final class DirectoryBrowserSupport implements HttpResponse {
         }
     }
 
-    private List<List<Path>> keepReadabilityOnlyOnDescendants(VirtualFile root, boolean patternUsed, List<List<Path>> pathFragmentsList){
+	private List<List<Path>> keepReadabilityOnlyOnDescendants(VirtualFile root, boolean patternUsed, List<List<Path>> pathFragmentsList){
         Stream<List<Path>> pathFragmentsStream = pathFragmentsList.stream().map((List<Path> pathFragments) -> {
             List<Path> mappedFragments = new ArrayList<>(pathFragments.size());
             String relativePath = "";
@@ -419,7 +436,7 @@ public final class DirectoryBrowserSupport implements HttpResponse {
         return pathFragmentsStream.collect(Collectors.toList());
     }
 
-    private boolean isDescendant(VirtualFile root, String relativePath){
+	private boolean isDescendant(VirtualFile root, String relativePath){
         try {
             return ALLOW_SYMLINK_ESCAPE || !root.supportIsDescendant() || root.isDescendant(relativePath);
         }
@@ -428,14 +445,15 @@ public final class DirectoryBrowserSupport implements HttpResponse {
         }
     }
 
-    private String getPath(StaplerRequest req) {
+	private String getPath(StaplerRequest req) {
         String path = req.getRestOfPath();
-        if(path.length()==0)
-            path = "/";
+        if(path.isEmpty()) {
+			path = "/";
+		}
         return path;
     }
 
-    /**
+	/**
      * Builds a list of {@link Path} that represents ancestors
      * from a string like "/foo/bar/zot".
      */
@@ -452,26 +470,28 @@ public final class DirectoryBrowserSupport implements HttpResponse {
         return r;
     }
 
-    private static String createBackRef(int times) {
-        if(times==0)    return "./";
+	private static String createBackRef(int times) {
+        if(times==0) {
+			return "./";
+		}
         StringBuilder buf = new StringBuilder(3*times);
-        for(int i=0; i<times; i++ )
-            buf.append("../");
+        for(int i=0; i<times; i++ ) {
+			buf.append("../");
+		}
         return buf.toString();
     }
 
-    private static void zip(StaplerResponse rsp, VirtualFile root, VirtualFile dir, String glob) throws IOException, InterruptedException {
+	private static void zip(StaplerResponse rsp, VirtualFile root, VirtualFile dir, String glob) throws IOException, InterruptedException {
         OutputStream outputStream = rsp.getOutputStream();
         try (ZipOutputStream zos = new ZipOutputStream(outputStream)) {
             zos.setEncoding(System.getProperty("file.encoding")); // TODO JENKINS-20663 make this overridable via query parameter
             // TODO consider using run(Callable) here
 
-            if (glob.isEmpty()) {
-                if (!root.supportsQuickRecursiveListing()) {
-                    // avoid slow listing when the Glob can do a quicker job
-                    glob = "**";
-                }
-            }
+            boolean condition = glob.isEmpty() && !root.supportsQuickRecursiveListing();
+			if (condition) {
+			    // avoid slow listing when the Glob can do a quicker job
+			    glob = "**";
+			}
             
             if (glob.isEmpty()) {
                 Map<String, VirtualFile> nameToVirtualFiles = collectRecursivelyAllLegalChildren(dir);
@@ -483,26 +503,26 @@ public final class DirectoryBrowserSupport implements HttpResponse {
         }
     }
 
-    private static void sendZipUsingMap(ZipOutputStream zos, VirtualFile dir, Map<String, VirtualFile> nameToVirtualFiles) throws IOException {
+	private static void sendZipUsingMap(ZipOutputStream zos, VirtualFile dir, Map<String, VirtualFile> nameToVirtualFiles) throws IOException {
         for (Map.Entry<String, VirtualFile> entry : nameToVirtualFiles.entrySet()) {
             String n = entry.getKey();
 
             // JENKINS-19947: traditional behavior is to prepend the directory name
-            String relativePath = dir.getName() + '/' + n;
+            String relativePath = new StringBuilder().append(dir.getName()).append('/').append(n).toString();
 
             VirtualFile f = entry.getValue();
             sendOneZipEntry(zos, f, relativePath);
         }
     }
 
-    private static void sendZipUsingListOfNames(ZipOutputStream zos, VirtualFile dir, Collection<String> listOfFileNames) throws IOException {
+	private static void sendZipUsingListOfNames(ZipOutputStream zos, VirtualFile dir, Collection<String> listOfFileNames) throws IOException {
         for (String relativePath : listOfFileNames) {
             VirtualFile f = dir.child(relativePath);
             sendOneZipEntry(zos, f, relativePath);
         }
     }
 
-    private static void sendOneZipEntry(ZipOutputStream zos, VirtualFile vf, String relativePath) throws IOException {
+	private static void sendOneZipEntry(ZipOutputStream zos, VirtualFile vf, String relativePath) throws IOException {
         // In ZIP archives "All slashes MUST be forward slashes" (http://pkware.com/documents/casestudies/APPNOTE.TXT)
         // TODO On Linux file names can contain backslashes which should not treated as file separators.
         //      Unfortunately, only the file separator char of the master is known (File.separatorChar)
@@ -519,13 +539,13 @@ public final class DirectoryBrowserSupport implements HttpResponse {
         }
     }
 
-    private static Map<String, VirtualFile> collectRecursivelyAllLegalChildren(VirtualFile dir) throws IOException {
+	private static Map<String, VirtualFile> collectRecursivelyAllLegalChildren(VirtualFile dir) throws IOException {
         Map<String, VirtualFile> nameToFiles = new LinkedHashMap<>();
         collectRecursivelyAllLegalChildren(dir, "", nameToFiles);
         return nameToFiles;
     }
 
-    private static void collectRecursivelyAllLegalChildren(VirtualFile currentDir, String currentPrefix, Map<String, VirtualFile> nameToFiles) throws IOException {
+	private static void collectRecursivelyAllLegalChildren(VirtualFile currentDir, String currentPrefix, Map<String, VirtualFile> nameToFiles) throws IOException {
         if (currentDir.isFile()) {
             if (currentDir.isDescendant("")) {
                 nameToFiles.put(currentPrefix, currentDir);
@@ -541,156 +561,7 @@ public final class DirectoryBrowserSupport implements HttpResponse {
         }
     }
 
-    /**
-     * Represents information about one file or folder.
-     */
-    public static final class Path implements Serializable {
-        /**
-         * Relative URL to this path from the current page.
-         */
-        private final String href;
-        /**
-         * Name of this path. Just the file name portion.
-         */
-        private final String title;
-
-        private final boolean isFolder;
-
-        /**
-         * File size, or null if this is not a file.
-         */
-        private final long size;
-        
-        /**
-         * If the current user can read the file.
-         */
-        private final boolean isReadable;
-
-       /**
-        * For a file, the last modified timestamp.
-        */
-        private final long lastModified;
-
-        /**
-         * @deprecated Use {@link #Path(String, String, boolean, long, boolean, long)}
-         */
-        @Deprecated
-        public Path(String href, String title, boolean isFolder, long size, boolean isReadable) {
-            this(href, title, isFolder, size, isReadable, 0L);
-        }
-
-        public Path(String href, String title, boolean isFolder, long size, boolean isReadable, long lastModified) {
-            this.href = href;
-            this.title = title;
-            this.isFolder = isFolder;
-            this.size = size;
-            this.isReadable = isReadable;
-            this.lastModified = lastModified;
-        }
-
-        public boolean isFolder() {
-            return isFolder;
-        }
-        
-        public boolean isReadable() {
-            return isReadable;
-        }
-
-        public String getHref() {
-            return href;
-        }
-
-        public String getTitle() {
-            return title;
-        }
-
-        public String getIconName() {
-            if (isReadable)
-                return isFolder?"folder.png":"text.png";
-            else
-                return isFolder?"folder-error.png":"text-error.png";
-        }
-
-        public String getIconClassName() {
-            if (isReadable)
-                return isFolder?"icon-folder":"icon-text";
-            else
-                return isFolder?"icon-folder-error":"icon-text-error";
-        }
-
-        public long getSize() {
-            return size;
-        }
-
-        /**
-         *
-         * @return A long value representing the time the file was last modified, measured in milliseconds since
-         * the epoch (00:00:00 GMT, January 1, 1970), or 0L if is not possible to obtain the times.
-         * @since 2.127
-         */
-        public long getLastModified() {
-            return lastModified;
-        }
-
-        /**
-         *
-         * @return A Calendar representing the time the file was last modified, it lastModified is 0L
-         * it will return 00:00:00 GMT, January 1, 1970.
-         * @since 2.127
-         */
-        @Restricted(NoExternalUse.class)
-        public Calendar getLastModifiedAsCalendar() {
-            final Calendar cal = new GregorianCalendar();
-            cal.setTimeInMillis(lastModified);
-            return cal;
-        }
-
-        public static Path createNotReadableVersionOf(Path that){
-            return new Path(that.href, that.title, that.isFolder, that.size, false);
-        }
-
-        private static final long serialVersionUID = 1L;
-    }
-
-
-
-    private static final class FileComparator implements Comparator<VirtualFile> {
-        private Collator collator;
-
-        FileComparator(Locale locale) {
-            this.collator = Collator.getInstance(locale);
-        }
-
-        public int compare(VirtualFile lhs, VirtualFile rhs) {
-            // directories first, files next
-            int r = dirRank(lhs)-dirRank(rhs);
-            if(r!=0) return r;
-            // otherwise alphabetical
-            return this.collator.compare(lhs.getName(), rhs.getName());
-        }
-
-        private int dirRank(VirtualFile f) {
-            try {
-            if(f.isDirectory())     return 0;
-            else                    return 1;
-            } catch (IOException ex) {
-                return 0;
-            }
-        }
-    }
-
-    private static final class BuildChildPaths extends MasterToSlaveCallable<List<List<Path>>,IOException> {
-        private final VirtualFile cur;
-        private final Locale locale;
-        BuildChildPaths(VirtualFile cur, Locale locale) {
-            this.cur = cur;
-            this.locale = locale;
-        }
-        @Override public List<List<Path>> call() throws IOException {
-            return buildChildPaths(cur, locale);
-        }
-    }
-    /**
+	/**
      * Builds a list of list of {@link Path}. The inner
      * list of {@link Path} represents one child item to be shown
      * (this mechanism is used to skip empty intermediate directory.)
@@ -715,12 +586,13 @@ public final class DirectoryBrowserSupport implements HttpResponse {
                             List<VirtualFile> sub = new ArrayList<>();
                             for (VirtualFile vf : f.list()) {
                                 String name = vf.getName();
-                                if (!name.startsWith(".") && !name.equals("CVS") && !name.equals(".svn")) {
+                                if (!name.startsWith(".") && !"CVS".equals(name) && !".svn".equals(name)) {
                                     sub.add(vf);
                                 }
                             }
-                            if (sub.size() !=1 || !sub.get(0).isDirectory())
-                                break;
+                            if (sub.size() !=1 || !sub.get(0).isDirectory()) {
+								break;
+							}
                             f = sub.get(0);
                             relPath += '/'+Util.rawEncode(f.getName());
                             l.add(new Path(relPath,f.getName(),true, f.length(), f.canRead(), f.lastModified()));
@@ -732,7 +604,7 @@ public final class DirectoryBrowserSupport implements HttpResponse {
             return r;
     }
 
-    /**
+	/**
      * Runs ant GLOB against the current {@link FilePath} and returns matching
      * paths.
      * @param baseRef String like "../../../" that cancels the 'rest' portion. Can be "./"
@@ -740,50 +612,196 @@ public final class DirectoryBrowserSupport implements HttpResponse {
     private static List<List<Path>> patternScan(VirtualFile baseDir, String pattern, String baseRef) throws IOException {
             Collection<String> files = baseDir.list(pattern, null, /* TODO what is the user expectation? */true);
 
-            if (!files.isEmpty()) {
-                List<List<Path>> r = new ArrayList<>(files.size());
-                for (String match : files) {
-                    List<Path> file = buildPathList(baseDir, baseDir.child(match), baseRef);
-                    r.add(file);
-                }
-                return r;
-            }
-
-            return null;
+            if (files.isEmpty()) {
+				return null;
+			}
+			List<List<Path>> r = new ArrayList<>(files.size());
+			for (String match : files) {
+			    List<Path> file = buildPathList(baseDir, baseDir.child(match), baseRef);
+			    r.add(file);
+			}
+			return r;
         }
 
-        /**
-         * Builds a path list from the current workspace directory down to the specified file path.
+	/**
+	 * Builds a path list from the current workspace directory down to the specified file path.
+	 */
+	private static List<Path> buildPathList(VirtualFile baseDir, VirtualFile filePath, String baseRef) throws IOException {
+	    List<Path> pathList = new ArrayList<>();
+	    StringBuilder href = new StringBuilder(baseRef);
+
+	    buildPathList(baseDir, filePath, pathList, href);
+	    return pathList;
+	}
+
+	/**
+	 * Builds the path list and href recursively top-down.
+	 */
+	private static void buildPathList(VirtualFile baseDir, VirtualFile filePath, List<Path> pathList, StringBuilder href) throws IOException {
+	    VirtualFile parent = filePath.getParent();
+	    if (!baseDir.equals(parent)) {
+	        buildPathList(baseDir, parent, pathList, href);
+	    }
+
+	    href.append(Util.rawEncode(filePath.getName()));
+	    if (filePath.isDirectory()) {
+	        href.append("/");
+	    }
+
+	    Path path = new Path(href.toString(), filePath.getName(), filePath.isDirectory(), filePath.length(), filePath.canRead(), filePath.lastModified());
+	    pathList.add(path);
+	}
+
+    /**
+     * Represents information about one file or folder.
+     */
+    public static final class Path implements Serializable {
+        private static final long serialVersionUID = 1L;
+		/**
+         * Relative URL to this path from the current page.
          */
-        private static List<Path> buildPathList(VirtualFile baseDir, VirtualFile filePath, String baseRef) throws IOException {
-            List<Path> pathList = new ArrayList<>();
-            StringBuilder href = new StringBuilder(baseRef);
-
-            buildPathList(baseDir, filePath, pathList, href);
-            return pathList;
-        }
-
-        /**
-         * Builds the path list and href recursively top-down.
+        private final String href;
+		/**
+         * Name of this path. Just the file name portion.
          */
-        private static void buildPathList(VirtualFile baseDir, VirtualFile filePath, List<Path> pathList, StringBuilder href) throws IOException {
-            VirtualFile parent = filePath.getParent();
-            if (!baseDir.equals(parent)) {
-                buildPathList(baseDir, parent, pathList, href);
-            }
+        private final String title;
+		private final boolean isFolder;
+		/**
+         * File size, or null if this is not a file.
+         */
+        private final long size;
+		/**
+         * If the current user can read the file.
+         */
+        private final boolean isReadable;
+		/**
+		    * For a file, the last modified timestamp.
+		    */
+		    private final long lastModified;
 
-            href.append(Util.rawEncode(filePath.getName()));
-            if (filePath.isDirectory()) {
-                href.append("/");
-            }
-
-            Path path = new Path(href.toString(), filePath.getName(), filePath.isDirectory(), filePath.length(), filePath.canRead(), filePath.lastModified());
-            pathList.add(path);
+		/**
+         * @deprecated Use {@link #Path(String, String, boolean, long, boolean, long)}
+         */
+        @Deprecated
+        public Path(String href, String title, boolean isFolder, long size, boolean isReadable) {
+            this(href, title, isFolder, size, isReadable, 0L);
         }
 
+		public Path(String href, String title, boolean isFolder, long size, boolean isReadable, long lastModified) {
+            this.href = href;
+            this.title = title;
+            this.isFolder = isFolder;
+            this.size = size;
+            this.isReadable = isReadable;
+            this.lastModified = lastModified;
+        }
 
-    private static final Logger LOGGER = Logger.getLogger(DirectoryBrowserSupport.class.getName());
+		public boolean isFolder() {
+            return isFolder;
+        }
 
-    @Restricted(NoExternalUse.class)
-    public static final String DEFAULT_CSP_VALUE = "sandbox; default-src 'none'; img-src 'self'; style-src 'self';";
+		public boolean isReadable() {
+            return isReadable;
+        }
+
+		public String getHref() {
+            return href;
+        }
+
+		public String getTitle() {
+            return title;
+        }
+
+		public String getIconName() {
+            if (isReadable) {
+				return isFolder?"folder.png":"text.png";
+			} else {
+				return isFolder?"folder-error.png":"text-error.png";
+			}
+        }
+
+		public String getIconClassName() {
+            if (isReadable) {
+				return isFolder?"icon-folder":"icon-text";
+			} else {
+				return isFolder?"icon-folder-error":"icon-text-error";
+			}
+        }
+
+		public long getSize() {
+            return size;
+        }
+
+		/**
+         *
+         * @return A long value representing the time the file was last modified, measured in milliseconds since
+         * the epoch (00:00:00 GMT, January 1, 1970), or 0L if is not possible to obtain the times.
+         * @since 2.127
+         */
+        public long getLastModified() {
+            return lastModified;
+        }
+
+		/**
+         *
+         * @return A Calendar representing the time the file was last modified, it lastModified is 0L
+         * it will return 00:00:00 GMT, January 1, 1970.
+         * @since 2.127
+         */
+        @Restricted(NoExternalUse.class)
+        public Calendar getLastModifiedAsCalendar() {
+            final Calendar cal = new GregorianCalendar();
+            cal.setTimeInMillis(lastModified);
+            return cal;
+        }
+
+		public static Path createNotReadableVersionOf(Path that){
+            return new Path(that.href, that.title, that.isFolder, that.size, false);
+        }
+    }
+
+
+
+    private static final class FileComparator implements Comparator<VirtualFile> {
+        private Collator collator;
+
+        FileComparator(Locale locale) {
+            this.collator = Collator.getInstance(locale);
+        }
+
+        @Override
+		public int compare(VirtualFile lhs, VirtualFile rhs) {
+            // directories first, files next
+            int r = dirRank(lhs)-dirRank(rhs);
+            if(r!=0) {
+				return r;
+			}
+            // otherwise alphabetical
+            return this.collator.compare(lhs.getName(), rhs.getName());
+        }
+
+        private int dirRank(VirtualFile f) {
+            try {
+            if(f.isDirectory()) {
+				return 0;
+			} else {
+				return 1;
+			}
+            } catch (IOException ex) {
+                return 0;
+            }
+        }
+    }
+
+    private static final class BuildChildPaths extends MasterToSlaveCallable<List<List<Path>>,IOException> {
+        private final VirtualFile cur;
+        private final Locale locale;
+        BuildChildPaths(VirtualFile cur, Locale locale) {
+            this.cur = cur;
+            this.locale = locale;
+        }
+        @Override public List<List<Path>> call() throws IOException {
+            return buildChildPaths(cur, locale);
+        }
+    }
 }

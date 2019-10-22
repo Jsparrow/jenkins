@@ -13,13 +13,9 @@ import org.junit.Test;
  */
 public class PackedMapTest {
 
-    static class Holder {
-        PackedMap pm;
-    }
-
     private XStream2 xs = new XStream2();
 
-    @Test
+	@Test
     public void basic() {
         Map<String,String> o = new TreeMap<>();
         o.put("a","b");
@@ -29,28 +25,20 @@ public class PackedMapTest {
         assertEquals("b",p.get("a"));
         assertEquals("d", p.get("c"));
         assertEquals(p.size(),2);
-        for (Entry<String,String> e : p.entrySet()) {
-            System.out.println(e.getKey()+'='+e.getValue());
-        }
+        p.entrySet().forEach(e -> System.out.println(new StringBuilder().append(e.getKey()).append('=').append(e.getValue()).toString()));
 
         Holder h = new Holder();
         h.pm = p;
         String xml = xs.toXML(h);
         assertEquals(
-                "<hudson.util.PackedMapTest_-Holder>\n" +
-                "  <pm>\n" +
-                "    <entry>\n" +
-                "      <string>a</string>\n" +
-                "      <string>b</string>\n" +
-                "    </entry>\n" +
-                "    <entry>\n" +
-                "      <string>c</string>\n" +
-                "      <string>d</string>\n" +
-                "    </entry>\n" +
-                "  </pm>\n" +
-                "</hudson.util.PackedMapTest_-Holder>",
+                new StringBuilder().append("<hudson.util.PackedMapTest_-Holder>\n").append("  <pm>\n").append("    <entry>\n").append("      <string>a</string>\n").append("      <string>b</string>\n").append("    </entry>\n").append("    <entry>\n")
+						.append("      <string>c</string>\n").append("      <string>d</string>\n").append("    </entry>\n").append("  </pm>\n").append("</hudson.util.PackedMapTest_-Holder>").toString(),
                 xml);
 
         xs.fromXML(xml);
+    }
+
+	static class Holder {
+        PackedMap pm;
     }
 }

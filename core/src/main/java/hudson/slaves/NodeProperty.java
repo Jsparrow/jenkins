@@ -82,7 +82,8 @@ public abstract class NodeProperty<N extends Node> implements ReconfigurableDesc
 
     protected void setNode(N node) { this.node = node; }
 
-    public NodePropertyDescriptor getDescriptor() {
+    @Override
+	public NodePropertyDescriptor getDescriptor() {
         return (NodePropertyDescriptor) Jenkins.get().getDescriptorOrDie(getClass());
     }
 
@@ -170,7 +171,8 @@ public abstract class NodeProperty<N extends Node> implements ReconfigurableDesc
         // default is no-op
     }
 
-    public NodeProperty<?> reconfigure(StaplerRequest req, JSONObject form) throws FormException {
+    @Override
+	public NodeProperty<?> reconfigure(StaplerRequest req, JSONObject form) throws FormException {
         return form==null ? null : getDescriptor().newInstance(req, form);
     }
 

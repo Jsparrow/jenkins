@@ -52,7 +52,9 @@ public enum Platform {
     }
 
     public static Platform current() {
-        if(File.pathSeparatorChar==':') return UNIX;
+        if(File.pathSeparatorChar==':') {
+			return UNIX;
+		}
         return WINDOWS;
     }
 

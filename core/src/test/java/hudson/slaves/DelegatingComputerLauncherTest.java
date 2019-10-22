@@ -25,27 +25,6 @@ import static org.powermock.api.mockito.PowerMockito.when;
 @PowerMockIgnore({"com.sun.org.apache.xerces.*", "javax.xml.*", "org.xml.*"})
 public class DelegatingComputerLauncherTest {
 
-    public static class DummyOne extends DelegatingComputerLauncher {
-
-        public DummyOne() {
-            super(null);
-        }
-
-        public static class DummyOneDescriptor extends DescriptorImpl {
-        }
-    }
-
-
-    public static class DummyTwo extends DelegatingComputerLauncher {
-
-        public DummyTwo() {
-            super(null);
-        }
-
-        public static class DummyTwoDescriptor extends DescriptorImpl {
-        }
-    }
-
     // Ensure that by default a DelegatingComputerLauncher subclass doesn't advertise the option to delegate another
     // DelegatingComputerLauncher
     @Test
@@ -68,6 +47,27 @@ public class DelegatingComputerLauncherTest {
         assertTrue("DelegatingComputerLauncher should filter out other DelegatingComputerLauncher instances " +
                    "from its descriptor's getApplicableDescriptors() method",
                 new DummyTwo.DummyTwoDescriptor().applicableDescriptors(null, new DumbSlave.DescriptorImpl()).isEmpty());
+    }
+
+	public static class DummyOne extends DelegatingComputerLauncher {
+
+        public DummyOne() {
+            super(null);
+        }
+
+        public static class DummyOneDescriptor extends DescriptorImpl {
+        }
+    }
+
+
+    public static class DummyTwo extends DelegatingComputerLauncher {
+
+        public DummyTwo() {
+            super(null);
+        }
+
+        public static class DummyTwoDescriptor extends DescriptorImpl {
+        }
     }
 
 }

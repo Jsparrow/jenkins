@@ -38,10 +38,10 @@ public abstract class ComputerPanelBox implements ExtensionPoint{
      */
     public static List<ComputerPanelBox> all(Computer computer) {
         List<ComputerPanelBox> boxs = new ArrayList<>();
-        for(ComputerPanelBox box:  ExtensionList.lookup(ComputerPanelBox.class)){
+        ExtensionList.lookup(ComputerPanelBox.class).forEach(box -> {
             box.setComputer(computer);
             boxs.add(box);
-        }
+        });
         return boxs;
     }
 

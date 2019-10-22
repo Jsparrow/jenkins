@@ -131,11 +131,38 @@ import java.util.logging.Logger;
  */
 public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityRealm> implements ExtensionPoint {
     /**
+     * Singleton constant that represents "no authentication."
+     */
+    public static final SecurityRealm NO_AUTHENTICATION = new None();
+
+	/**
+     * All registered {@link SecurityRealm} implementations.
+     *
+     * @deprecated as of 1.286
+     *      Use {@link #all()} for read access, and use {@link Extension} for registration.
+     */
+    @Deprecated
+    public static final DescriptorList<SecurityRealm> LIST = new DescriptorList<>(SecurityRealm.class);
+
+	private static final Logger LOGGER = Logger.getLogger(SecurityRealm.class.getName());
+
+	/**
+     * {@link GrantedAuthority} that represents the built-in "authenticated" role, which is granted to
+     * anyone non-anonymous.
+     */
+    public static final GrantedAuthority AUTHENTICATED_AUTHORITY = new GrantedAuthorityImpl("authenticated");
+
+	/**
      * Captcha Support to be used with this SecurityRealm for User Signup
      */
     private CaptchaSupport captchaSupport;
 
-    /**
+	/**
+     * Holder for the SecurityComponents.
+     */
+    private transient SecurityComponents securityComponents;
+
+	/**
      * Creates fully-configured {@link AuthenticationManager} that performs authentication
      * against the user realm. The implementation hides how such authentication manager
      * is configured.
@@ -153,7 +180,7 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
      */
     public abstract SecurityComponents createSecurityComponents();
 
-    /**
+	/**
      * Returns the {@link IdStrategy} that should be used for turning
      * {@link org.acegisecurity.userdetails.UserDetails#getUsername()} into an ID.
      * Mostly this should be {@link IdStrategy.CaseInsensitive} but there may be occasions when either
@@ -167,7 +194,7 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
         return IdStrategy.CASE_INSENSITIVE;
     }
 
-    /**
+	/**
      * Returns the {@link IdStrategy} that should be used for turning {@link hudson.security.GroupDetails#getName()}
      * into an ID.
      * Note: Mostly this should be the same as {@link #getUserIdStrategy()} but some security realms may have legitimate
@@ -181,7 +208,7 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
         return getUserIdStrategy();
     }
 
-    /**
+	/**
      * @deprecated No longer used.
      */
     @Deprecated
@@ -189,7 +216,7 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
         throw new UnsupportedOperationException();
     }
 
-    /**
+	/**
      * {@inheritDoc}
      *
      * <p>
@@ -202,7 +229,7 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
         return super.getDescriptor();
     }
 
-    /**
+	/**
      * Returns the URL to submit a form for the authentication.
      * There's no need to override this, except for {@link LegacySecurityRealm}.
      */
@@ -210,7 +237,7 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
         return "j_acegi_security_check";
     }
 
-    /**
+	/**
      * Gets the target URL of the "login" link.
      * There's no need to override this, except for {@link LegacySecurityRealm}.
      * On legacy implementation this should point to {@code loginEntry}, which
@@ -226,7 +253,7 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
         return "login";
     }
 
-    /**
+	/**
      * Returns true if this {@link SecurityRealm} supports explicit logout operation.
      *
      * <p>
@@ -243,7 +270,7 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
         return true;
     }
 
-    /**
+	/**
      * Controls where the user is sent to after a logout. By default, it's the top page
      * of Hudson, but you can return arbitrary URL.
      *
@@ -263,19 +290,19 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
         return req.getContextPath()+"/";
     }
 
-    public CaptchaSupport getCaptchaSupport() {
+	public CaptchaSupport getCaptchaSupport() {
         return captchaSupport;
     }
 
-    public void setCaptchaSupport(CaptchaSupport captchaSupport) {
+	public void setCaptchaSupport(CaptchaSupport captchaSupport) {
         this.captchaSupport = captchaSupport;
     }
 
-    public List<Descriptor<CaptchaSupport>> getCaptchaSupportDescriptors() {
+	public List<Descriptor<CaptchaSupport>> getCaptchaSupportDescriptors() {
         return CaptchaSupport.all();
     }
 
-    /**
+	/**
      * Handles the logout processing.
      *
      * <p>
@@ -286,19 +313,20 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
      */
     public void doLogout(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
         HttpSession session = req.getSession(false);
-        if(session!=null)
-            session.invalidate();
+        if(session!=null) {
+			session.invalidate();
+		}
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         SecurityContextHolder.clearContext();
 
         String contextPath = req.getContextPath().length() > 0 ? req.getContextPath() : "/";
         resetRememberMeCookie(req, rsp, contextPath);
-        clearStaleSessionCookies(req, rsp, contextPath);
+        clearStaleSessionCookies(req, rsp);
 
         rsp.sendRedirect2(getPostLogOutUrl(req,auth));
     }
 
-    private void resetRememberMeCookie(StaplerRequest req, StaplerResponse rsp, String contextPath) {
+	private void resetRememberMeCookie(StaplerRequest req, StaplerResponse rsp, String contextPath) {
         Cookie cookie = new Cookie(ACEGI_SECURITY_HASHED_REMEMBER_ME_COOKIE_KEY, "");
         cookie.setMaxAge(0);
         cookie.setSecure(req.isSecure());
@@ -307,7 +335,7 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
         rsp.addCookie(cookie);
     }
 
-    private void clearStaleSessionCookies(StaplerRequest req, StaplerResponse rsp, String contextPath) {
+	private void clearStaleSessionCookies(StaplerRequest req, StaplerResponse rsp) {
         /* While "executableWar.jetty.sessionIdCookieName" and
          * "executableWar.jetty.disableCustomSessionIdCookieName"
          * <https://github.com/jenkinsci/extras-executable-war/blob/6558df699d1366b18d045d2ffda3e970df377873/src/main/java/Main.java#L79-L97>
@@ -337,7 +365,7 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
         }
     }
 
-    /**
+	/**
      * Returns true if this {@link SecurityRealm} allows online sign-up.
      * This creates a hyperlink that redirects users to {@code CONTEXT_ROOT/signUp},
      * which will be served by the {@code signup.jelly} view of this class.
@@ -355,7 +383,7 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
         return clz.getClassLoader().getResource(clz.getName().replace('.','/')+"/signup.jelly")!=null;
     }
 
-    /**
+	/**
      * Shortcut for {@link UserDetailsService#loadUserByUsername(String)}.
      *
      * @throws UserMayOrMayNotExistException
@@ -363,11 +391,11 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
      * @return
      *      never null.
      */
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException, DataAccessException {
+    public UserDetails loadUserByUsername(String username) {
         return getSecurityComponents().userDetails.loadUserByUsername(username);
     }
 
-    /**
+	/**
      * If this {@link SecurityRealm} supports a look up of {@link GroupDetails} by their names, override this method
      * to provide the look up.
      *
@@ -375,11 +403,11 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
      * This information, when available, can be used by {@link AuthorizationStrategy}s to improve the UI and
      * error diagnostics for the user.
      */
-    public GroupDetails loadGroupByGroupname(String groupname) throws UsernameNotFoundException, DataAccessException {
+    public GroupDetails loadGroupByGroupname(String groupname) {
         throw new UserMayOrMayNotExistException(groupname);
     }
 
-    /**
+	/**
      * If this {@link SecurityRealm} supports a look up of {@link GroupDetails} by their names, override this method
      * to provide the look up.
      * <p>
@@ -395,12 +423,11 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
      * @throws DataAccessException           if the backing security realm could not be connected to.
      * @since 1.549
      */
-    public GroupDetails loadGroupByGroupname(String groupname, boolean fetchMembers)
-            throws UsernameNotFoundException, DataAccessException {
+    public GroupDetails loadGroupByGroupname(String groupname, boolean fetchMembers) {
         return loadGroupByGroupname(groupname);
     }
 
-    /**
+	/**
      * Starts the user registration process for a new user that has the given verified identity.
      *
      * <p>
@@ -422,35 +449,35 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
         throw new UnsupportedOperationException();
     }
 
-    /**
+	/**
      * Generates a captcha image.
      */
     public final void doCaptcha(StaplerRequest req, StaplerResponse rsp) throws IOException {
-        if (captchaSupport != null) {
-            String id = req.getSession().getId();
-            rsp.setContentType("image/png");
-            // source: https://stackoverflow.com/a/3414217
-            rsp.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-            rsp.setHeader("Pragma", "no-cache");
-            rsp.setHeader("Expires", "0");
-            captchaSupport.generateImage(id, rsp.getOutputStream());
-        }
+        if (captchaSupport == null) {
+			return;
+		}
+		String id = req.getSession().getId();
+		rsp.setContentType("image/png");
+		// source: https://stackoverflow.com/a/3414217
+		rsp.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+		rsp.setHeader("Pragma", "no-cache");
+		rsp.setHeader("Expires", "0");
+		captchaSupport.generateImage(id, rsp.getOutputStream());
     }
 
-    /**
+	/**
      * Validates the captcha.
      */
     protected final boolean validateCaptcha(String text) {
-        if (captchaSupport != null) {
-            String id = Stapler.getCurrentRequest().getSession().getId();
-            return captchaSupport.validateCaptcha(id, text);
-        }
-
-        // If no Captcha Support then bogus validation always returns true
-        return true;
+        if (captchaSupport == null) {
+			// If no Captcha Support then bogus validation always returns true
+			return true;
+		}
+		String id = Stapler.getCurrentRequest().getSession().getId();
+		return captchaSupport.validateCaptcha(id, text);
     }
 
-    /**
+	/**
      * Picks up the instance of the given type from the spring context.
      * If there are multiple beans of the same type or if there are none,
      * this method treats that as an {@link IllegalArgumentException}.
@@ -462,20 +489,15 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
         Map m = context.getBeansOfType(type);
         switch(m.size()) {
         case 0:
-            throw new IllegalArgumentException("No beans of "+type+" are defined");
+            throw new IllegalArgumentException(new StringBuilder().append("No beans of ").append(type).append(" are defined").toString());
         case 1:
             return type.cast(m.values().iterator().next());
         default:
-            throw new IllegalArgumentException("Multiple beans of "+type+" are defined: "+m);            
+            throw new IllegalArgumentException(new StringBuilder().append("Multiple beans of ").append(type).append(" are defined: ").append(m).toString());            
         }
     }
 
-    /**
-     * Holder for the SecurityComponents.
-     */
-    private transient SecurityComponents securityComponents;
-
-    /**
+	/**
      * Use this function to get the security components, without necessarily
      * recreating them.
      */
@@ -486,7 +508,7 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
         return this.securityComponents;
     }
 
-    /**
+	/**
      * Creates {@link Filter} that all the incoming HTTP requests will go through
      * for authentication.
      *
@@ -514,12 +536,7 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
         return (Filter) context.getBean("filter");
     }
 
-    /**
-     * Singleton constant that represents "no authentication."
-     */
-    public static final SecurityRealm NO_AUTHENTICATION = new None();
-
-    /**
+	/**
      * Perform a calculation where we should go back after successful login
      *
      * @return Encoded URI where we should go back after successful login
@@ -529,7 +546,8 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
      */
     @Restricted(DoNotUse.class)
     public static String getFrom() {
-        String from = null, returnValue = null;
+        String from = null;
+		String returnValue = null;
         final StaplerRequest request = Stapler.getCurrentRequest();
 
         // Try to obtain a return point either from the Session
@@ -546,8 +564,8 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
         if (from == null
                 && request != null
                 && request.getRequestURI() != null
-                && !request.getRequestURI().equals("/loginError")
-                && !request.getRequestURI().equals("/login")) {
+                && !"/loginError".equals(request.getRequestURI())
+                && !"/login".equals(request.getRequestURI())) {
 
                 from = request.getRequestURI();
         }
@@ -566,17 +584,19 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
         return StringUtils.isBlank(returnValue) ? "/" : returnValue;
     }
 
-    private static class None extends SecurityRealm {
-        public SecurityComponents createSecurityComponents() {
-            return new SecurityComponents(new AuthenticationManager() {
-                public Authentication authenticate(Authentication authentication) {
-                    return authentication;
-                }
-            }, new UserDetailsService() {
-                public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException, DataAccessException {
-                    throw new UsernameNotFoundException(username);
-                }
-            });
+	/**
+     * Returns all the registered {@link SecurityRealm} descriptors.
+     */
+    public static DescriptorExtensionList<SecurityRealm,Descriptor<SecurityRealm>> all() {
+        return Jenkins.get().getDescriptorList(SecurityRealm.class);
+    }
+
+	private static class None extends SecurityRealm {
+        @Override
+		public SecurityComponents createSecurityComponents() {
+            return new SecurityComponents((Authentication authentication) -> authentication, (String username) -> {
+			    throw new UsernameNotFoundException(username);
+			});
         }
 
         /**
@@ -592,7 +612,7 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
          * There's no group.
          */
         @Override
-        public GroupDetails loadGroupByGroupname(String groupname) throws UsernameNotFoundException, DataAccessException {
+        public GroupDetails loadGroupByGroupname(String groupname) {
             throw new UsernameNotFoundException(groupname);
         }
 
@@ -669,29 +689,4 @@ public abstract class SecurityRealm extends AbstractDescribableImpl<SecurityReal
             return rms;
         }
     }
-
-    /**
-     * All registered {@link SecurityRealm} implementations.
-     *
-     * @deprecated as of 1.286
-     *      Use {@link #all()} for read access, and use {@link Extension} for registration.
-     */
-    @Deprecated
-    public static final DescriptorList<SecurityRealm> LIST = new DescriptorList<>(SecurityRealm.class);
-
-    /**
-     * Returns all the registered {@link SecurityRealm} descriptors.
-     */
-    public static DescriptorExtensionList<SecurityRealm,Descriptor<SecurityRealm>> all() {
-        return Jenkins.get().getDescriptorList(SecurityRealm.class);
-    }
-
-
-    private static final Logger LOGGER = Logger.getLogger(SecurityRealm.class.getName());
-
-    /**
-     * {@link GrantedAuthority} that represents the built-in "authenticated" role, which is granted to
-     * anyone non-anonymous.
-     */
-    public static final GrantedAuthority AUTHENTICATED_AUTHORITY = new GrantedAuthorityImpl("authenticated");
 }

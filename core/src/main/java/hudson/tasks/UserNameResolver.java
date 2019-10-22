@@ -51,6 +51,15 @@ import java.util.List;
 public abstract class UserNameResolver implements ExtensionPoint {
 
     /**
+     * All registered {@link UserNameResolver} implementations.
+     *
+     * @deprecated since 2009-02-24.
+     *      Use {@link #all()} for read access, and use {@link Extension} for registration.
+     */
+    @Deprecated
+    public static final List<UserNameResolver> LIST = ExtensionListView.createList(UserNameResolver.class);
+
+	/**
      * Finds full name of the given user.
      *
      * <p>
@@ -68,29 +77,22 @@ public abstract class UserNameResolver implements ExtensionPoint {
      *      null if the inference failed.
      */
     public abstract String findNameFor(User u);
-    
-    public static String resolve(User u) {
+
+	public static String resolve(User u) {
         for (UserNameResolver r : all()) {
             String name = r.findNameFor(u);
-            if(name!=null) return name;
+            if(name!=null) {
+				return name;
+			}
         }
 
         return null;
     }
 
-    /**
+	/**
      * Returns all the registered {@link UserNameResolver} descriptors.
      */
     public static ExtensionList<UserNameResolver> all() {
         return ExtensionList.lookup(UserNameResolver.class);
     }
-
-    /**
-     * All registered {@link UserNameResolver} implementations.
-     *
-     * @deprecated since 2009-02-24.
-     *      Use {@link #all()} for read access, and use {@link Extension} for registration.
-     */
-    @Deprecated
-    public static final List<UserNameResolver> LIST = ExtensionListView.createList(UserNameResolver.class);
 }

@@ -46,24 +46,39 @@ import javax.annotation.CheckForNull;
  * @since 1.351
  */
 public class ReflectionUtils extends org.springframework.util.ReflectionUtils {
-    /**
+    // TODO the version in org.kohsuke.stapler is incomplete
+    private static final Map<Class<?>, Object> defaultPrimitiveValue = new HashMap<>();
+	static {
+        defaultPrimitiveValue.put(boolean.class, false);
+        defaultPrimitiveValue.put(char.class, '\0');
+        defaultPrimitiveValue.put(byte.class, (byte) 0);
+        defaultPrimitiveValue.put(short.class, (short) 0);
+        defaultPrimitiveValue.put(int.class, 0);
+        defaultPrimitiveValue.put(long.class, 0L);
+        defaultPrimitiveValue.put(float.class, (float) 0);
+        defaultPrimitiveValue.put(double.class, (double) 0);
+        defaultPrimitiveValue.put(void.class, null); // FWIW
+    }
+	/**
      * Finds a public method of the given name, regardless of its parameter definitions,
      */
     public static Method getPublicMethodNamed(Class c, String methodName) {
-        for( Method m : c.getMethods() )
-            if(m.getName().equals(methodName))
-                return m;
+        for( Method m : c.getMethods() ) {
+			if(m.getName().equals(methodName)) {
+				return m;
+			}
+		}
         return null;
     }
 
-    /**
+	/**
      * Returns an object-oriented view of parameters of each type.
      */
     public static List<Parameter> getParameters(Method m) {
         return new MethodInfo(m);
     }
 
-    public static Object getPublicProperty(Object o, String p) throws InvocationTargetException, NoSuchMethodException, IllegalAccessException {
+	public static Object getPublicProperty(Object o, String p) throws InvocationTargetException, NoSuchMethodException, IllegalAccessException {
         PropertyDescriptor pd = PropertyUtils.getPropertyDescriptor(o, p);
         if(pd==null) {
             // field?
@@ -71,14 +86,22 @@ public class ReflectionUtils extends org.springframework.util.ReflectionUtils {
                 Field f = o.getClass().getField(p);
                 return f.get(o);
             } catch (NoSuchFieldException e) {
-                throw new IllegalArgumentException("No such property "+p+" on "+o.getClass());
+                throw new IllegalArgumentException(new StringBuilder().append("No such property ").append(p).append(" on ").append(o.getClass()).toString());
             }
         } else {
             return PropertyUtils.getProperty(o, p);
         }
     }
 
-    /**
+	/**
+     * Given the primitive type, returns the VM default value for that type in a boxed form.
+     * @return null unless {@link Class#isPrimitive}
+     */
+    public static @CheckForNull Object getVmDefaultValueForPrimitiveType(Class<?> type) {
+        return defaultPrimitiveValue.get(type);
+    }
+
+	/**
      * Most reflection operations give us properties of parameters in a batch,
      * so we use this object to store them, then {@link Parameter} will created
      * more object-oriented per-parameter view.
@@ -106,20 +129,23 @@ public class ReflectionUtils extends org.springframework.util.ReflectionUtils {
         }
 
         public Type[] genericTypes() {
-            if (genericTypes==null)
-                genericTypes = method.getGenericParameterTypes();
+            if (genericTypes==null) {
+				genericTypes = method.getGenericParameterTypes();
+			}
             return genericTypes;
         }
 
         public Annotation[][] annotations() {
-            if (annotations==null)
-                annotations = method.getParameterAnnotations();
+            if (annotations==null) {
+				annotations = method.getParameterAnnotations();
+			}
             return annotations;
         }
 
         public String[] names() {
-            if (names==null)
-                names = ClassDescriptor.loadParameterNames(method);
+            if (names==null) {
+				names = ClassDescriptor.loadParameterNames(method);
+			}
             return names;
         }
     }
@@ -165,9 +191,11 @@ public class ReflectionUtils extends org.springframework.util.ReflectionUtils {
          * Gets the specified annotation on this parameter or null.
          */
         public <A extends Annotation> A annotation(Class<A> type) {
-            for (Annotation a : annotations())
-                if (a.annotationType()==type)
-                    return type.cast(a);
+            for (Annotation a : annotations()) {
+				if (a.annotationType()==type) {
+					return type.cast(a);
+				}
+			}
             return null;
         }
 
@@ -178,8 +206,9 @@ public class ReflectionUtils extends org.springframework.util.ReflectionUtils {
          */
         public String name() {
             String[] names = parent.names();
-            if (index<names.length)
-                return names[index];
+            if (index<names.length) {
+				return names[index];
+			}
             return null;
         }
 
@@ -202,27 +231,5 @@ public class ReflectionUtils extends org.springframework.util.ReflectionUtils {
         public Annotation[] getDeclaredAnnotations() {
             return annotations();
         }
-    }
-
-    /**
-     * Given the primitive type, returns the VM default value for that type in a boxed form.
-     * @return null unless {@link Class#isPrimitive}
-     */
-    public static @CheckForNull Object getVmDefaultValueForPrimitiveType(Class<?> type) {
-        return defaultPrimitiveValue.get(type);
-    }
-
-    // TODO the version in org.kohsuke.stapler is incomplete
-    private static final Map<Class<?>, Object> defaultPrimitiveValue = new HashMap<>();
-    static {
-        defaultPrimitiveValue.put(boolean.class, false);
-        defaultPrimitiveValue.put(char.class, '\0');
-        defaultPrimitiveValue.put(byte.class, (byte) 0);
-        defaultPrimitiveValue.put(short.class, (short) 0);
-        defaultPrimitiveValue.put(int.class, 0);
-        defaultPrimitiveValue.put(long.class, 0L);
-        defaultPrimitiveValue.put(float.class, (float) 0);
-        defaultPrimitiveValue.put(double.class, (double) 0);
-        defaultPrimitiveValue.put(void.class, null); // FWIW
     }
 }

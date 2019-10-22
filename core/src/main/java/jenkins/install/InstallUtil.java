@@ -75,20 +75,6 @@ public class InstallUtil {
     private static final VersionNumber FORCE_NEW_INSTALL_VERSION = new VersionNumber("0.0");
 
     /**
-     * Simple chain pattern using iterator.next()
-     */
-    private static class ProviderChain<T> implements Provider<T> {
-        private final Iterator<Function<Provider<T>,T>> functions;
-        public ProviderChain(Iterator<Function<Provider<T>,T>> functions) {
-            this.functions = functions;
-        }
-        @Override
-        public T get() {
-            return functions.next().apply(this);
-        }
-    }
-    
-    /**
      * Proceed to the state following the provided one
      */
     public static void proceedToNextStateFrom(InstallState prior) {
@@ -97,15 +83,13 @@ public class InstallUtil {
             Jenkins.get().setInstallState(next);
         }
     }
-    
-    /**
+
+	/**
      * Returns the next state during a transition from the current install state
      */
     /*package*/ static InstallState getNextInstallState(InstallState current) {
         List<Function<Provider<InstallState>,InstallState>> installStateFilterChain = new ArrayList<>();
-        for (InstallStateFilter setupExtension : InstallStateFilter.all()) {
-            installStateFilterChain.add(next -> setupExtension.getNextInstallState(current, next));
-        }
+        InstallStateFilter.all().forEach(setupExtension -> installStateFilterChain.add(next -> setupExtension.getNextInstallState(current, next)));
         // Terminal condition: getNextState() on the current install state
         installStateFilterChain.add(input -> {
             // Initially, install state is unknown and 
@@ -130,15 +114,15 @@ public class InstallUtil {
         ProviderChain<InstallState> chain = new ProviderChain<>(installStateFilterChain.iterator());
         return chain.get();
     }
-    
-    private static InstallState getDefaultInstallState() {
+
+	private static InstallState getDefaultInstallState() {
         // Support a simple state override. Useful for testing.
         String stateOverride = System.getProperty("jenkins.install.state", System.getenv("jenkins.install.state"));
         if (stateOverride != null) {
             try {
                 return InstallState.valueOf(stateOverride.toUpperCase());
             } catch (RuntimeException e) {
-                throw new IllegalStateException("Unknown install state override specified on the commandline: '" + stateOverride + "'.");
+                throw new IllegalStateException(new StringBuilder().append("Unknown install state override specified on the commandline: '").append(stateOverride).append("'.").toString());
             }
         }
         
@@ -177,14 +161,13 @@ public class InstallUtil {
                 }
             }
 
-            if (!FORCE_NEW_INSTALL_VERSION.equals(lastRunVersion)) {
-                // Edge case: used Jenkins 1 but did not save the system config page,
-                // the version is not persisted and returns 1.0, so try to check if
-                // they actually did anything
-                if (!j.getItemMap().isEmpty() || !j.getNodes().isEmpty()) {
-                    return InstallState.UPGRADE;
-                }
-            }
+            boolean condition = !FORCE_NEW_INSTALL_VERSION.equals(lastRunVersion) && (!j.getItemMap().isEmpty() || !j.getNodes().isEmpty());
+			// Edge case: used Jenkins 1 but did not save the system config page,
+			// the version is not persisted and returns 1.0, so try to check if
+			// they actually did anything
+			if (condition) {
+			    return InstallState.UPGRADE;
+			}
             
             return InstallState.INITIAL_SECURITY_SETUP;
         }
@@ -202,7 +185,7 @@ public class InstallUtil {
         }
     }
 
-    /**
+	/**
      * Save the current Jenkins instance version as the last executed version.
      * <p>
      * This state information is required in order to determine whether or not the Jenkins instance
@@ -216,7 +199,7 @@ public class InstallUtil {
         saveLastExecVersion(Jenkins.VERSION);
     }
 
-    /**
+	/**
      * Get the last saved Jenkins instance version.
      * @return The last saved Jenkins instance version.
      * @see #saveLastExecVersion()
@@ -261,7 +244,7 @@ public class InstallUtil {
         }
     }
 
-    /**
+	/**
      * Save a specific version as the last execute version.
      * @param version The version to save.
      */
@@ -274,19 +257,19 @@ public class InstallUtil {
         }
     }
 
-    static File getConfigFile() {
+	static File getConfigFile() {
         return new File(Jenkins.get().getRootDir(), "config.xml");
     }
 
-    static File getLastExecVersionFile() {
+	static File getLastExecVersionFile() {
         return new File(Jenkins.get().getRootDir(), "jenkins.install.InstallUtil.lastExecVersion");
     }
 
-    static File getInstallingPluginsFile() {
+	static File getInstallingPluginsFile() {
         return new File(Jenkins.get().getRootDir(), "jenkins.install.InstallUtil.installingPlugins");
     }
 
-    private static String getCurrentExecVersion() {
+	private static String getCurrentExecVersion() {
         if (Jenkins.VERSION.equals(Jenkins.UNCOMPUTED_VERSION)) {
             // This should never happen!! Only adding this check in case someone moves the call to this method to the wrong place.
             throw new IllegalStateException("Unexpected call to InstallUtil.getCurrentExecVersion(). Jenkins.VERSION has not been initialized. Call computeVersion() first.");
@@ -294,7 +277,7 @@ public class InstallUtil {
         return Jenkins.VERSION;
     }
 
-    /**
+	/**
      * Returns a list of any plugins that are persisted in the installing list
      */
     @SuppressWarnings("unchecked")
@@ -306,7 +289,7 @@ public class InstallUtil {
         return (Map<String,String>)new XStream().fromXML(installingPluginsFile);
     }
 
-    /**
+	/**
      * Persists a list of installing plugins; this is used in the case Jenkins fails mid-installation and needs to be restarted
      * @param installingPlugins
      */
@@ -318,17 +301,14 @@ public class InstallUtil {
 	}
 	LOGGER.fine("Writing install state to: " + installingPluginsFile.getAbsolutePath());
 	Map<String,String> statuses = new HashMap<>();
-	for(UpdateCenterJob j : installingPlugins) {
-		if(j instanceof InstallationJob && j.getCorrelationId() != null) { // only include install jobs with a correlation id (directly selected)
-			InstallationJob ij = (InstallationJob)j;
-			InstallationStatus status = ij.status;
-			String statusText = status.getType();
-			if(status instanceof Installing) { // flag currently installing plugins as pending
-				statusText = "Pending";
-			}
-			statuses.put(ij.plugin.name, statusText);
+	installingPlugins.stream().filter(j -> j instanceof InstallationJob && j.getCorrelationId() != null).map(j -> (InstallationJob)j).forEach(ij -> {
+		InstallationStatus status = ij.status;
+		String statusText = status.getType();
+		if(status instanceof Installing) { // flag currently installing plugins as pending
+			statusText = "Pending";
 		}
-	}
+		statuses.put(ij.plugin.name, statusText);
+	});
         try {
 		String installingPluginXml = new XStream().toXML(statuses);
             FileUtils.write(installingPluginsFile, installingPluginXml);
@@ -337,10 +317,24 @@ public class InstallUtil {
         }
     }
 
-    /**
+	/**
      * Call to remove any active install status
      */
 	public static void clearInstallStatus() {
 		persistInstallStatus(null);
 	}
+
+	/**
+     * Simple chain pattern using iterator.next()
+     */
+    private static class ProviderChain<T> implements Provider<T> {
+        private final Iterator<Function<Provider<T>,T>> functions;
+        public ProviderChain(Iterator<Function<Provider<T>,T>> functions) {
+            this.functions = functions;
+        }
+        @Override
+        public T get() {
+            return functions.next().apply(this);
+        }
+    }
 }

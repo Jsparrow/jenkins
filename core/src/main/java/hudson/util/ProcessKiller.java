@@ -56,14 +56,16 @@ import java.io.Serializable;
  * @since 1.362
  */
 public abstract class ProcessKiller implements ExtensionPoint, Serializable {
-    /**
+    private static final long serialVersionUID = 1L;
+
+	/**
      * Returns all the registered {@link ProcessKiller} descriptors.
      */
     public static ExtensionList<ProcessKiller> all() {
         return ExtensionList.lookup(ProcessKiller.class);
     }
 
-    /**
+	/**
      * Attempts to kill the given process.
      *
      * @param process process to be killed. Always a {@linkplain ProcessTree.Local local process}.
@@ -79,6 +81,4 @@ public abstract class ProcessKiller implements ExtensionPoint, Serializable {
      *      {@link InterruptedException} and just let it thrown from the method.
      */
     public abstract boolean kill(ProcessTree.OSProcess process) throws IOException, InterruptedException;
-
-    private static final long serialVersionUID = 1L;
 }

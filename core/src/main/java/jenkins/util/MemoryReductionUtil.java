@@ -32,7 +32,10 @@ import java.util.Map;
  * @author Sam Van Oort
  */
 public class MemoryReductionUtil {
-    /** Returns the capacity we need to allocate for a HashMap so it will hold all elements without needing to resize. */
+    /** Empty string array, exactly what it says on the tin. Avoids repeatedly created empty array when calling "toArray." */
+    public static final String[] EMPTY_STRING_ARRAY = new String[0];
+
+	/** Returns the capacity we need to allocate for a HashMap so it will hold all elements without needing to resize. */
     public static int preallocatedHashmapCapacity(int elementsToHold) {
         if (elementsToHold <= 0) {
             return 0;
@@ -43,15 +46,12 @@ public class MemoryReductionUtil {
         }
     }
 
-    /** Returns a mutable HashMap presized to hold the given number of elements without needing to resize. */
+	/** Returns a mutable HashMap presized to hold the given number of elements without needing to resize. */
     public static Map getPresizedMutableMap(int elementCount) {
         return new HashMap(preallocatedHashmapCapacity(elementCount));
     }
 
-    /** Empty string array, exactly what it says on the tin. Avoids repeatedly created empty array when calling "toArray." */
-    public static final String[] EMPTY_STRING_ARRAY = new String[0];
-
-    /** Returns the input strings, but with all values interned. */
+	/** Returns the input strings, but with all values interned. */
     public static String[] internInPlace(String[] input) {
         if (input == null) {
             return null;

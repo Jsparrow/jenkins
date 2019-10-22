@@ -36,7 +36,17 @@ public class JobParameterDefinition extends SimpleParameterDefinition {
         super(name);
     }
 
-    // @Extension --- not live yet
+    @Override
+    public ParameterValue createValue(StaplerRequest req, JSONObject jo) {
+        return req.bindJSON(JobParameterValue.class, jo);
+    }
+
+	@Override
+	public ParameterValue createValue(String value) {
+        return new JobParameterValue(getName(), Jenkins.get().getItemByFullName(value,Job.class));
+    }
+
+	// @Extension --- not live yet
     public static class DescriptorImpl extends ParameterDescriptor {
         @Override
         public String getDisplayName() {
@@ -48,14 +58,5 @@ public class JobParameterDefinition extends SimpleParameterDefinition {
             return req.bindJSON(JobParameterDefinition.class, formData);
         }
 
-    }
-
-    @Override
-    public ParameterValue createValue(StaplerRequest req, JSONObject jo) {
-        return req.bindJSON(JobParameterValue.class, jo);
-    }
-
-    public ParameterValue createValue(String value) {
-        return new JobParameterValue(getName(), Jenkins.get().getItemByFullName(value,Job.class));
     }
 }

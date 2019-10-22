@@ -18,8 +18,10 @@ import jnr.posix.util.DefaultPOSIXHandler;
 public class PosixAPI {
 
     private static POSIX posix;
-    
-    /**
+	private static org.jruby.ext.posix.POSIX jnaPosix;
+	private static final Logger LOGGER = Logger.getLogger(PosixAPI.class.getName());
+
+	/**
      * Load the JNR implementation of the POSIX APIs for the current platform.
      * Runtime exceptions will be of type {@link PosixException}.
      * {@link IllegalStateException} will be thrown for methods not implemented on this platform.
@@ -30,10 +32,11 @@ public class PosixAPI {
         if (posix == null) {
             posix = POSIXFactory.getPOSIX(new DefaultPOSIXHandler() {
                 @Override public void error(Errno error, String extraData) {
-                    throw new PosixException("native error " + error.description() + " " + extraData, convert(error));
+                    throw new PosixException(new StringBuilder().append("native error ").append(error.description()).append(" ").append(extraData).toString(), convert(error));
                 }
                 @Override public void error(Errno error, String methodName, String extraData) {
-                    throw new PosixException("native error calling " + methodName + ": " + error.description() + " " + extraData, convert(error));
+                    throw new PosixException(new StringBuilder().append("native error calling ").append(methodName).append(": ").append(error.description()).append(" ")
+							.append(extraData).toString(), convert(error));
                 }
                 private org.jruby.ext.posix.POSIX.ERRORS convert(Errno error) {
                     try {
@@ -47,7 +50,7 @@ public class PosixAPI {
         return posix;
     }
 
-    /**
+	/**
      * @deprecated use {@link #jnr} and {@link POSIX#isNative}
      */
     @Deprecated
@@ -55,7 +58,7 @@ public class PosixAPI {
         return supportsNative();
     }
 
-    /**
+	/**
      * @deprecated use {@link #jnr} and {@link POSIX#isNative}
      */
     @Deprecated
@@ -63,63 +66,70 @@ public class PosixAPI {
         return !(jnaPosix instanceof org.jruby.ext.posix.JavaPOSIX);
     }
 
-    private static org.jruby.ext.posix.POSIX jnaPosix;
-    /** @deprecated Use {@link #jnr} instead. */
+	/** @deprecated Use {@link #jnr} instead. */
     @Deprecated
     public static synchronized org.jruby.ext.posix.POSIX get() {
         if (jnaPosix == null) {
             jnaPosix = org.jruby.ext.posix.POSIXFactory.getPOSIX(new org.jruby.ext.posix.POSIXHandler() {
-        public void error(org.jruby.ext.posix.POSIX.ERRORS errors, String s) {
+        @Override
+		public void error(org.jruby.ext.posix.POSIX.ERRORS errors, String s) {
             throw new PosixException(s,errors);
         }
 
-        public void unimplementedError(String s) {
+        @Override
+		public void unimplementedError(String s) {
             throw new UnsupportedOperationException(s);
         }
 
-        public void warn(WARNING_ID warning_id, String s, Object... objects) {
+        @Override
+		public void warn(WARNING_ID warning_id, String s, Object... objects) {
             LOGGER.fine(s);
         }
 
-        public boolean isVerbose() {
+        @Override
+		public boolean isVerbose() {
             return true;
         }
 
-        public File getCurrentWorkingDirectory() {
+        @Override
+		public File getCurrentWorkingDirectory() {
             return new File(".").getAbsoluteFile();
         }
 
-        public String[] getEnv() {
+        @Override
+		public String[] getEnv() {
             Map<String,String> envs = System.getenv();
             String[] envp = new String[envs.size()];
             
             int i = 0;
             for (Map.Entry<String,String> e : envs.entrySet()) {
-                envp[i++] = e.getKey()+'+'+e.getValue();
+                envp[i++] = new StringBuilder().append(e.getKey()).append('+').append(e.getValue()).toString();
             }
             return envp;
         }
 
-        public InputStream getInputStream() {
+        @Override
+		public InputStream getInputStream() {
             return System.in;
         }
 
-        public PrintStream getOutputStream() {
+        @Override
+		public PrintStream getOutputStream() {
             return System.out;
         }
 
-        public int getPID() {
+        @Override
+		public int getPID() {
             // TODO
             return 0;
         }
 
-        public PrintStream getErrorStream() {
+        @Override
+		public PrintStream getErrorStream() {
             return System.err;
         }
     }, true);
         }
         return jnaPosix;
     }
-
-    private static final Logger LOGGER = Logger.getLogger(PosixAPI.class.getName());
 }

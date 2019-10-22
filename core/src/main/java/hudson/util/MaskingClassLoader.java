@@ -58,18 +58,17 @@ public class MaskingClassLoader extends ClassLoader {
         this.masksClasses.addAll(masks);
 
         /**
-         * The name of a resource is a '/'-separated path name
-         */
-        for (String mask : masks) {
-            masksResources.add(mask.replace(".","/"));
-        }
+		         * The name of a resource is a '/'-separated path name
+		         */
+		masks.forEach(mask -> masksResources.add(mask.replace(".", "/")));
     }
 
     @Override
     protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
         for (String mask : masksClasses) {
-            if(name.startsWith(mask))
-                throw new ClassNotFoundException();
+            if(name.startsWith(mask)) {
+				throw new ClassNotFoundException();
+			}
         }
 
         return super.loadClass(name, resolve);
@@ -77,14 +76,18 @@ public class MaskingClassLoader extends ClassLoader {
 
     @Override
     public URL getResource(String name) {
-        if (isMasked(name)) return null;
+        if (isMasked(name)) {
+			return null;
+		}
 
         return super.getResource(name);
     }
 
     @Override
     public Enumeration<URL> getResources(String name) throws IOException {
-        if (isMasked(name)) return Collections.emptyEnumeration();
+        if (isMasked(name)) {
+			return Collections.emptyEnumeration();
+		}
 
         return super.getResources(name);
     }
@@ -97,10 +100,6 @@ public class MaskingClassLoader extends ClassLoader {
     }
 
     private boolean isMasked(String name) {
-        for (String mask : masksResources) {
-            if(name.startsWith(mask))
-                return true;
-        }
-        return false;
+        return masksResources.stream().anyMatch(name::startsWith);
     }
 }

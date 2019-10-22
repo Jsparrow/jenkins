@@ -23,24 +23,29 @@ import jenkins.util.SystemProperties;
  */
 public class CloudSlaveRetentionStrategy<T extends Computer> extends RetentionStrategy<T> {
 
-    @Override
+    // for debugging, it's convenient to be able to reduce this time
+    public static long TIMEOUT = SystemProperties.getLong(CloudSlaveRetentionStrategy.class.getName()+".timeout", TimeUnit.MINUTES.toMillis(10));
+
+	private static final Logger LOGGER = Logger.getLogger(CloudSlaveRetentionStrategy.class.getName());
+
+	@Override
     @GuardedBy("hudson.model.Queue.lock")
     public long check(T c) {
-        if (!c.isConnecting() && c.isAcceptingTasks()) {
-            if (isIdleForTooLong(c)) {
-                try {
-                    Node n = c.getNode();
-                    if (n!=null)    // rare, but n==null if the node is deleted and being checked roughly at the same time
-                        kill(n);
-                } catch (IOException e) {
-                    LOGGER.log(Level.WARNING, "Failed to remove "+c.getDisplayName(),e);
-                }
-            }
-        }
+        boolean condition = !c.isConnecting() && c.isAcceptingTasks() && isIdleForTooLong(c);
+		if (condition) {
+		    try {
+		        Node n = c.getNode();
+		        if (n!=null) {
+					kill(n);
+				}
+		    } catch (IOException e) {
+		        LOGGER.log(Level.WARNING, "Failed to remove "+c.getDisplayName(),e);
+		    }
+		}
         return checkCycle();
     }
 
-    /**
+	/**
      * Remove the node.
      *
      * <p>
@@ -50,29 +55,24 @@ public class CloudSlaveRetentionStrategy<T extends Computer> extends RetentionSt
         Jenkins.get().removeNode(n);
     }
 
-    /**
+	/**
      * When do we check again next time?
      */
     protected long checkCycle() {
         return getIdleMaxTime()/10;
     }
 
-    /**
+	/**
      * Has this computer been idle for too long?
      */
     protected boolean isIdleForTooLong(T c) {
         return System.currentTimeMillis()-c.getIdleStartMilliseconds() > getIdleMaxTime();
     }
 
-    /**
+	/**
      * If the computer has been idle longer than this time, we'll kill the agent.
      */
     protected long getIdleMaxTime() {
         return TIMEOUT;
     }
-
-    // for debugging, it's convenient to be able to reduce this time
-    public static long TIMEOUT = SystemProperties.getLong(CloudSlaveRetentionStrategy.class.getName()+".timeout", TimeUnit.MINUTES.toMillis(10));
-
-    private static final Logger LOGGER = Logger.getLogger(CloudSlaveRetentionStrategy.class.getName());
 }

@@ -84,71 +84,69 @@ import org.kohsuke.accmod.restrictions.NoExternalUse;
  */
 @ExportedBean
 public class Executor extends Thread implements ModelObject {
-    protected final @Nonnull Computer owner;
-    private final Queue queue;
-    private final ReadWriteLock lock = new ReentrantReadWriteLock();
     private static final int DEFAULT_ESTIMATED_DURATION = -1;
-
-    @GuardedBy("lock")
+	/**
+     * Mechanism to allow threads (in particular the channel request handling threads) to
+     * run on behalf of {@link Executor}.
+     */
+    private static final ThreadLocal<Executor> IMPERSONATION = new ThreadLocal<>();
+	private static final Logger LOGGER = Logger.getLogger(Executor.class.getName());
+	protected final @Nonnull Computer owner;
+	private final Queue queue;
+	private final ReadWriteLock lock = new ReentrantReadWriteLock();
+	@GuardedBy("lock")
     private long startTime;
-    /**
+	/**
      * Used to track when a job was last executed.
      */
     private final long creationTime = System.currentTimeMillis();
-
-    /**
+	/**
      * Executor number that identifies it among other executors for the same {@link Computer}.
      */
     private int number;
-    /**
+	/**
      * {@link hudson.model.Queue.Executable} being executed right now, or null if the executor is idle.
      */
     @GuardedBy("lock")
     private Queue.Executable executable;
-
-    /**
+	/**
      * Calculation of estimated duration needs some time, so, it's better to cache it once executable is known
      */
     private long executableEstimatedDuration = DEFAULT_ESTIMATED_DURATION;
-
-    /**
+	/**
      * Used to mark that the execution is continuing asynchronously even though {@link Executor} as {@link Thread}
      * has finished.
      */
     @GuardedBy("lock")
     private AsynchronousExecution asynchronousExecution;
-
-    /**
+	/**
      * When {@link Queue} allocates a work for this executor, this field is set
      * and the executor is {@linkplain Thread#start() started}.
      */
     @GuardedBy("lock")
     private WorkUnit workUnit;
-
-    @GuardedBy("lock")
+	@GuardedBy("lock")
     private boolean started;
-
-    /**
+	/**
      * When the executor is interrupted, we allow the code that interrupted the thread to override the
      * result code it prefers.
      */
     @GuardedBy("lock")
     private Result interruptStatus;
-
-    /**
+	/**
      * Cause of interruption. Access needs to be synchronized.
      */
     @GuardedBy("lock")
     private final List<CauseOfInterruption> causes = new Vector<>();
 
-    public Executor(@Nonnull Computer owner, int n) {
-        super("Executor #"+n+" for "+owner.getDisplayName());
+	public Executor(@Nonnull Computer owner, int n) {
+        super(new StringBuilder().append("Executor #").append(n).append(" for ").append(owner.getDisplayName()).toString());
         this.owner = owner;
         this.queue = Jenkins.get().getQueue();
         this.number = n;
     }
 
-    @Override
+	@Override
     public void interrupt() {
         if (Thread.currentThread() == this) {
             // If you catch an InterruptedException the "correct" options are limited to one of two choices:
@@ -180,10 +178,11 @@ public class Executor extends Thread implements ModelObject {
         }
     }
 
-    void interruptForShutdown() {
+	void interruptForShutdown() {
         interrupt(Result.ABORTED, true);
     }
-    /**
+
+	/**
      * Interrupt the execution,
      * but instead of marking the build as aborted, mark it as specified result.
      *
@@ -193,27 +192,28 @@ public class Executor extends Thread implements ModelObject {
         interrupt(result, false);
     }
 
-    private void interrupt(Result result, boolean forShutdown) {
+	private void interrupt(Result result, boolean forShutdown) {
         Authentication a = Jenkins.getAuthentication();
-        if (a == ACL.SYSTEM)
-            interrupt(result, forShutdown, new CauseOfInterruption[0]);
-        else {
+        if (a == ACL.SYSTEM) {
+			interrupt(result, forShutdown, new CauseOfInterruption[0]);
+		} else {
             // worth recording who did it
             // avoid using User.get() to avoid deadlock.
             interrupt(result, forShutdown, new UserInterruption(a.getName()));
         }
     }
 
-    /**
+	/**
      * Interrupt the execution. Mark the cause and the status accordingly.
      */
     public void interrupt(Result result, CauseOfInterruption... causes) {
         interrupt(result, false, causes);
     }
 
-    private void interrupt(Result result, boolean forShutdown, CauseOfInterruption... causes) {
-        if (LOGGER.isLoggable(FINE))
-            LOGGER.log(FINE, String.format("%s is interrupted(%s): %s", getDisplayName(), result, Util.join(Arrays.asList(causes),",")), new InterruptedException());
+	private void interrupt(Result result, boolean forShutdown, CauseOfInterruption... causes) {
+        if (LOGGER.isLoggable(FINE)) {
+			LOGGER.log(FINE, String.format("%s is interrupted(%s): %s", getDisplayName(), result, Util.join(Arrays.asList(causes),",")), new InterruptedException());
+		}
 
         lock.writeLock().lock();
         try {
@@ -226,8 +226,9 @@ public class Executor extends Thread implements ModelObject {
             interruptStatus = result;
 
             for (CauseOfInterruption c : causes) {
-                if (!this.causes.contains(c))
-                    this.causes.add(c);
+                if (!this.causes.contains(c)) {
+					this.causes.add(c);
+				}
             }
             if (asynchronousExecution != null) {
                 asynchronousExecution.interrupt(forShutdown);
@@ -239,7 +240,7 @@ public class Executor extends Thread implements ModelObject {
         }
     }
 
-    public Result abortResult() {
+	public Result abortResult() {
         // this method is almost always called as a result of the current thread being interrupted
         // as a result we need to clean the interrupt flag so that the lock's lock method doesn't
         // get confused and think it was interrupted while awaiting the lock
@@ -250,8 +251,11 @@ public class Executor extends Thread implements ModelObject {
         lock.writeLock().lock();
         try {
             Result r = interruptStatus;
-            if (r == null) r =
-                    Result.ABORTED; // this is when we programmatically throw InterruptedException instead of calling the interrupt method.
+            if (r == null)
+			 {
+				r =
+				        Result.ABORTED; // this is when we programmatically throw InterruptedException instead of calling the interrupt method.
+			}
 
             return r;
         } finally {
@@ -259,7 +263,7 @@ public class Executor extends Thread implements ModelObject {
         }
     }
 
-    /**
+	/**
      * report cause of interruption and record it to the build, if available.
      *
      * @since 1.425
@@ -270,7 +274,9 @@ public class Executor extends Thread implements ModelObject {
         // atomically get&clear causes.
         lock.writeLock().lock();
         try {
-            if (causes.isEmpty())   return;
+            if (causes.isEmpty()) {
+				return;
+			}
             r = new ArrayList<>(causes);
             causes.clear();
         } finally {
@@ -278,11 +284,10 @@ public class Executor extends Thread implements ModelObject {
         }
 
         build.addAction(new InterruptedBuildAction(r));
-        for (CauseOfInterruption c : r)
-            c.print(listener);
+        r.forEach(c -> c.print(listener));
     }
 
-    /**
+	/**
      * There are some cases where an executor is started but the node is removed or goes off-line before we are ready
      * to start executing the assigned work unit. This method is called to clear the assigned work unit so that
      * the {@link Queue#maintain()} method can return the item to the buildable state.
@@ -298,9 +303,7 @@ public class Executor extends Thread implements ModelObject {
                 pw.print("No termination trace available.");
             } else {
                 pw.println("Termination trace follows:");
-                for (Computer.TerminationRequest request : owner.getTerminatedBy()) {
-                    Functions.printStackTrace(request, pw);
-                }
+                owner.getTerminatedBy().forEach(request -> Functions.printStackTrace(request, pw));
             }
         }
         LOGGER.log(WARNING, writer.toString());
@@ -315,7 +318,7 @@ public class Executor extends Thread implements ModelObject {
         }
     }
 
-    @Override
+	@Override
     public void run() {
         if (!owner.isOnline()) {
             resetWorkUnit("went off-line before the task's worker thread started");
@@ -359,8 +362,9 @@ public class Executor extends Thread implements ModelObject {
                     // is removed or goes off-line then the build will just have to fail.
                     workUnit.setExecutor(Executor.this);
                     queue.onStartExecuting(Executor.this);
-                    if (LOGGER.isLoggable(FINE))
-                        LOGGER.log(FINE, getName()+" grabbed "+workUnit+" from queue");
+                    if (LOGGER.isLoggable(FINE)) {
+						LOGGER.log(FINE, new StringBuilder().append(getName()).append(" grabbed ").append(workUnit).append(" from queue").toString());
+					}
                     SubTask task = workUnit.work;
                     Executable executable = task.createExecutable();
                     if (executable == null) {
@@ -388,8 +392,9 @@ public class Executor extends Thread implements ModelObject {
             } finally {
                 lock.readLock().unlock();
             }
-            if (LOGGER.isLoggable(FINE))
-                LOGGER.log(FINE, getName()+" is going to execute "+executable);
+            if (LOGGER.isLoggable(FINE)) {
+				LOGGER.log(FINE, new StringBuilder().append(getName()).append(" is going to execute ").append(executable).toString());
+			}
 
             Throwable problems = null;
             try {
@@ -408,12 +413,10 @@ public class Executor extends Thread implements ModelObject {
                     if (LOGGER.isLoggable(Level.FINER)) {
                         LOGGER.log(FINER, "when running {0} from {1} we are copying {2} actions whereas the item currently has {3}", new Object[] {executable, workUnit.context.item, workUnit.context.actions, workUnit.context.item.getAllActions()});
                     }
-                    for (Action action: workUnit.context.actions) {
-                        ((Actionable) executable).addAction(action);
-                    }
+                    workUnit.context.actions.forEach(action -> ((Actionable) executable).addAction(action));
                 }
 
-                setName(getName() + " : executing " + executable.toString());
+                setName(new StringBuilder().append(getName()).append(" : executing ").append(executable.toString()).toString());
                 Authentication auth = workUnit.context.item.authenticate();
                 LOGGER.log(FINE, "{0} is now executing {1} as {2}", new Object[] {getName(), executable, auth});
                 if (LOGGER.isLoggable(FINE) && auth.equals(ACL.SYSTEM)) { // i.e., unspecified
@@ -463,7 +466,7 @@ public class Executor extends Thread implements ModelObject {
         }
     }
 
-    private void finish1(@CheckForNull Throwable problems) {
+	private void finish1(@CheckForNull Throwable problems) {
         if (problems != null) {
             // for some reason the executor died. this is really
             // a bug in the code, but we don't want the executor to die,
@@ -482,10 +485,8 @@ public class Executor extends Thread implements ModelObject {
         }
     }
 
-    private void finish2() {
-        for (RuntimeException e1 : owner.getTerminatedBy()) {
-            LOGGER.log(Level.FINE, String.format("%s termination trace", getName()), e1);
-        }
+	private void finish2() {
+        owner.getTerminatedBy().forEach(e1 -> LOGGER.log(Level.FINE, String.format("%s termination trace", getName()), e1));
         owner.removeExecutor(this);
         if (this instanceof OneOffExecutor) {
             owner.remove((OneOffExecutor) this);
@@ -494,7 +495,7 @@ public class Executor extends Thread implements ModelObject {
         queue.scheduleMaintenance();
     }
 
-    @Restricted(NoExternalUse.class)
+	@Restricted(NoExternalUse.class)
     public void completedAsynchronous(@CheckForNull Throwable error) {
         try {
             finish1(error);
@@ -504,7 +505,7 @@ public class Executor extends Thread implements ModelObject {
         asynchronousExecution = null;
     }
 
-    /**
+	/**
      * Returns the current build this executor is running.
      *
      * @return
@@ -519,7 +520,7 @@ public class Executor extends Thread implements ModelObject {
         }
     }
 
-    /**
+	/**
      * Same as {@link #getCurrentExecutable} but checks {@link Item#READ}.
      */
     @Exported(name="currentExecutable")
@@ -528,8 +529,8 @@ public class Executor extends Thread implements ModelObject {
         Executable candidate = getCurrentExecutable();
         return candidate instanceof AccessControlled && ((AccessControlled) candidate).hasPermission(Item.READ) ? candidate : null;
     }
-    
-    /**
+
+	/**
      * Returns causes of interruption.
      *
      * @return Unmodifiable collection of causes of interruption.
@@ -539,7 +540,7 @@ public class Executor extends Thread implements ModelObject {
         return Collections.unmodifiableCollection(causes);
     }
 
-    /**
+	/**
      * Returns the current {@link WorkUnit} (of {@link #getCurrentExecutable() the current executable})
      * that this executor is running.
      *
@@ -556,7 +557,7 @@ public class Executor extends Thread implements ModelObject {
         }
     }
 
-    /**
+	/**
      * If {@linkplain #getCurrentExecutable() current executable} is {@link AbstractBuild},
      * return the workspace that this executor is using, or null if the build hasn't gotten
      * to that point yet.
@@ -577,14 +578,15 @@ public class Executor extends Thread implements ModelObject {
         }
     }
 
-    /**
+	/**
      * Human readable name of the Jenkins executor. For the Java thread name use {@link #getName()}.
      */
-    public String getDisplayName() {
+    @Override
+	public String getDisplayName() {
         return "Executor #"+getNumber();
     }
 
-    /**
+	/**
      * Gets the executor number that uniquely identifies it among
      * other {@link Executor}s for the same computer.
      *
@@ -596,7 +598,7 @@ public class Executor extends Thread implements ModelObject {
         return number;
     }
 
-    /**
+	/**
      * Returns true if this {@link Executor} is ready for action.
      */
     @Exported
@@ -609,7 +611,7 @@ public class Executor extends Thread implements ModelObject {
         }
     }
 
-    /**
+	/**
      * The opposite of {@link #isIdle()} &mdash; the executor is doing some work.
      */
     public boolean isBusy() {
@@ -621,7 +623,7 @@ public class Executor extends Thread implements ModelObject {
         }
     }
 
-    /**
+	/**
      * Check if executor is ready to accept tasks.
      * This method becomes the critical one since 1.536, which introduces the
      * on-demand creation of executor threads. Callers should use
@@ -639,7 +641,7 @@ public class Executor extends Thread implements ModelObject {
         }
     }
 
-    /**
+	/**
      * If currently running in asynchronous mode, returns that handle.
      * @since 1.607
      */
@@ -652,7 +654,7 @@ public class Executor extends Thread implements ModelObject {
         }
     }
 
-    /**
+	/**
      * If this executor is running an {@link AsynchronousExecution} and that execution wants to hide the display
      * cell for the executor (because there is another executor displaying the job progress and we don't want to
      * confuse the user) then this method will return {@code false} to indicate to {@code executors.jelly} that
@@ -668,7 +670,7 @@ public class Executor extends Thread implements ModelObject {
         return asynchronousExecution == null || asynchronousExecution.displayCell();
     }
 
-    /**
+	/**
      * Returns true if this executor is waiting for a task to execute.
      */
     public boolean isParking() {
@@ -680,7 +682,7 @@ public class Executor extends Thread implements ModelObject {
         }
     }
 
-    /**
+	/**
      * @deprecated no longer used
      */
     @Deprecated
@@ -688,7 +690,7 @@ public class Executor extends Thread implements ModelObject {
         return null;
     }
 
-    /**
+	/**
      * Returns the progress of the current build in the number between 0-100.
      *
      * @return -1
@@ -708,7 +710,7 @@ public class Executor extends Thread implements ModelObject {
         return num;
     }
 
-    /**
+	/**
      * Returns true if the current build is likely stuck.
      *
      * <p>
@@ -737,7 +739,7 @@ public class Executor extends Thread implements ModelObject {
         }
     }
 
-    public long getElapsedTime() {
+	public long getElapsedTime() {
         lock.readLock().lock();
         try {
             return System.currentTimeMillis() - startTime;
@@ -746,7 +748,7 @@ public class Executor extends Thread implements ModelObject {
         }
     }
 
-    /**
+	/**
      * Returns the number of milli-seconds the currently executing job spent in the queue
      * waiting for an available executor. This excludes the quiet period time of the job.
      * @since 1.440
@@ -760,7 +762,7 @@ public class Executor extends Thread implements ModelObject {
         }
     }
 
-    /**
+	/**
      * Gets the string that says how long since this build has started.
      *
      * @return
@@ -770,7 +772,7 @@ public class Executor extends Thread implements ModelObject {
         return Util.getTimeSpanString(getElapsedTime());
     }
 
-    /**
+	/**
      * Computes a human-readable text that shows the expected remaining time
      * until the build completes.
      */
@@ -788,7 +790,7 @@ public class Executor extends Thread implements ModelObject {
         return Util.getTimeSpanString(eta);
     }
 
-    /**
+	/**
      * The same as {@link #getEstimatedRemainingTime()} but return
      * it as a number of milli-seconds.
      */
@@ -806,7 +808,7 @@ public class Executor extends Thread implements ModelObject {
         return eta;
     }
 
-    /**
+	/**
      * Can't start executor like you normally start a thread.
      *
      * @see #start(WorkUnit)
@@ -816,7 +818,7 @@ public class Executor extends Thread implements ModelObject {
         throw new UnsupportedOperationException();
     }
 
-    /*protected*/ void start(WorkUnit task) {
+	/*protected*/ void start(WorkUnit task) {
         lock.writeLock().lock();
         try {
             this.workUnit = task;
@@ -827,8 +829,7 @@ public class Executor extends Thread implements ModelObject {
         }
     }
 
-
-    /**
+	/**
      * @deprecated as of 1.489
      *      Use {@link #doStop()}.
      */
@@ -838,7 +839,7 @@ public class Executor extends Thread implements ModelObject {
         doStop().generateResponse(req,rsp,this);
     }
 
-    /**
+	/**
      * Stops the current build.
      *
      * @since 1.489
@@ -857,7 +858,7 @@ public class Executor extends Thread implements ModelObject {
         return HttpResponses.forwardToPreviousPage();
     }
 
-    /**
+	/**
      * @deprecated now a no-op
      */
     @Deprecated
@@ -865,7 +866,7 @@ public class Executor extends Thread implements ModelObject {
         return HttpResponses.redirectViaContextPath("/");
     }
 
-    /**
+	/**
      * Checks if the current user has a permission to stop this build.
      */
     public boolean hasStopPermission() {
@@ -877,35 +878,36 @@ public class Executor extends Thread implements ModelObject {
         }
     }
 
-    public @Nonnull Computer getOwner() {
+	public @Nonnull Computer getOwner() {
         return owner;
     }
 
-    /**
+	/**
      * Returns when this executor started or should start being idle.
      */
     public long getIdleStartMilliseconds() {
-        if (isIdle())
-            return Math.max(creationTime, owner.getConnectTime());
-        else {
+        if (isIdle()) {
+			return Math.max(creationTime, owner.getConnectTime());
+		} else {
             return Math.max(startTime + Math.max(0, executableEstimatedDuration), System.currentTimeMillis() + 15000);
         }
     }
 
-    /**
+	/**
      * Exposes the executor to the remote API.
      */
     public Api getApi() {
         return new Api(this);
     }
 
-    /**
+	/**
      * Creates a proxy object that executes the callee in the context that impersonates
      * this executor. Useful to export an object to a remote channel.
      */
     public <T> T newImpersonatingProxy(Class<T> type, T core) {
         return new InterceptingProxy() {
-            protected Object call(Object o, Method m, Object[] args) throws Throwable {
+            @Override
+			protected Object call(Object o, Method m, Object[] args) throws Throwable {
                 final Executor old = IMPERSONATION.get();
                 IMPERSONATION.set(Executor.this);
                 try {
@@ -917,16 +919,18 @@ public class Executor extends Thread implements ModelObject {
         }.wrap(type,core);
     }
 
-    /**
+	/**
      * Returns the executor of the current thread or null if current thread is not an executor.
      */
     public static @CheckForNull Executor currentExecutor() {
         Thread t = Thread.currentThread();
-        if (t instanceof Executor) return (Executor) t;
+        if (t instanceof Executor) {
+			return (Executor) t;
+		}
         return IMPERSONATION.get();
     }
 
-    /**
+	/**
      * Finds the executor currently running a given process.
      * @param executable a possibly running executable
      * @return the executor (possibly a {@link OneOffExecutor}) whose {@link Executor#getCurrentExecutable} matches that,
@@ -949,19 +953,11 @@ public class Executor extends Thread implements ModelObject {
         return null;
     }
 
-    /**
+	/**
      * @deprecated call {@link Executable#getEstimatedDuration} directly
      */
     @Deprecated
     public static long getEstimatedDurationFor(Executable e) {
         return e == null ? DEFAULT_ESTIMATED_DURATION : e.getEstimatedDuration();
     }
-
-    /**
-     * Mechanism to allow threads (in particular the channel request handling threads) to
-     * run on behalf of {@link Executor}.
-     */
-    private static final ThreadLocal<Executor> IMPERSONATION = new ThreadLocal<>();
-
-    private static final Logger LOGGER = Logger.getLogger(Executor.class.getName());
 }

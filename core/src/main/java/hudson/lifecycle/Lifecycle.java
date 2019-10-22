@@ -49,13 +49,14 @@ import org.apache.commons.io.FileUtils;
  */
 public abstract class Lifecycle implements ExtensionPoint {
     private static Lifecycle INSTANCE = null;
+	private static final Logger LOGGER = Logger.getLogger(Lifecycle.class.getName());
 
-    /**
+	/**
      * Gets the singleton instance.
      *
      * @return never null
      */
-    public synchronized static Lifecycle get() {
+    public static synchronized Lifecycle get() {
         if(INSTANCE==null) {
             Lifecycle instance;
             String p = SystemProperties.getString("hudson.lifecycle");
@@ -111,7 +112,7 @@ public abstract class Lifecycle implements ExtensionPoint {
         return INSTANCE;
     }
 
-    /**
+	/**
      * If the location of {@code jenkins.war} is known in this life cycle,
      * return it location. Otherwise return null to indicate that it is unknown.
      *
@@ -121,12 +122,13 @@ public abstract class Lifecycle implements ExtensionPoint {
      */
     public File getHudsonWar() {
         String war = SystemProperties.getString("executable-war");
-        if(war!=null && new File(war).exists())
-            return new File(war);
+        if(war!=null && new File(war).exists()) {
+			return new File(war);
+		}
         return null;
     }
 
-    /**
+	/**
      * Replaces jenkins.war by the given file.
      *
      * <p>
@@ -138,22 +140,26 @@ public abstract class Lifecycle implements ExtensionPoint {
         File dest = getHudsonWar();
         // this should be impossible given the canRewriteHudsonWar method,
         // but let's be defensive
-        if(dest==null)  throw new IOException("jenkins.war location is not known.");
+        if(dest==null) {
+			throw new IOException("jenkins.war location is not known.");
+		}
 
         // backing up the old jenkins.war before it gets lost due to upgrading
         // (newly downloaded jenkins.war and 'backup' (jenkins.war.tmp) are the same files
         // unless we are trying to rewrite jenkins.war by a backup itself
         File bak = new File(dest.getPath() + ".bak");
-        if (!by.equals(bak))
-            FileUtils.copyFile(dest, bak);
+        if (!by.equals(bak)) {
+			FileUtils.copyFile(dest, bak);
+		}
        
         FileUtils.copyFile(by, dest);
         // we don't want to keep backup if we are downgrading
-        if (by.equals(bak)&&bak.exists())
-            bak.delete();
+        if (by.equals(bak)&&bak.exists()) {
+			bak.delete();
+		}
     }
 
-    /**
+	/**
      * Can {@link #rewriteHudsonWar(File)} work?
      */
     public boolean canRewriteHudsonWar() {
@@ -169,7 +175,7 @@ public abstract class Lifecycle implements ExtensionPoint {
         return true;
     }
 
-    /**
+	/**
      * If this life cycle supports a restart of Hudson, do so.
      * Otherwise, throw {@link UnsupportedOperationException},
      * which is what the default implementation does.
@@ -186,7 +192,7 @@ public abstract class Lifecycle implements ExtensionPoint {
         throw new UnsupportedOperationException();
     }
 
-    /**
+	/**
      * Can the {@link #restart()} method restart Hudson?
      *
      * @throws RestartNotSupportedException
@@ -194,12 +200,12 @@ public abstract class Lifecycle implements ExtensionPoint {
      */
     public void verifyRestartable() throws RestartNotSupportedException {
         // the rewriteHudsonWar method isn't overridden.
-        if (!Util.isOverridden(Lifecycle.class,getClass(), "restart"))
-            throw new RestartNotSupportedException("Restart is not supported in this running mode (" +
-                    getClass().getName() + ").");
+        if (!Util.isOverridden(Lifecycle.class,getClass(), "restart")) {
+			throw new RestartNotSupportedException(new StringBuilder().append("Restart is not supported in this running mode (").append(getClass().getName()).append(").").toString());
+		}
     }
 
-    /**
+	/**
      * The same as {@link #verifyRestartable()} except the status is indicated by the return value,
      * not by an exception.
      */
@@ -211,6 +217,4 @@ public abstract class Lifecycle implements ExtensionPoint {
             return false;
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(Lifecycle.class.getName());
 }

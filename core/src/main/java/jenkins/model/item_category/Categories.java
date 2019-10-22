@@ -70,12 +70,7 @@ public class Categories implements HttpResponse, Serializable {
 
     @CheckForNull
     public Category getItem(@Nonnull String id) {
-        for (Category category : items) {
-            if (category.getId().equals(id)) {
-                return category;
-            }
-        }
-        return null;
+        return items.stream().filter(category -> category.getId().equals(id)).findFirst().orElse(null);
     }
 
 }

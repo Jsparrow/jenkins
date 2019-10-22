@@ -50,6 +50,24 @@ import javax.annotation.Nonnull;
 public abstract class RetentionStrategy<T extends Computer> extends AbstractDescribableImpl<RetentionStrategy<?>> implements ExtensionPoint {
 
     /**
+     * All registered {@link RetentionStrategy} implementations.
+     * @deprecated as of 1.286
+     *      Use {@link #all()} for read access, and {@link Extension} for registration.
+     */
+    @Deprecated
+    public static final DescriptorList<RetentionStrategy<?>> LIST = new DescriptorList<>((Class)RetentionStrategy.class);
+
+	/**
+     * Dummy instance that doesn't do any attempt to retention.
+     */
+    public static final RetentionStrategy<Computer> NOOP = new NoOp();
+
+	/**
+     * Convenient singleton instance, since this {@link RetentionStrategy} is stateless.
+     */
+    public static final Always INSTANCE = new Always();
+
+	/**
      * This method will be called periodically to allow this strategy to decide what to do with its owning agent.
      *
      * @param c {@link Computer} for which this strategy is assigned. This computer may be online or offline.
@@ -60,7 +78,7 @@ public abstract class RetentionStrategy<T extends Computer> extends AbstractDesc
     @GuardedBy("hudson.model.Queue.lock")
     public abstract long check(@Nonnull T c);
 
-    /**
+	/**
      * This method is called to determine whether manual launching of the agent is allowed right now.
      * @param c {@link Computer} for which this strategy is assigned. This computer may be online or offline.
      *          This object also exposes a bunch of properties that the callee can use to decide if manual launching is
@@ -71,7 +89,7 @@ public abstract class RetentionStrategy<T extends Computer> extends AbstractDesc
         return true;
     }
 
-    /**
+	/**
      * Returns {@code true} if the computer is accepting tasks. Needed to allow retention strategies programmatic
      * suspension of task scheduling that in preparation for going offline. Called by
      * {@link hudson.model.Computer#isAcceptingTasks()}
@@ -85,7 +103,7 @@ public abstract class RetentionStrategy<T extends Computer> extends AbstractDesc
         return true;
     }
 
-    /**
+	/**
      * Called when a new {@link Computer} object is introduced (such as when Hudson started, or when
      * a new agent is added).
      *
@@ -100,50 +118,33 @@ public abstract class RetentionStrategy<T extends Computer> extends AbstractDesc
         Queue.withLock((Runnable) () -> check(c));
     }
 
-    /**
+	/**
      * Returns all the registered {@link RetentionStrategy} descriptors.
      */
     public static DescriptorExtensionList<RetentionStrategy<?>,Descriptor<RetentionStrategy<?>>> all() {
         return (DescriptorExtensionList) Jenkins.get().getDescriptorList(RetentionStrategy.class);
     }
 
-    /**
-     * All registered {@link RetentionStrategy} implementations.
-     * @deprecated as of 1.286
-     *      Use {@link #all()} for read access, and {@link Extension} for registration.
-     */
-    @Deprecated
-    public static final DescriptorList<RetentionStrategy<?>> LIST = new DescriptorList<RetentionStrategy<?>>((Class)RetentionStrategy.class);
-
-    /**
-     * Dummy instance that doesn't do any attempt to retention.
-     */
-    public static final RetentionStrategy<Computer> NOOP = new NoOp();
-    private static final class NoOp extends RetentionStrategy<Computer> {
-        @GuardedBy("hudson.model.Queue.lock")
+	private static final class NoOp extends RetentionStrategy<Computer> {
+        private static final DescriptorImpl DESCRIPTOR = new DescriptorImpl();
+		@GuardedBy("hudson.model.Queue.lock")
         @Override
         public long check(Computer c) {
             return 60;
         }
-        @Override
+		@Override
         public void start(Computer c) {
             c.connect(false);
         }
-        @Override
+		@Override
         public Descriptor<RetentionStrategy<?>> getDescriptor() {
             return DESCRIPTOR;
         }
-        private Object readResolve() {
+		private Object readResolve() {
             return NOOP;
         }
-        private static final DescriptorImpl DESCRIPTOR = new DescriptorImpl();
-        private static final class DescriptorImpl extends Descriptor<RetentionStrategy<?>> {}
+		private static final class DescriptorImpl extends Descriptor<RetentionStrategy<?>> {}
     }
-
-    /**
-     * Convenient singleton instance, since this {@link RetentionStrategy} is stateless.
-     */
-    public static final Always INSTANCE = new Always();
 
     /**
      * {@link RetentionStrategy} that tries to keep the node online all the time.
@@ -156,16 +157,19 @@ public abstract class RetentionStrategy<T extends Computer> extends AbstractDesc
         public Always() {
         }
 
-        @GuardedBy("hudson.model.Queue.lock")
+        @Override
+		@GuardedBy("hudson.model.Queue.lock")
         public long check(SlaveComputer c) {
-            if (c.isOffline() && !c.isConnecting() && c.isLaunchSupported())
-                c.tryReconnect();
+            if (c.isOffline() && !c.isConnecting() && c.isLaunchSupported()) {
+				c.tryReconnect();
+			}
             return 1;
         }
 
         @Extension(ordinal=100) @Symbol("always")
         public static class DescriptorImpl extends Descriptor<RetentionStrategy<?>> {
-            public String getDisplayName() {
+            @Override
+			public String getDisplayName() {
                 return Messages.RetentionStrategy_Always_displayName();
             }
         }
@@ -220,8 +224,9 @@ public abstract class RetentionStrategy<T extends Computer> extends AbstractDesc
                 for (Computer o : Jenkins.get().getComputers()) {
                     if ((o.isOnline() || o.isConnecting()) && o.isPartiallyIdle() && o.isAcceptingTasks()) {
                         final int idleExecutors = o.countIdle();
-                        if (idleExecutors>0)
-                            availableComputers.put(o, idleExecutors);
+                        if (idleExecutors>0) {
+							availableComputers.put(o, idleExecutors);
+						}
                     }
                 }
 

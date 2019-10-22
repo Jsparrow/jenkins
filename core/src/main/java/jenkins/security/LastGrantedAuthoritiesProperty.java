@@ -33,10 +33,11 @@ import java.util.logging.Logger;
  * @see ImpersonatingUserDetailsService
  */
 public class LastGrantedAuthoritiesProperty extends UserProperty {
-    private volatile String[] roles;
-    private long timestamp;
+    private static final Logger LOGGER = Logger.getLogger(LastGrantedAuthoritiesProperty.class.getName());
+	private volatile String[] roles;
+	private long timestamp;
 
-    /**
+	/**
      * Stick to the same object since there's no UI for this.
      */
     @Override
@@ -45,7 +46,7 @@ public class LastGrantedAuthoritiesProperty extends UserProperty {
     	return this;
     }
 
-    public GrantedAuthority[] getAuthorities() {
+	public GrantedAuthority[] getAuthorities() {
         String[] roles = this.roles;    // capture to a variable for immutability
 
         if(roles == null){
@@ -66,7 +67,7 @@ public class LastGrantedAuthoritiesProperty extends UserProperty {
         return grantedAuthorities.toArray(new GrantedAuthority[0]);
     }
 
-    /**
+	/**
      * Persist the information with the new {@link UserDetails}.
      */
     public void update(@Nonnull Authentication auth) throws IOException {
@@ -75,25 +76,27 @@ public class LastGrantedAuthoritiesProperty extends UserProperty {
             roles.add(ga.getAuthority());
         }
         String[] a = roles.toArray(new String[0]);
-        if (!Arrays.equals(this.roles,a)) {
-            this.roles = a;
-            this.timestamp = System.currentTimeMillis();
-            user.save();
-        }
+        if (Arrays.equals(this.roles,a)) {
+			return;
+		}
+		this.roles = a;
+		this.timestamp = System.currentTimeMillis();
+		user.save();
     }
 
-    /**
+	/**
      * Removes the recorded information
      */
     public void invalidate() throws IOException {
-        if (roles!=null) {
-            roles = null;
-            timestamp = System.currentTimeMillis();
-            user.save();
-        }
+        if (roles == null) {
+			return;
+		}
+		roles = null;
+		timestamp = System.currentTimeMillis();
+		user.save();
     }
 
-    /**
+	/**
      * Listen to the login success/failure event to persist {@link GrantedAuthority}s properly.
      */
     @Extension
@@ -105,11 +108,14 @@ public class LastGrantedAuthoritiesProperty extends UserProperty {
                 // but as this is a callback of a successful login we can safely create the user.
                 User u = User.getById(username, true);
                 LastGrantedAuthoritiesProperty o = u.getProperty(LastGrantedAuthoritiesProperty.class);
-                if (o==null)
-                    u.addProperty(o=new LastGrantedAuthoritiesProperty());
+                if (o==null) {
+					u.addProperty(o=new LastGrantedAuthoritiesProperty());
+				}
                 Authentication a = Jenkins.getAuthentication();
                 if (a!=null && a.getName().equals(username))
-                    o.update(a);    // just for defensive sanity checking
+				 {
+					o.update(a);    // just for defensive sanity checking
+				}
             } catch (IOException e) {
                 LOGGER.log(Level.WARNING, "Failed to record granted authorities",e);
             }
@@ -152,10 +158,9 @@ public class LastGrantedAuthoritiesProperty extends UserProperty {
             return false;
         }
         
-        public UserProperty newInstance(User user) {
+        @Override
+		public UserProperty newInstance(User user) {
             return null;
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(LastGrantedAuthoritiesProperty.class.getName());
 }

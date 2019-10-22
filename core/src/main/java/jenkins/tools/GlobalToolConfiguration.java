@@ -49,39 +49,43 @@ import java.util.logging.Logger;
 @Restricted(NoExternalUse.class)
 public class GlobalToolConfiguration extends ManagementLink {
 
-    @Override
+    public static Predicate<GlobalConfigurationCategory> FILTER = (GlobalConfigurationCategory input) -> input instanceof ToolConfigurationCategory;
+
+	private static final Logger LOGGER = Logger.getLogger(GlobalToolConfiguration.class.getName());
+
+	@Override
     public String getIconFileName() {
         return "setting.png";
     }
 
-    @Override
+	@Override
     public String getDisplayName() {
         return jenkins.management.Messages.ConfigureTools_DisplayName();
     }
 
-    @Override
+	@Override
     public String getDescription() {
         return jenkins.management.Messages.ConfigureTools_Description();
     }
 
-    @Override
+	@Override
     public String getUrlName() {
         return "configureTools";
     }
 
-    @Override
+	@Override
     public Permission getRequiredPermission() {
         return Jenkins.ADMINISTER;
     }
 
-    @POST
+	@POST
     public synchronized void doConfigure(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException, Descriptor.FormException {
         boolean result = configure(req, req.getSubmittedForm());
         LOGGER.log(Level.FINE, "tools saved: "+result);
         FormApply.success(req.getContextPath() + "/manage").generateResponse(req, rsp, null);
     }
 
-    private boolean configure(StaplerRequest req, JSONObject json) throws hudson.model.Descriptor.FormException, IOException {
+	private boolean configure(StaplerRequest req, JSONObject json) throws hudson.model.Descriptor.FormException, IOException {
         Jenkins j = Jenkins.get();
         j.checkPermission(Jenkins.ADMINISTER);
 
@@ -94,18 +98,10 @@ public class GlobalToolConfiguration extends ManagementLink {
         return result;
     }
 
-    private boolean configureDescriptor(StaplerRequest req, JSONObject json, Descriptor<?> d) throws Descriptor.FormException {
+	private boolean configureDescriptor(StaplerRequest req, JSONObject json, Descriptor<?> d) throws Descriptor.FormException {
         String name = d.getJsonSafeClassName();
         JSONObject js = json.has(name) ? json.getJSONObject(name) : new JSONObject(); // if it doesn't have the property, the method returns invalid null object.
         json.putAll(js);
         return d.configure(req, js);
     }
-
-    public static Predicate<GlobalConfigurationCategory> FILTER = new Predicate<GlobalConfigurationCategory>() {
-        public boolean apply(GlobalConfigurationCategory input) {
-            return input instanceof ToolConfigurationCategory;
-        }
-    };
-
-    private static final Logger LOGGER = Logger.getLogger(GlobalToolConfiguration.class.getName());
 }

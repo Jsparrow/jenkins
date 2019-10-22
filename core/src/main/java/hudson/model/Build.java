@@ -86,35 +86,37 @@ import javax.annotation.Nonnull;
 public abstract class Build <P extends Project<P,B>,B extends Build<P,B>>
     extends AbstractBuild<P,B> {
 
-    /**
+    private static final Logger LOGGER = Logger.getLogger(Build.class.getName());
+
+	/**
      * Creates a new build.
      */
     protected Build(P project) throws IOException {
         super(project);
     }
 
-    protected Build(P job, Calendar timestamp) {
+	protected Build(P job, Calendar timestamp) {
         super(job, timestamp);
     }
 
-    /**
+	/**
      * Loads a build from a log file.
      */
     protected Build(P project, File buildDir) throws IOException {
         super(project,buildDir);
     }
 
-//
-//
-// actions
-//
-//
-    @Override
-    public void run() {
-        execute(createRunner());
-    }
+	//
+	//
+	// actions
+	//
+	//
+	    @Override
+	    public void run() {
+	        execute(createRunner());
+	    }
 
-    /**
+	/**
      * @deprecated as of 1.467
      *      Override the {@link #run()} method by calling {@link #execute(hudson.model.Run.RunExecution)} with
      *      proper execution object.
@@ -125,7 +127,7 @@ public abstract class Build <P extends Project<P,B>,B extends Build<P,B>>
         return new BuildExecution();
     }
 
-    /**
+	/**
      * @deprecated as of 1.467
      *      Please use {@link BuildExecution}
      */
@@ -139,35 +141,43 @@ public abstract class Build <P extends Project<P,B>,B extends Build<P,B>>
             deprecated class here.
          */
 
-        protected Result doRun(@Nonnull BuildListener listener) throws Exception {
-            if(!preBuild(listener,project.getBuilders()))
-                return FAILURE;
-            if(!preBuild(listener,project.getPublishersList()))
-                return FAILURE;
+        @Override
+		protected Result doRun(@Nonnull BuildListener listener) throws Exception {
+            if(!preBuild(listener,project.getBuilders())) {
+				return FAILURE;
+			}
+            if(!preBuild(listener,project.getPublishersList())) {
+				return FAILURE;
+			}
 
             Result r = null;
             try {
                 List<BuildWrapper> wrappers = new ArrayList<>(project.getBuildWrappers().values());
                 
                 ParametersAction parameters = getAction(ParametersAction.class);
-                if (parameters != null)
-                    parameters.createBuildWrappers(Build.this,wrappers);
+                if (parameters != null) {
+					parameters.createBuildWrappers(Build.this,wrappers);
+				}
 
                 for( BuildWrapper w : wrappers ) {
                     Environment e = w.setUp((AbstractBuild<?,?>)Build.this, launcher, listener);
-                    if(e==null)
-                        return (r = FAILURE);
+                    if(e==null) {
+						return (r = FAILURE);
+					}
                     buildEnvironments.add(e);
                 }
 
-                if(!build(listener,project.getBuilders()))
-                    r = FAILURE;
+                if(!build(listener,project.getBuilders())) {
+					r = FAILURE;
+				}
             } catch (InterruptedException e) {
                 r = Executor.currentExecutor().abortResult();
                 // not calling Executor.recordCauseOfInterruption here. We do that where this exception is consumed.
                 throw e;
             } finally {
-                if (r != null) setResult(r);
+                if (r != null) {
+					setResult(r);
+				}
                 // tear down in reverse order
                 boolean failed=false;
                 for( int i=buildEnvironments.size()-1; i>=0; i-- ) {
@@ -176,17 +186,22 @@ public abstract class Build <P extends Project<P,B>,B extends Build<P,B>>
                     }                    
                 }
                 // WARNING The return in the finally clause will trump any return before
-                if (failed) return FAILURE;
+                if (failed) {
+					return FAILURE;
+				}
             }
 
             return r;
         }
 
-        public void post2(@Nonnull BuildListener listener) throws IOException, InterruptedException {
-            if (!performAllBuildSteps(listener, project.getPublishersList(), true))
-                setResult(FAILURE);
-            if (!performAllBuildSteps(listener, project.getProperties(), true))
-                setResult(FAILURE);
+        @Override
+		public void post2(@Nonnull BuildListener listener) throws IOException, InterruptedException {
+            if (!performAllBuildSteps(listener, project.getPublishersList(), true)) {
+				setResult(FAILURE);
+			}
+            if (!performAllBuildSteps(listener, project.getProperties(), true)) {
+				setResult(FAILURE);
+			}
         }
 
         @Override
@@ -217,6 +232,4 @@ public abstract class Build <P extends Project<P,B>,B extends Build<P,B>>
             return true;
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(Build.class.getName());
 }

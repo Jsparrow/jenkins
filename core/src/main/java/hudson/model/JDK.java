@@ -65,8 +65,23 @@ public final class JDK extends ToolInstallation implements NodeSpecific<JDK>, En
      */
     public static final String DEFAULT_NAME = "(System)";
     private static final long serialVersionUID = -3318291200160313357L;
+	private static final Logger LOGGER = Logger.getLogger(JDK.class.getName());
+	/**
+     * @deprecated since 2009-02-25
+     */
+    @Deprecated // kept for backward compatibility - use getHome() instead
+    private transient String javaHome;
 
-    @Restricted(NoExternalUse.class)
+	public JDK(String name, String javaHome) {
+        super(name, javaHome, Collections.emptyList());
+    }
+
+	@DataBoundConstructor
+    public JDK(String name, String home, List<? extends ToolProperty<?>> properties) {
+        super(name, home, properties);
+    }
+
+	@Restricted(NoExternalUse.class)
     public static boolean isDefaultName(String name) {
         if ("(Default)".equals(name)) {
             // DEFAULT_NAME took this value prior to 1.598.
@@ -75,22 +90,7 @@ public final class JDK extends ToolInstallation implements NodeSpecific<JDK>, En
         return DEFAULT_NAME.equals(name) || name == null;
     }
 
-    /**
-     * @deprecated since 2009-02-25
-     */
-    @Deprecated // kept for backward compatibility - use getHome() instead
-    private transient String javaHome;
-
-    public JDK(String name, String javaHome) {
-        super(name, javaHome, Collections.emptyList());
-    }
-
-    @DataBoundConstructor
-    public JDK(String name, String home, List<? extends ToolProperty<?>> properties) {
-        super(name, home, properties);
-    }
-
-    /**
+	/**
      * install directory.
      *
      * @deprecated as of 1.304
@@ -101,13 +101,14 @@ public final class JDK extends ToolInstallation implements NodeSpecific<JDK>, En
         return getHome();
     }
 
-    /**
+	/**
      * Gets the path to the bin directory.
      */
     public File getBinDir() {
         return new File(getHome(),"bin");
     }
-    /**
+
+	/**
      * Gets the path to 'java'.
      */
     private File getExecutable() {
@@ -115,14 +116,14 @@ public final class JDK extends ToolInstallation implements NodeSpecific<JDK>, En
         return new File(getHome(),"bin/"+execName);
     }
 
-    /**
+	/**
      * Returns true if the executable exists.
      */
     public boolean getExists() {
         return getExecutable().exists();
     }
 
-    /**
+	/**
      * @deprecated as of 1.460. Use {@link #buildEnvVars(EnvVars)}
      */
     @Deprecated
@@ -136,7 +137,7 @@ public final class JDK extends ToolInstallation implements NodeSpecific<JDK>, En
         env.put("JAVA_HOME", home);
     }
 
-    /**
+	/**
      * Sets PATH and JAVA_HOME from this JDK.
      */
     @Override
@@ -144,15 +145,17 @@ public final class JDK extends ToolInstallation implements NodeSpecific<JDK>, En
         buildEnvVars((Map)env);
     }
 
-    public JDK forNode(Node node, TaskListener log) throws IOException, InterruptedException {
+	@Override
+	public JDK forNode(Node node, TaskListener log) throws IOException, InterruptedException {
         return new JDK(getName(), translateFor(node, log));
     }
 
-    public JDK forEnvironment(EnvVars environment) {
+	@Override
+	public JDK forEnvironment(EnvVars environment) {
         return new JDK(getName(), environment.expand(getHome()));
     }
 
-    /**
+	/**
      * Checks if "java" is in PATH on the given node.
      *
      * <p>
@@ -172,7 +175,8 @@ public final class JDK extends ToolInstallation implements NodeSpecific<JDK>, En
     @Extension @Symbol("jdk")
     public static class DescriptorImpl extends ToolDescriptor<JDK> {
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return "JDK"; // TODO I18N
         }
 
@@ -209,8 +213,9 @@ public final class JDK extends ToolInstallation implements NodeSpecific<JDK>, En
             // JENKINS-25601: JDK 9+ no longer has tools.jar. Keep the existing dt.jar/tools.jar checks to be safe.
             File javac = new File(value, "bin/javac");
             File javacExe = new File(value, "bin/javac.exe");
-            if(!toolsJar.exists() && !mac.exists() && !javac.exists() && !javacExe.exists())
-                return FormValidation.error(Messages.Hudson_NotJDKDir(value));
+            if(!toolsJar.exists() && !mac.exists() && !javac.exists() && !javacExe.exists()) {
+				return FormValidation.error(Messages.Hudson_NotJDKDir(value));
+			}
 
             return FormValidation.ok();
         }
@@ -223,6 +228,4 @@ public final class JDK extends ToolInstallation implements NodeSpecific<JDK>, En
             return ((JDK)obj).javaHome;
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(JDK.class.getName());
 }

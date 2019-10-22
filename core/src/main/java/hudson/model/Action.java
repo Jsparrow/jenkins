@@ -107,7 +107,8 @@ public interface Action extends ModelObject {
      *
      * @return Can be null in case the action is hidden.
      */
-    @CheckForNull String getDisplayName();
+    @Override
+	@CheckForNull String getDisplayName();
 
     /**
      * Gets the URL path name.

@@ -36,11 +36,13 @@ import org.springframework.dao.DataAccessException;
 public class UserDetailsServiceProxy implements UserDetailsService {
     private volatile UserDetailsService delegate;
 
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException, DataAccessException {
+    @Override
+	public UserDetails loadUserByUsername(String username) {
         UserDetailsService uds = delegate;  // fix the reference for concurrency support
 
-        if(uds ==null)
-            throw new UserMayOrMayNotExistException(Messages.UserDetailsServiceProxy_UnableToQuery(username));
+        if(uds ==null) {
+			throw new UserMayOrMayNotExistException(Messages.UserDetailsServiceProxy_UnableToQuery(username));
+		}
         return uds.loadUserByUsername(username);
     }
 

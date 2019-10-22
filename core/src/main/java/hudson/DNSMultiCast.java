@@ -26,61 +26,70 @@ import java.util.logging.Logger;
  * @author Kohsuke Kawaguchi
  */
 public class DNSMultiCast implements Closeable {
-    private JenkinsJmDNS jmdns;
+    private static final Logger LOGGER = Logger.getLogger(DNSMultiCast.class.getName());
 
-    public DNSMultiCast(final Jenkins jenkins) {
-        if (disabled)   return; // escape hatch
+	public static boolean disabled = SystemProperties.getBoolean(DNSMultiCast.class.getName()+".disabled");
+
+	private JenkinsJmDNS jmdns;
+
+	public DNSMultiCast(final Jenkins jenkins) {
+        if (disabled)
+		 {
+			return; // escape hatch
+		}
         
         // the registerService call can be slow. run these asynchronously
-        MasterComputer.threadPoolForRemoting.submit(new Callable<Object>() {
-            public Object call() {
-                try {
-                    jmdns = new JenkinsJmDNS(null, null);
+        MasterComputer.threadPoolForRemoting.submit(() -> {
+		    try {
+		        jmdns = new JenkinsJmDNS(null, null);
 
-                    Map<String,String> props = new HashMap<>();
-                    String rootURL = jenkins.getRootUrl();
-                    if (rootURL==null)  return null;
+		        Map<String,String> props = new HashMap<>();
+		        String rootURL = jenkins.getRootUrl();
+		        if (rootURL==null) {
+					return null;
+				}
 
-                    props.put("url", rootURL);
-                    try {
-                        props.put("version",String.valueOf(Jenkins.getVersion()));
-                    } catch (IllegalArgumentException e) {
-                        // failed to parse the version number
-                    }
+		        props.put("url", rootURL);
+		        try {
+		            props.put("version",String.valueOf(Jenkins.getVersion()));
+		        } catch (IllegalArgumentException e) {
+		            // failed to parse the version number
+		        }
 
-                    TcpSlaveAgentListener tal = jenkins.getTcpSlaveAgentListener();
-                    if (tal!=null)
-                        props.put("slave-port",String.valueOf(tal.getPort()));
+		        TcpSlaveAgentListener tal = jenkins.getTcpSlaveAgentListener();
+		        if (tal!=null) {
+					props.put("slave-port",String.valueOf(tal.getPort()));
+				}
 
-                    props.put("server-id", jenkins.getLegacyInstanceId());
+		        props.put("server-id", jenkins.getLegacyInstanceId());
 
-                    URL jenkins_url = new URL(rootURL);
-                    int jenkins_port = jenkins_url.getPort();
-                    if (jenkins_port == -1) {
-                        jenkins_port = 80;
-                    }
-                    if (jenkins_url.getPath().length() > 0) {
-                        props.put("path", jenkins_url.getPath());
-                    }
+		        URL jenkins_url = new URL(rootURL);
+		        int jenkins_port = jenkins_url.getPort();
+		        if (jenkins_port == -1) {
+		            jenkins_port = 80;
+		        }
+		        if (jenkins_url.getPath().length() > 0) {
+		            props.put("path", jenkins_url.getPath());
+		        }
 
-                    jmdns.registerService(ServiceInfo.create("_hudson._tcp.local.","jenkins",
-                            jenkins_port,0,0,props));	// for backward compatibility
-                    jmdns.registerService(ServiceInfo.create("_jenkins._tcp.local.","jenkins",
-                            jenkins_port,0,0,props));
+		        jmdns.registerService(ServiceInfo.create("_hudson._tcp.local.","jenkins",
+		                jenkins_port,0,0,props));	// for backward compatibility
+		        jmdns.registerService(ServiceInfo.create("_jenkins._tcp.local.","jenkins",
+		                jenkins_port,0,0,props));
 
-                    // Make Jenkins appear in Safari's Bonjour bookmarks
-                    jmdns.registerService(ServiceInfo.create("_http._tcp.local.","Jenkins",
-                            jenkins_port,0,0,props));
-                } catch (IOException e) {
-                    LOGGER.log(Level.INFO, "Cannot advertise service to DNS multi-cast, skipping: {0}", e);
-                    LOGGER.log(Level.FINE, null, e);
-                }
-                return null;
-            }
-        });
+		        // Make Jenkins appear in Safari's Bonjour bookmarks
+		        jmdns.registerService(ServiceInfo.create("_http._tcp.local.","Jenkins",
+		                jenkins_port,0,0,props));
+		    } catch (IOException e) {
+		        LOGGER.log(Level.INFO, "Cannot advertise service to DNS multi-cast, skipping: {0}", e);
+		        LOGGER.log(Level.FINE, null, e);
+		    }
+		    return null;
+		});
     }
 
-    public void close() {
+	@Override
+	public void close() {
         if (jmdns!=null) {
             try {
                 jmdns.abort();
@@ -91,11 +100,7 @@ public class DNSMultiCast implements Closeable {
         }
     }
 
-    private static final Logger LOGGER = Logger.getLogger(DNSMultiCast.class.getName());
-
-    public static boolean disabled = SystemProperties.getBoolean(DNSMultiCast.class.getName()+".disabled");
-
-    /**
+	/**
      * Class that extends {@link JmDNSImpl} to add an abort method. Since {@link javax.jmdns.JmDNS#close()} might
      * make the instance hang during the shutdown, the abort method terminate uncleanly, but rapidly and
      * without blocking.

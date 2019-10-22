@@ -114,29 +114,42 @@ import org.apache.commons.io.IOUtils;
  * @author Kohsuke Kawaguchi
  */
 public final class XmlFile {
-    private final XStream xs;
-    private final File file;
     private static final Map<Object, Void> beingWritten = Collections.synchronizedMap(new IdentityHashMap<>());
-    private static final ThreadLocal<File> writing = new ThreadLocal<>();
+	private static final ThreadLocal<File> writing = new ThreadLocal<>();
+	/**
+     * {@link XStream} instance is supposed to be thread-safe.
+     */
 
-    public XmlFile(File file) {
+    private static final Logger LOGGER = Logger.getLogger(XmlFile.class.getName());
+	private static final SAXParserFactory JAXP = SAXParserFactory.newInstance();
+	private static final HierarchicalStreamDriver DEFAULT_DRIVER = XStream2.getDefaultDriver();
+	private static final XStream DEFAULT_XSTREAM = new XStream2(DEFAULT_DRIVER);
+
+	static {
+        JAXP.setNamespaceAware(true);
+    }
+
+	private final XStream xs;
+	private final File file;
+
+	public XmlFile(File file) {
         this(DEFAULT_XSTREAM,file);
     }
 
-    public XmlFile(XStream xs, File file) {
+	public XmlFile(XStream xs, File file) {
         this.xs = xs;
         this.file = file;
     }
 
-    public File getFile() {
+	public File getFile() {
         return file;
     }
 
-    public XStream getXStream() {
+	public XStream getXStream() {
         return xs;
     }
 
-    /**
+	/**
      * Loads the contents of this file into a new object.
      */
     public Object read() throws IOException {
@@ -150,7 +163,7 @@ public final class XmlFile {
         }
     }
 
-    /**
+	/**
      * Loads the contents of this file into an existing object.
      *
      * @return
@@ -161,7 +174,7 @@ public final class XmlFile {
         return unmarshal(o, false);
     }
 
-    /**
+	/**
      * Variant of {@link #unmarshal(Object)} applying {@link XStream2#unmarshal(HierarchicalStreamReader, Object, DataHolder, boolean)}.
      * @since 2.99
      */
@@ -169,7 +182,7 @@ public final class XmlFile {
         return unmarshal(o, true);
     }
 
-    private Object unmarshal(Object o, boolean nullOut) throws IOException {
+	private Object unmarshal(Object o, boolean nullOut) throws IOException {
         try (InputStream in = new BufferedInputStream(Files.newInputStream(file.toPath()))) {
             // TODO: expose XStream the driver from XStream
             if (nullOut) {
@@ -182,7 +195,7 @@ public final class XmlFile {
         }
     }
 
-    public void write( Object o ) throws IOException {
+	public void write( Object o ) throws IOException {
         mkdirs();
         AtomicFileWriter w = new AtomicFileWriter(file);
         try {
@@ -203,7 +216,7 @@ public final class XmlFile {
         }
     }
 
-    /**
+	/**
      * Provides an XStream replacement for an object unless a call to {@link #write} is currently in progress.
      * As per JENKINS-45892 this may be used by any class which expects to be written at top level to an XML file
      * but which cannot safely be serialized as a nested object (for example, because it expects some {@code onLoad} hook):
@@ -219,29 +232,29 @@ public final class XmlFile {
         if (beingWritten.containsKey(o) || currentlyWriting == null) {
             return o;
         } else {
-            LOGGER.log(Level.WARNING, "JENKINS-45892: reference to " + o + " being saved from unexpected " + currentlyWriting, new IllegalStateException());
+            LOGGER.log(Level.WARNING, new StringBuilder().append("JENKINS-45892: reference to ").append(o).append(" being saved from unexpected ").append(currentlyWriting).toString(), new IllegalStateException());
             return replacement.get();
         }
     }
 
-    public boolean exists() {
+	public boolean exists() {
         return file.exists();
     }
 
-    public void delete() {
+	public void delete() {
         file.delete();
     }
-    
-    public void mkdirs() {
+
+	public void mkdirs() {
         file.getParentFile().mkdirs();
     }
 
-    @Override
+	@Override
     public String toString() {
         return file.toString();
     }
 
-    /**
+	/**
      * Opens a {@link Reader} that loads XML.
      * This method uses {@link #sniffEncoding() the right encoding},
      * not just the system default encoding.
@@ -264,7 +277,7 @@ public final class XmlFile {
         }
     }
 
-    /**
+	/**
      * Returns the XML file read as a string.
      */
     public String asString() throws IOException {
@@ -273,7 +286,7 @@ public final class XmlFile {
         return w.toString();
     }
 
-    /**
+	/**
      * Writes the raw XML to the given {@link Writer}.
      * Writer will not be closed by the implementation.
      */
@@ -283,7 +296,7 @@ public final class XmlFile {
         }
     }
 
-    /**
+	/**
      * Parses the beginning of the file and determines the encoding.
      *
      * @throws IOException
@@ -322,20 +335,25 @@ public final class XmlFile {
                 }
 
                 private void attempt() throws Eureka {
-                    if(loc==null)   return;
-                    if (loc instanceof Locator2) {
-                        Locator2 loc2 = (Locator2) loc;
-                        String e = loc2.getEncoding();
-                        if(e!=null)
-                            throw new Eureka(e);
-                    }
+                    if(loc==null) {
+						return;
+					}
+                    if (!(loc instanceof Locator2)) {
+						return;
+					}
+					Locator2 loc2 = (Locator2) loc;
+					String e = loc2.getEncoding();
+					if(e!=null) {
+						throw new Eureka(e);
+					}
                 }
             });
             // can't reach here
             throw new AssertionError();
         } catch (Eureka e) {
-            if(e.encoding!=null)
-                return e.encoding;
+            if(e.encoding!=null) {
+				return e.encoding;
+			}
             // the environment can contain old version of Xerces and others that do not support Locator2
             // in such a case, assume UTF-8 rather than fail, since Jenkins internally always write XML in UTF-8
             return "UTF-8";
@@ -346,21 +364,5 @@ public final class XmlFile {
         } catch (ParserConfigurationException e) {
             throw new AssertionError(e);    // impossible
         }
-    }
-
-    /**
-     * {@link XStream} instance is supposed to be thread-safe.
-     */
-
-    private static final Logger LOGGER = Logger.getLogger(XmlFile.class.getName());
-
-    private static final SAXParserFactory JAXP = SAXParserFactory.newInstance();
-
-    private static final HierarchicalStreamDriver DEFAULT_DRIVER = XStream2.getDefaultDriver();
-
-    private static final XStream DEFAULT_XSTREAM = new XStream2(DEFAULT_DRIVER);
-
-    static {
-        JAXP.setNamespaceAware(true);
     }
 }

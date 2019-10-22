@@ -53,6 +53,14 @@ import javax.annotation.Nonnull;
 public abstract class ManagementLink implements ExtensionPoint, Action {
 
     /**
+     * All registered instances.
+     * @deprecated as of 1.286
+     *      Use {@link #all()} for read access and put {@link Extension} for registration.
+     */
+    @Deprecated
+    public static final List<ManagementLink> LIST = ExtensionListView.createList(ManagementLink.class);
+
+	/**
      * Mostly works like {@link Action#getIconFileName()}, except that
      * the expected icon size is 48x48, not 24x24. So if you give
      * just a file name, "/images/48x48" will be assumed.
@@ -62,9 +70,10 @@ public abstract class ManagementLink implements ExtensionPoint, Action {
      *      This is useful for defining {@link ManagementLink} that only shows up under
      *      certain circumstances.
      */
-    public abstract @CheckForNull String getIconFileName();
+    @Override
+	public abstract @CheckForNull String getIconFileName();
 
-    /**
+	/**
      * Returns a short description of what this link does. This text
      * is the one that's displayed in grey. This can include HTML,
      * although the use of block tags is highly discouraged.
@@ -75,7 +84,7 @@ public abstract class ManagementLink implements ExtensionPoint, Action {
         return "";
     }
 
-    /**
+	/**
      * {@inheritDoc}
      *
      * <p>
@@ -85,7 +94,7 @@ public abstract class ManagementLink implements ExtensionPoint, Action {
     @Override
     public abstract @CheckForNull String getUrlName();
 
-    /**
+	/**
      * Allows implementations to request that this link show a confirmation dialog, and use POST if confirmed.
      * Suitable for links which perform an action rather than simply displaying a page.
      * @return true if this link takes an action
@@ -96,29 +105,21 @@ public abstract class ManagementLink implements ExtensionPoint, Action {
         return false;
     }
 
-    /**
-     * All registered instances.
-     * @deprecated as of 1.286
-     *      Use {@link #all()} for read access and put {@link Extension} for registration.
-     */
-    @Deprecated
-    public static final List<ManagementLink> LIST = ExtensionListView.createList(ManagementLink.class);
-
-    /**
+	/**
      * All registered instances.
      */
     public static @Nonnull ExtensionList<ManagementLink> all() {
         return ExtensionList.lookup(ManagementLink.class);
     }
 
-    /**
+	/**
      * @return permission required for user to access this management link, in addition to {@link Jenkins#ADMINISTER}
      */
     public @CheckForNull Permission getRequiredPermission() {
         return null;
     }
 
-    /**
+	/**
      * Define if the rendered link will use the default GET method or POST.
      * @return true if POST must be used
      * @see RequirePOST

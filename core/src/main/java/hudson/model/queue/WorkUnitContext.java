@@ -54,7 +54,9 @@ public final class WorkUnitContext {
      */
     public final List<Action> actions;
 
-    private final Latch startLatch, endLatch;
+    private final Latch startLatch;
+
+	private final Latch endLatch;
 
     private List<WorkUnit> workUnits = new ArrayList<>();
 
@@ -149,17 +151,22 @@ public final class WorkUnitContext {
      * When one of the work unit is aborted, call this method to abort all the other work units.
      */
     public synchronized void abort(Throwable cause) {
-        if (cause==null)        throw new IllegalArgumentException();
-        if (aborted!=null)      return; // already aborted    
+        if (cause==null) {
+			throw new IllegalArgumentException();
+		}
+        if (aborted!=null)
+		 {
+			return; // already aborted    
+		}
         aborted = cause;
         startLatch.abort(cause);
         endLatch.abort(cause);
 
         Thread c = Thread.currentThread();
-        for (WorkUnit wu : workUnits) {
-            Executor e = wu.getExecutor();
-            if (e!=null && e!=c)
-                e.interrupt();
-        }
+        workUnits.stream().map(WorkUnit::getExecutor).forEach(e -> {
+			if (e!=null && e!=c) {
+				e.interrupt();
+			}
+		});
     }
 }

@@ -60,10 +60,6 @@ import org.kohsuke.accmod.restrictions.NoExternalUse;
  * @see SecurityRealm
  */
 public class PluginServletFilter implements Filter, ExtensionPoint {
-    private final List<Filter> list = new CopyOnWriteArrayList<>();
-
-    private /*almost final*/ FilterConfig config;
-
     /**
      * For backward compatibility with plugins that might register filters before Jenkins.get()
      * starts functioning, when we are not sure which Jenkins instance a filter belongs to, put it here,
@@ -71,9 +67,15 @@ public class PluginServletFilter implements Filter, ExtensionPoint {
      */
     private static final List<Filter> LEGACY = new Vector<>();
 
-    private static final String KEY = PluginServletFilter.class.getName();
+	private static final String KEY = PluginServletFilter.class.getName();
 
-    /**
+	private static final Logger LOGGER = Logger.getLogger(PluginServletFilter.class.getName());
+
+	private final List<Filter> list = new CopyOnWriteArrayList<>();
+
+	private /*almost final*/ FilterConfig config;
+
+	/**
      * Lookup the instance from servlet context.
      *
      * @param c the ServletContext most of the time taken from a Jenkins instance
@@ -83,7 +85,8 @@ public class PluginServletFilter implements Filter, ExtensionPoint {
         return (PluginServletFilter)c.getAttribute(KEY);
     }
 
-    public void init(FilterConfig config) throws ServletException {
+	@Override
+	public void init(FilterConfig config) throws ServletException {
         this.config = config;
         synchronized (LEGACY) {
             list.addAll(LEGACY);
@@ -95,7 +98,7 @@ public class PluginServletFilter implements Filter, ExtensionPoint {
         config.getServletContext().setAttribute(KEY,this);
     }
 
-    public static void addFilter(Filter filter) throws ServletException {
+	public static void addFilter(Filter filter) throws ServletException {
         Jenkins j = Jenkins.getInstanceOrNull();
         
         PluginServletFilter container = null;
@@ -113,7 +116,7 @@ public class PluginServletFilter implements Filter, ExtensionPoint {
         }
     }
 
-    /**
+	/**
      * Checks whether the given filter is already registered in the chain.
      * @param filter the filter to check.
      * @return true if the filter is already registered in the chain.
@@ -132,7 +135,7 @@ public class PluginServletFilter implements Filter, ExtensionPoint {
         }
     }
 
-    public static void removeFilter(Filter filter) throws ServletException {
+	public static void removeFilter(Filter filter) throws ServletException {
         Jenkins j = Jenkins.getInstanceOrNull();
         if (j==null || getInstance(j.servletContext) == null) {
             LEGACY.remove(filter);
@@ -141,11 +144,13 @@ public class PluginServletFilter implements Filter, ExtensionPoint {
         }
     }
 
-    public void doFilter(ServletRequest request, ServletResponse response, final FilterChain chain) throws IOException, ServletException {
+	@Override
+	public void doFilter(ServletRequest request, ServletResponse response, final FilterChain chain) throws IOException, ServletException {
         new FilterChain() {
             private final Iterator<Filter> itr = list.iterator();
 
-            public void doFilter(ServletRequest request, ServletResponse response) throws IOException, ServletException {
+            @Override
+			public void doFilter(ServletRequest request, ServletResponse response) throws IOException, ServletException {
                 if(itr.hasNext()) {
                     // call next
                     itr.next().doFilter(request, response, this);
@@ -157,44 +162,42 @@ public class PluginServletFilter implements Filter, ExtensionPoint {
         }.doFilter(request,response);
     }
 
-    public void destroy() {
-        for (Filter f : list) {
-            f.destroy();
-        }
+	@Override
+	public void destroy() {
+        list.forEach(Filter::destroy);
         list.clear();
     }
 
-    @Restricted(NoExternalUse.class)
+	@Restricted(NoExternalUse.class)
     public static void cleanUp() {
         Jenkins jenkins = Jenkins.getInstanceOrNull();
         if (jenkins == null) {
             return;
         }
         PluginServletFilter instance = getInstance(jenkins.servletContext);
-        if (instance != null) {
-            // While we could rely on the current implementation of list being a CopyOnWriteArrayList
-            // safer to just take an explicit copy of the list and operate on the copy
-            for (Filter f: new ArrayList<>(instance.list)) {
-                instance.list.remove(f);
-                // remove from the list even if destroy() fails as a failed destroy is still a destroy
-                try {
-                    f.destroy();
-                } catch (RuntimeException e) {
-                    LOGGER.log(Level.WARNING, "Filter " + f + " propagated an exception from its destroy method",
-                            e);
-                } catch (Error e) {
-                    throw e; // we are not supposed to catch errors, don't log as could be an OOM
-                } catch (Throwable e) {
-                    LOGGER.log(Level.SEVERE, "Filter " + f + " propagated an exception from its destroy method", e);
-                }
-            }
-            // if some fool adds a filter while we are terminating, we should just log the fact
-            if (!instance.list.isEmpty()) {
-                LOGGER.log(Level.SEVERE, "The following filters appear to have been added during clean up: {0}",
-                        instance.list);
-            }
-        }
+        if (instance == null) {
+			return;
+		}
+		// While we could rely on the current implementation of list being a CopyOnWriteArrayList
+		// safer to just take an explicit copy of the list and operate on the copy
+		for (Filter f: new ArrayList<>(instance.list)) {
+		    instance.list.remove(f);
+		    // remove from the list even if destroy() fails as a failed destroy is still a destroy
+		    try {
+		        f.destroy();
+		    } catch (RuntimeException e) {
+		        LOGGER.log(Level.WARNING, new StringBuilder().append("Filter ").append(f).append(" propagated an exception from its destroy method").toString(),
+		                e);
+		    } catch (Error e) {
+		        throw e; // we are not supposed to catch errors, don't log as could be an OOM
+		    } catch (Throwable e) {
+		        LOGGER.log(Level.SEVERE, new StringBuilder().append("Filter ").append(f).append(" propagated an exception from its destroy method").toString(), e);
+		    }
+		}
+		// if some fool adds a filter while we are terminating, we should just log the fact
+		if (!instance.list.isEmpty()) {
+		    LOGGER.log(Level.SEVERE, "The following filters appear to have been added during clean up: {0}",
+		            instance.list);
+		}
     }
-
-    private static final Logger LOGGER = Logger.getLogger(PluginServletFilter.class.getName());
 }

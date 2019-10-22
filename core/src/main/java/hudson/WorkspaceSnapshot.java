@@ -58,16 +58,19 @@ public abstract class WorkspaceSnapshot implements Action {
      */
     public abstract void restoreTo(AbstractBuild<?,?> owner, FilePath dst, TaskListener listener) throws IOException, InterruptedException;
 
-    public String getIconFileName() {
+    @Override
+	public String getIconFileName() {
         // by default, hide from the UI
         return null;
     }
 
-    public String getDisplayName() {
+    @Override
+	public String getDisplayName() {
         return "Workspace";
     }
 
-    public String getUrlName() {
+    @Override
+	public String getUrlName() {
         return "workspace";
     }
 }

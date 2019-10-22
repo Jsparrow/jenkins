@@ -43,11 +43,13 @@ import com.thoughtworks.xstream.converters.basic.StringConverter;
  */
 public class HeapSpaceStringConverter extends AbstractSingleValueConverter {
 
-    public boolean canConvert(Class type) {
+    @Override
+	public boolean canConvert(Class type) {
         return type.equals(String.class);
     }
 
-    public Object fromString(String str) {
+    @Override
+	public Object fromString(String str) {
         return str;
     }
 }

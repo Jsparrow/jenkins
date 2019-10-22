@@ -76,9 +76,7 @@ public abstract class InterceptingExecutorService extends ForwardingExecutorServ
 
     private <T> Collection<Callable<T>> wrap(Collection<? extends Callable<T>> callables) {
         List<Callable<T>> r = new ArrayList<>();
-        for (Callable<T> c : callables) {
-            r.add(wrap(c));
-        }
+        callables.forEach(c -> r.add(wrap(c)));
         return r;
     }
 }

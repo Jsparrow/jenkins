@@ -254,7 +254,8 @@ public abstract class TopLevelItemDescriptor extends Descriptor<TopLevelItem> im
      * @deprecated since 2007-01-19.
      *      This is not a valid operation for {@link Item}s.
      */
-    @Deprecated
+    @Override
+	@Deprecated
     public TopLevelItem newInstance(StaplerRequest req) throws FormException {
         throw new UnsupportedOperationException();
     }

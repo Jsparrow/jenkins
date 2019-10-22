@@ -58,7 +58,8 @@ public class ColorPalette {
      */
     public static void apply(LineAndShapeRenderer renderer) {
         int n=0;
-        for (Color c : LINE_GRAPH)
-            renderer.setSeriesPaint(n++,c);
+        for (Color c : LINE_GRAPH) {
+			renderer.setSeriesPaint(n++,c);
+		}
     }
 }

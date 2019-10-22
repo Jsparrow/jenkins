@@ -47,10 +47,11 @@ import jenkins.model.Jenkins;
  * @since 1.304
  */
 public class UnixLifecycle extends Lifecycle {
-    private JavaVMArguments args;
-    private Throwable failedToObtainArgs;
+    private static final Logger LOGGER = Logger.getLogger(UnixLifecycle.class.getName());
+	private JavaVMArguments args;
+	private Throwable failedToObtainArgs;
 
-    public UnixLifecycle() throws IOException {
+	public UnixLifecycle() throws IOException {
         try {
             args = JavaVMArguments.current();
 
@@ -62,7 +63,7 @@ public class UnixLifecycle extends Lifecycle {
         }
     }
 
-    @Override
+	@Override
     public void restart() throws IOException, InterruptedException {
         Jenkins jenkins = Jenkins.getInstanceOrNull(); // guard against repeated concurrent calls to restart
         try {
@@ -77,17 +78,19 @@ public class UnixLifecycle extends Lifecycle {
         int sz = LIBC.getdtablesize();
         for(int i=3; i<sz; i++) {
             int flags = LIBC.fcntl(i, F_GETFD);
-            if(flags<0) continue;
+            if(flags<0) {
+				continue;
+			}
             LIBC.fcntl(i, F_SETFD,flags| FD_CLOEXEC);
         }
 
         // exec to self
         String exe = args.get(0);
         LIBC.execvp(exe, new StringArray(args.toArray(new String[0])));
-        throw new IOException("Failed to exec '"+exe+"' "+LIBC.strerror(Native.getLastError()));
+        throw new IOException(new StringBuilder().append("Failed to exec '").append(exe).append("' ").append(LIBC.strerror(Native.getLastError())).toString());
     }
 
-    @Override
+	@Override
     public void verifyRestartable() throws RestartNotSupportedException {
         // see http://lists.apple.com/archives/cocoa-dev/2005/Oct/msg00836.html and
         // http://factor-language.blogspot.com/2007/07/execve-returning-enotsup-on-mac-os-x.html
@@ -95,11 +98,11 @@ public class UnixLifecycle extends Lifecycle {
         // the one described in http://www.nabble.com/Restarting-hudson-not-working-on-MacOS--to24641779.html
         //
         // according to http://www.mail-archive.com/wine-devel@winehq.org/msg66797.html this now works on Snow Leopard
-        if (Platform.isDarwin() && !Platform.isSnowLeopardOrLater())
-            throw new RestartNotSupportedException("Restart is not supported on Mac OS X");
-        if (args==null)
-            throw new RestartNotSupportedException("Failed to obtain the command line arguments of the process",failedToObtainArgs);
+        if (Platform.isDarwin() && !Platform.isSnowLeopardOrLater()) {
+			throw new RestartNotSupportedException("Restart is not supported on Mac OS X");
+		}
+        if (args==null) {
+			throw new RestartNotSupportedException("Failed to obtain the command line arguments of the process",failedToObtainArgs);
+		}
     }
-
-    private static final Logger LOGGER = Logger.getLogger(UnixLifecycle.class.getName());
 }

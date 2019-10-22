@@ -48,19 +48,36 @@ import org.jenkinsci.Symbol;
  */
 @Extension @Symbol("workspaceCleanup")
 public class WorkspaceCleanupThread extends AsyncPeriodicWork {
-    public WorkspaceCleanupThread() {
+    private static final Logger LOGGER = Logger.getLogger(WorkspaceCleanupThread.class.getName());
+
+	/**
+     * Can be used to disable workspace clean up.
+     */
+    public static boolean disabled = SystemProperties.getBoolean(WorkspaceCleanupThread.class.getName()+".disabled");
+
+	/**
+     * How often the clean up should run. This is final as Jenkins will not reflect changes anyway.
+     */
+    public static final int recurrencePeriodHours = SystemProperties.getInteger(WorkspaceCleanupThread.class.getName()+".recurrencePeriodHours", 24);
+
+	/**
+     * Number of days workspaces should be retained.
+     */
+    public static int retainForDays = SystemProperties.getInteger(WorkspaceCleanupThread.class.getName()+".retainForDays", 30);
+
+	public WorkspaceCleanupThread() {
         super("Workspace clean-up");
     }
 
-    @Override public long getRecurrencePeriod() {
+	@Override public long getRecurrencePeriod() {
         return recurrencePeriodHours * HOUR;
     }
 
-    public static void invoke() {
+	public static void invoke() {
         ExtensionList.lookup(AsyncPeriodicWork.class).get(WorkspaceCleanupThread.class).run();
     }
 
-    @Override protected void execute(TaskListener listener) throws InterruptedException, IOException {
+	@Override protected void execute(TaskListener listener) throws InterruptedException, IOException {
         if (disabled) {
             LOGGER.fine("Disabled. Skipping execution");
             return;
@@ -87,19 +104,19 @@ public class WorkspaceCleanupThread extends AsyncPeriodicWork {
                     continue;
                 }
                 if (check) {
-                    listener.getLogger().println("Deleting " + ws + " on " + node.getDisplayName());
+                    listener.getLogger().println(new StringBuilder().append("Deleting ").append(ws).append(" on ").append(node.getDisplayName()).toString());
                     try {
                         ws.deleteRecursive();
                         WorkspaceList.tempDir(ws).deleteRecursive();
                     } catch (IOException | InterruptedException x) {
-                        Functions.printStackTrace(x, listener.error("Failed to delete " + ws + " on " + node.getDisplayName()));
+                        Functions.printStackTrace(x, listener.error(new StringBuilder().append("Failed to delete ").append(ws).append(" on ").append(node.getDisplayName()).toString()));
                     }
                 }
             }
         }
     }
 
-    private boolean shouldBeDeleted(@Nonnull TopLevelItem item, FilePath dir, @Nonnull Node n) throws IOException, InterruptedException {
+	private boolean shouldBeDeleted(@Nonnull TopLevelItem item, FilePath dir, @Nonnull Node n) throws IOException, InterruptedException {
         // TODO: the use of remoting is not optimal.
         // One remoting can execute "exists", "lastModified", and "delete" all at once.
         // (Could even invert master loop so that one FileCallable takes care of all known items.)
@@ -146,21 +163,4 @@ public class WorkspaceCleanupThread extends AsyncPeriodicWork {
         LOGGER.log(Level.FINER, "Going to delete directory {0}", dir);
         return true;
     }
-
-    private static final Logger LOGGER = Logger.getLogger(WorkspaceCleanupThread.class.getName());
-
-    /**
-     * Can be used to disable workspace clean up.
-     */
-    public static boolean disabled = SystemProperties.getBoolean(WorkspaceCleanupThread.class.getName()+".disabled");
-
-    /**
-     * How often the clean up should run. This is final as Jenkins will not reflect changes anyway.
-     */
-    public static final int recurrencePeriodHours = SystemProperties.getInteger(WorkspaceCleanupThread.class.getName()+".recurrencePeriodHours", 24);
-
-    /**
-     * Number of days workspaces should be retained.
-     */
-    public static int retainForDays = SystemProperties.getInteger(WorkspaceCleanupThread.class.getName()+".retainForDays", 30);
 }

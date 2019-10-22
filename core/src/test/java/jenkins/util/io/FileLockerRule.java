@@ -61,8 +61,9 @@ public class FileLockerRule extends ExternalResource {
                 exceptions.add(e);
             }
         }
-        if (!exceptions.isEmpty())
-            throw new CompositeIOException("Could not unlock all files", exceptions).asUncheckedIOException();
+        if (!exceptions.isEmpty()) {
+			throw new CompositeIOException("Could not unlock all files", exceptions).asUncheckedIOException();
+		}
     }
 
     public synchronized void acquireLock(@Nonnull File file) throws IOException {

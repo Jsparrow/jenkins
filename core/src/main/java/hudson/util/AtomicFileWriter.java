@@ -85,22 +85,6 @@ public class AtomicFileWriter extends Writer {
     }
 
     /**
-     * Wraps potential {@link java.nio.file.InvalidPathException} thrown by {@link File#toPath()} in an
-     * {@link IOException} for backward compatibility.
-     *
-     * @param file
-     * @return the path for that file
-     * @see File#toPath()
-     */
-    private static Path toPath(@Nonnull File file) throws IOException {
-        try {
-            return file.toPath();
-        } catch (InvalidPathException e) {
-            throw new IOException(e);
-        }
-    }
-
-    /**
      * @param destinationPath the destination path where to write the content when committed.
      * @param charset File charset to write.
      */
@@ -109,7 +93,7 @@ public class AtomicFileWriter extends Writer {
         this(destinationPath, charset, false, true);
     }
 
-    /**
+	/**
      * <strong>DO NOT USE THIS METHOD, OR YOU WILL LOSE DATA INTEGRITY.</strong>
      *
      * @param destinationPath the destination path where to write the content when committed.
@@ -152,29 +136,48 @@ public class AtomicFileWriter extends Writer {
         core = new FileChannelWriter(tmpPath, charset, integrityOnFlush, integrityOnClose, StandardOpenOption.WRITE);
     }
 
-    @Override
+	/**
+     * Wraps potential {@link java.nio.file.InvalidPathException} thrown by {@link File#toPath()} in an
+     * {@link IOException} for backward compatibility.
+     *
+     * @param file
+     * @return the path for that file
+     * @see File#toPath()
+     */
+    private static Path toPath(@Nonnull File file) throws IOException {
+        try {
+            return file.toPath();
+        } catch (InvalidPathException e) {
+            throw new IOException(e);
+        }
+    }
+
+	@Override
     public void write(int c) throws IOException {
         core.write(c);
     }
 
-    @Override
+	@Override
     public void write(String str, int off, int len) throws IOException {
         core.write(str,off,len);
     }
 
-    public void write(char[] cbuf, int off, int len) throws IOException {
+	@Override
+	public void write(char[] cbuf, int off, int len) throws IOException {
         core.write(cbuf,off,len);
     }
 
-    public void flush() throws IOException {
+	@Override
+	public void flush() throws IOException {
         core.flush();
     }
 
-    public void close() throws IOException {
+	@Override
+	public void close() throws IOException {
         core.close();
     }
 
-    /**
+	/**
      * When the write operation failed, call this method to
      * leave the original file intact and remove the temporary file.
      * This method can be safely invoked from the "finally" block, even after
@@ -184,7 +187,7 @@ public class AtomicFileWriter extends Writer {
         closeAndDeleteTempFile();
     }
 
-    public void commit() throws IOException {
+	public void commit() throws IOException {
         close();
         try {
             // Try to make an atomic move.
@@ -221,12 +224,12 @@ public class AtomicFileWriter extends Writer {
         }
     }
 
-    @Override
+	@Override
     protected void finalize() throws Throwable {
         closeAndDeleteTempFile();
     }
 
-    private void closeAndDeleteTempFile() throws IOException {
+	private void closeAndDeleteTempFile() throws IOException {
         // one way or the other, temporary file should be deleted.
         try {
             close();
@@ -235,7 +238,7 @@ public class AtomicFileWriter extends Writer {
         }
     }
 
-    /**
+	/**
      * Until the data is committed, this file captures
      * the written content.
      *
@@ -246,7 +249,7 @@ public class AtomicFileWriter extends Writer {
         return tmpPath.toFile();
     }
 
-    /**
+	/**
      * Until the data is committed, this file captures
      * the written content.
      * @since 2.93

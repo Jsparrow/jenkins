@@ -59,13 +59,26 @@ import javax.annotation.Nonnull;
  * 
  * @author Kohsuke Kawaguchi
  */
-public class StreamTaskListener extends AbstractTaskListener implements TaskListener, Closeable {
-    @Nonnull
+public class StreamTaskListener extends AbstractTaskListener implements Closeable {
+    private static final String KEY_AUTO_FLUSH = StreamTaskListener.class.getName() + ".AUTO_FLUSH";
+	static {
+        SystemProperties.allowOnAgent(KEY_AUTO_FLUSH);
+    }
+	/**
+     * Restores eager remote flushing behavior.
+     * By default, remote tasks are expected to call {@link PrintStream#flush} before exiting.
+     * This flag will ensure that no output is lost from tasks which neglect to do so,
+     * at the expense of heavier Remoting traffic and reduced performance.
+     */
+    private static /* not final */ boolean AUTO_FLUSH = SystemProperties.getBoolean(KEY_AUTO_FLUSH);
+	private static final long serialVersionUID = 1L;
+	private static final Logger LOGGER = Logger.getLogger(StreamTaskListener.class.getName());
+	@Nonnull
     private PrintStream out;
-    @CheckForNull
+	@CheckForNull
     private Charset charset;
 
-    /**
+	/**
      * @deprecated as of 1.349
      *      The caller should use {@link #StreamTaskListener(OutputStream, Charset)} to pass in
      *      the charset and output stream separately, so that this class can handle encoding correctly,
@@ -76,16 +89,17 @@ public class StreamTaskListener extends AbstractTaskListener implements TaskList
         this(out,null);
     }
 
-    public StreamTaskListener(@Nonnull OutputStream out) {
+	public StreamTaskListener(@Nonnull OutputStream out) {
         this(out,null);
     }
 
-    public StreamTaskListener(@Nonnull OutputStream out, @CheckForNull Charset charset) {
+	public StreamTaskListener(@Nonnull OutputStream out, @CheckForNull Charset charset) {
         try {
-            if (charset == null)
-                this.out = (out instanceof PrintStream) ? (PrintStream)out : new PrintStream(out, false);
-            else
-                this.out = new PrintStream(out, false, charset.name());
+            if (charset == null) {
+				this.out = (out instanceof PrintStream) ? (PrintStream)out : new PrintStream(out, false);
+			} else {
+				this.out = new PrintStream(out, false, charset.name());
+			}
             this.charset = charset;
         } catch (UnsupportedEncodingException e) {
             // it's not very pretty to do this, but otherwise we'd have to touch too many call sites.
@@ -93,26 +107,18 @@ public class StreamTaskListener extends AbstractTaskListener implements TaskList
         }
     }
 
-    public StreamTaskListener(@Nonnull File out) throws IOException {
+	public StreamTaskListener(@Nonnull File out) throws IOException {
         this(out,null);
     }
 
-    public StreamTaskListener(@Nonnull File out, @CheckForNull Charset charset) throws IOException {
+	public StreamTaskListener(@Nonnull File out, @CheckForNull Charset charset) throws IOException {
         // don't do buffering so that what's written to the listener
         // gets reflected to the file immediately, which can then be
         // served to the browser immediately
         this(Files.newOutputStream(asPath(out)), charset);
     }
 
-    private static Path asPath(@Nonnull File out) throws IOException {
-        try {
-            return out.toPath();
-        } catch (InvalidPathException e) {
-            throw new IOException(e);
-        }
-    }
-
-    /**
+	/**
      * Constructs a {@link StreamTaskListener} that sends the output to a specified file.
      *
      * @param out     the file.
@@ -133,11 +139,11 @@ public class StreamTaskListener extends AbstractTaskListener implements TaskList
         );
     }
 
-    public StreamTaskListener(@Nonnull Writer w) throws IOException {
+	public StreamTaskListener(@Nonnull Writer w) throws IOException {
         this(new WriterOutputStream(w));
     }
 
-    /**
+	/**
      * @deprecated as of 1.349
      *      Use {@link #NULL}
      */
@@ -146,25 +152,33 @@ public class StreamTaskListener extends AbstractTaskListener implements TaskList
         this(new NullStream());
     }
 
-    public static StreamTaskListener fromStdout() {
+	private static Path asPath(@Nonnull File out) throws IOException {
+        try {
+            return out.toPath();
+        } catch (InvalidPathException e) {
+            throw new IOException(e);
+        }
+    }
+
+	public static StreamTaskListener fromStdout() {
         return new StreamTaskListener(System.out,Charset.defaultCharset());
     }
 
-    public static StreamTaskListener fromStderr() {
+	public static StreamTaskListener fromStderr() {
         return new StreamTaskListener(System.err,Charset.defaultCharset());
     }
 
-    @Override
+	@Override
     public PrintStream getLogger() {
         return out;
     }
 
-    @Override
+	@Override
     public Charset getCharset() {
         return charset != null ? charset : Charset.defaultCharset();
     }
 
-    private void writeObject(ObjectOutputStream out) throws IOException {
+	private void writeObject(ObjectOutputStream out) throws IOException {
         out.writeObject(new RemoteOutputStream(new CloseProofOutputStream(this.out)));
         out.writeObject(charset==null? null : charset.name());
         if (LOGGER.isLoggable(Level.FINE)) {
@@ -172,19 +186,7 @@ public class StreamTaskListener extends AbstractTaskListener implements TaskList
         }
     }
 
-    private static final String KEY_AUTO_FLUSH = StreamTaskListener.class.getName() + ".AUTO_FLUSH";
-    static {
-        SystemProperties.allowOnAgent(KEY_AUTO_FLUSH);
-    }
-    /**
-     * Restores eager remote flushing behavior.
-     * By default, remote tasks are expected to call {@link PrintStream#flush} before exiting.
-     * This flag will ensure that no output is lost from tasks which neglect to do so,
-     * at the expense of heavier Remoting traffic and reduced performance.
-     */
-    private static /* not final */ boolean AUTO_FLUSH = SystemProperties.getBoolean(KEY_AUTO_FLUSH);
-
-    private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
+	private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
         out = new PrintStream((OutputStream)in.readObject(), AUTO_FLUSH);
         String name = (String)in.readObject();
         charset = name==null ? null : Charset.forName(name);
@@ -193,12 +195,12 @@ public class StreamTaskListener extends AbstractTaskListener implements TaskList
         }
     }
 
-    @Override
+	@Override
     public void close() throws IOException {
         out.close();
     }
 
-    /**
+	/**
      * Closes this listener and swallows any exceptions, if raised.
      *
      * @since 1.349
@@ -210,8 +212,4 @@ public class StreamTaskListener extends AbstractTaskListener implements TaskList
             LOGGER.log(Level.WARNING,"Failed to close",e);
         }
     }
-
-    private static final long serialVersionUID = 1L;
-
-    private static final Logger LOGGER = Logger.getLogger(StreamTaskListener.class.getName());
 }

@@ -53,7 +53,7 @@ public final class MetaLocaleDrivenResourceProvider extends LocaleDrivenResource
                     return url;
                 }
             } catch (Exception e) {
-                LOGGER.warn("Failed to lookup URL for '" + s + "' from '" + provider.toString(), e);
+                LOGGER.warn(new StringBuilder().append("Failed to lookup URL for '").append(s).append("' from '").append(provider.toString()).toString(), e);
             }
         }
         return null;

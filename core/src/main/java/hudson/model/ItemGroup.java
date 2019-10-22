@@ -72,7 +72,7 @@ public interface ItemGroup<T extends Item> extends PersistenceRoot, ModelObject 
      * @throws AccessDeniedException if the current user has {@link Item#DISCOVER} but not {@link Item#READ} on this item
      * @return an item whose {@link Item#getName} is {@code name} and whose {@link Item#getParent} is {@code this}, or null if there is no such item, or there is but the current user lacks both {@link Item#DISCOVER} and {@link Item#READ} on it
      */
-    @CheckForNull T getItem(String name) throws AccessDeniedException;
+    @CheckForNull T getItem(String name);
 
     /**
      * Assigns the {@link Item#getRootDir() root directory} for children.

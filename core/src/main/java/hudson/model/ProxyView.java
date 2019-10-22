@@ -118,15 +118,23 @@ public class ProxyView extends View implements StaplerFallback {
         checkPermission(View.CREATE);
 
         String view = Util.fixEmpty(value);
-        if(view==null) return FormValidation.ok();
+        if(view==null) {
+			return FormValidation.ok();
+		}
 
-        if(Jenkins.get().getView(view)!=null)
-            return FormValidation.ok();
-        else
-            return FormValidation.error(Messages.ProxyView_NoSuchViewExists(value));
+        if(Jenkins.get().getView(view)!=null) {
+			return FormValidation.ok();
+		} else {
+			return FormValidation.error(Messages.ProxyView_NoSuchViewExists(value));
+		}
     }
 
-    @Extension @Symbol("proxy")
+    @Override
+	public Object getStaplerFallback() {
+        return getProxiedView();
+    }
+
+	@Extension @Symbol("proxy")
     public static class DescriptorImpl extends ViewDescriptor {
 
         @Override
@@ -140,10 +148,6 @@ public class ProxyView extends View implements StaplerFallback {
         	return !(Stapler.getCurrentRequest().findAncestorObject(ViewGroup.class) instanceof Jenkins);
         }
 
-    }
-
-    public Object getStaplerFallback() {
-        return getProxiedView();
     }
 
 }

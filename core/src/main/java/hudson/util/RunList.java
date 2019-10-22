@@ -59,8 +59,7 @@ public class RunList<R extends Run> extends AbstractList<R> {
 
     public RunList(View view) {// this is a type unsafe operation
         Set<Job> jobs = new HashSet<>();
-        for (TopLevelItem item : view.getItems())
-            jobs.addAll(item.getAllJobs());
+        view.getItems().forEach(item -> jobs.addAll(item.getAllJobs()));
 
         List<Iterable<R>> runLists = new ArrayList<>();
         for (Job job : jobs) {
@@ -71,12 +70,17 @@ public class RunList<R extends Run> extends AbstractList<R> {
 
     public RunList(Collection<? extends Job> jobs) {
         List<Iterable<R>> runLists = new ArrayList<>();
-        for (Job j : jobs)
-            runLists.add(j.getBuilds());
+        for (Job j : jobs) {
+			runLists.add(j.getBuilds());
+		}
         this.base = combine(runLists);
     }
 
-    /**
+    private RunList(Iterable<R> c) {
+        base = c;
+    }
+
+	/**
      * Creates a a {@link RunList} combining all the runs of the supplied jobs.
      *
      * @param jobs the supplied jobs.
@@ -87,33 +91,35 @@ public class RunList<R extends Run> extends AbstractList<R> {
      */
     public static <J extends Job<J,R>, R extends Run<J,R>> RunList<R> fromJobs(Iterable<? extends J> jobs) {
         List<Iterable<R>> runLists = new ArrayList<>();
-        for (Job j : jobs)
-            runLists.add(j.getBuilds());
+        for (Job j : jobs) {
+			runLists.add(j.getBuilds());
+		}
         return new RunList<>(combine(runLists));
     }
 
-    private static <R extends Run> Iterable<R> combine(Iterable<Iterable<R>> runLists) {
+	private static <R extends Run> Iterable<R> combine(Iterable<Iterable<R>> runLists) {
         return Iterables.mergeSorted(runLists, new Comparator<R>() {
-            public int compare(R o1, R o2) {
+            @Override
+			public int compare(R o1, R o2) {
                 long lhs = o1.getTimeInMillis();
                 long rhs = o2.getTimeInMillis();
-                if (lhs > rhs) return -1;
-                if (lhs < rhs) return 1;
+                if (lhs > rhs) {
+					return -1;
+				}
+                if (lhs < rhs) {
+					return 1;
+				}
                 return 0;
             }
         });
     }
 
-    private RunList(Iterable<R> c) {
-        base = c;
-    }
-
-    @Override
+	@Override
     public Iterator<R> iterator() {
         return base.iterator();
     }
 
-    /**
+	/**
      * @deprecated as of 1.485
      *      {@link RunList}, despite its name, should be really used as {@link Iterable}, not as {@link List}.
      */
@@ -131,7 +137,7 @@ public class RunList<R extends Run> extends AbstractList<R> {
         return size;
     }
 
-    /**
+	/**
      * @deprecated as of 1.485
      *      {@link RunList}, despite its name, should be really used as {@link Iterable}, not as {@link List}.
      */
@@ -141,7 +147,7 @@ public class RunList<R extends Run> extends AbstractList<R> {
         return Iterators.get(iterator(),index);
     }
 
-    /**
+	/**
      * {@link AbstractList#subList(int, int)} isn't very efficient on our {@link Iterable} based implementation.
      * In fact the range check alone would require us to iterate all the elements,
      * so we'd be better off just copying into ArrayList.
@@ -157,52 +163,54 @@ public class RunList<R extends Run> extends AbstractList<R> {
         return r;
     }
 
-    @Override
+	@Override
     public int indexOf(Object o) {
         int index=0;
         for (R r : this) {
-            if (r.equals(o))
-                return index;
+            if (r.equals(o)) {
+				return index;
+			}
             index++;
         }
         return -1;
     }
 
-    @Override
+	@Override
     public int lastIndexOf(Object o) {
         int a = -1;
         int index=0;
         for (R r : this) {
-            if (r.equals(o))
-                a = index;
+            if (r.equals(o)) {
+				a = index;
+			}
             index++;
         }
         return a;
     }
 
-    @Override
+	@Override
     public boolean isEmpty() {
         return !iterator().hasNext();
     }
 
-    /** @deprecated see {@link #size()} for why this violates lazy-loading */
+	/** @deprecated see {@link #size()} for why this violates lazy-loading */
     @Deprecated
     public R getFirstBuild() {
         size();
         return first;
     }
 
-    public R getLastBuild() {
+	public R getLastBuild() {
         Iterator<R> itr = iterator();
         return itr.hasNext() ? itr.next() : null;
     }
 
-    public static <R extends Run>
+	public static <R extends Run>
     RunList<R> fromRuns(Collection<? extends R> runs) {
-        return new RunList<R>((Iterable)runs);
+        return new RunList<>((Iterable)runs);
     }
 
-    /**
+	/**
      * Returns elements that satisfy the given predicate.
      * <em>Warning:</em> this method mutates the original list and then returns it.
      * @since 1.544
@@ -214,7 +222,7 @@ public class RunList<R extends Run> extends AbstractList<R> {
         return this;
     }
 
-    /**
+	/**
      * Returns the first streak of the elements that satisfy the given predicate.
      *
      * For example, {@code filter([1,2,3,4],odd)==[1,3]} but {@code limit([1,2,3,4],odd)==[1]}.
@@ -224,7 +232,8 @@ public class RunList<R extends Run> extends AbstractList<R> {
         first = null;
         final Iterable<R> nested = base;
         base = new Iterable<R>() {
-            public Iterator<R> iterator() {
+            @Override
+			public Iterator<R> iterator() {
                 return hudson.util.Iterators.limit(nested.iterator(),predicate);
             }
 
@@ -236,7 +245,7 @@ public class RunList<R extends Run> extends AbstractList<R> {
         return this;
     }
 
-    /**
+	/**
      * Return only the most recent builds.
      * <em>Warning:</em> this method mutates the original list and then returns it.
      * @param n a count
@@ -244,76 +253,52 @@ public class RunList<R extends Run> extends AbstractList<R> {
      * @since 1.507
      */
     public RunList<R> limit(final int n) {
-        return limit(new CountingPredicate<R>() {
-            public boolean apply(int index, R input) {
-                return index<n;
-            }
-        });
+        return limit((int index, R input) -> index < n);
     }
 
-    /**
+	/**
      * Filter the list to non-successful builds only.
      * <em>Warning:</em> this method mutates the original list and then returns it.
      */
     public RunList<R> failureOnly() {
-        return filter(new Predicate<R>() {
-            public boolean apply(R r) {
-                return r.getResult()!=Result.SUCCESS;
-            }
-        });
+        return filter((R r) -> r.getResult() != Result.SUCCESS);
     }
 
-    /**
+	/**
      * Filter the list to builds above threshold.
      * <em>Warning:</em> this method mutates the original list and then returns it.
      * @since 1.517
      */
     public RunList<R> overThresholdOnly(final Result threshold) {
-        return filter(new Predicate<R>() {
-            public boolean apply(R r) {
-                return (r.getResult() != null && r.getResult().isBetterOrEqualTo(threshold));
-            }
-        });
+        return filter((R r) -> (r.getResult() != null && r.getResult().isBetterOrEqualTo(threshold)));
     }
 
-    /**
+	/**
      * Filter the list to completed builds.
      * <em>Warning:</em> this method mutates the original list and then returns it.
      * @since 1.561
      */
     public RunList<R> completedOnly() {
-        return filter(new Predicate<R>() {
-            public boolean apply(R r) {
-                return !r.isBuilding();
-            }
-        });
+        return filter((R r) -> !r.isBuilding());
     }
 
-    /**
+	/**
      * Filter the list to builds on a single node only
      * <em>Warning:</em> this method mutates the original list and then returns it.
      */
     public RunList<R> node(final Node node) {
-        return filter(new Predicate<R>() {
-            public boolean apply(R r) {
-                return (r instanceof AbstractBuild) && ((AbstractBuild)r).getBuiltOn()==node;
-            }
-        });
+        return filter((R r) -> (r instanceof AbstractBuild) && ((AbstractBuild) r).getBuiltOn() == node);
     }
 
-    /**
+	/**
      * Filter the list to regression builds only.
      * <em>Warning:</em> this method mutates the original list and then returns it.
      */
     public RunList<R> regressionOnly() {
-        return filter(new Predicate<R>() {
-            public boolean apply(R r) {
-                return r.getBuildStatusSummary().isWorse;
-            }
-        });
+        return filter((R r) -> r.getBuildStatusSummary().isWorse);
     }
 
-    /**
+	/**
      * Filter the list by timestamp.
      *
      * {@code s&lt=;e}.
@@ -321,18 +306,10 @@ public class RunList<R extends Run> extends AbstractList<R> {
      */
     public RunList<R> byTimestamp(final long start, final long end) {
         return
-        limit(new CountingPredicate<R>() {
-            public boolean apply(int index, R r) {
-                return start<=r.getTimeInMillis();
-            }
-        }).filter(new Predicate<R>() {
-        	public boolean apply(R r) {
-        		return r.getTimeInMillis()<end;
-                    }
-        });
+        limit((int index, R r) -> start <= r.getTimeInMillis()).filter((R r) -> r.getTimeInMillis() < end);
     }
 
-    /**
+	/**
      * Reduce the size of the list by only leaving relatively new ones.
      * This also removes on-going builds, as RSS cannot be used to publish information
      * if it changes.
@@ -344,16 +321,8 @@ public class RunList<R extends Run> extends AbstractList<R> {
         final long t = cal.getTimeInMillis();
 
         // can't publish on-going builds
-        return filter(new Predicate<R>() {
-            public boolean apply(R r) {
-                return !r.isBuilding();
-            }
-        })
+        return filter((R r) -> !r.isBuilding())
         // put at least 10 builds, but otherwise ignore old builds
-        .limit(new CountingPredicate<R>() {
-            public boolean apply(int index, R r) {
-                return index < 10 || r.getTimeInMillis() >= t;
-            }
-        });
+        .limit((int index, R r) -> index < 10 || r.getTimeInMillis() >= t);
     }
 }

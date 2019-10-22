@@ -22,34 +22,33 @@ import static java.util.logging.Level.*;
  */
 @Extension
 public class BasicHeaderApiTokenAuthenticator extends BasicHeaderAuthenticator {
-    /**
+    private static final Logger LOGGER = Logger.getLogger(BasicHeaderApiTokenAuthenticator.class.getName());
+
+	/**
      * Note: if the token does not exist or does not match, we do not use {@link SecurityListener#fireFailedToAuthenticate(String)}
      * because it will be done in the {@link BasicHeaderRealPasswordAuthenticator} in the case the password is not valid either
      */
     @Override
     public Authentication authenticate(HttpServletRequest req, HttpServletResponse rsp, String username, String password) throws ServletException {
         User u = BasicApiTokenHelper.isConnectingUsingApiToken(username, password);
-        if(u != null) {
-            Authentication auth;
-            try {
-                UserDetails userDetails = u.getUserDetailsForImpersonation();
-                auth = u.impersonate(userDetails);
+        if (u == null) {
+			return null;
+		}
+		Authentication auth;
+		try {
+		    UserDetails userDetails = u.getUserDetailsForImpersonation();
+		    auth = u.impersonate(userDetails);
 
-                SecurityListener.fireAuthenticated(userDetails);
-            } catch (UsernameNotFoundException x) {
-                // The token was valid, but the impersonation failed. This token is clearly not his real password,
-                // so there's no point in continuing the request processing. Report this error and abort.
-                LOGGER.log(WARNING, "API token matched for user " + username + " but the impersonation failed", x);
-                throw new ServletException(x);
-            } catch (DataAccessException x) {
-                throw new ServletException(x);
-            }
-
-            req.setAttribute(BasicHeaderApiTokenAuthenticator.class.getName(), true);
-            return auth;
-        }
-        return null;
+		    SecurityListener.fireAuthenticated(userDetails);
+		} catch (UsernameNotFoundException x) {
+		    // The token was valid, but the impersonation failed. This token is clearly not his real password,
+		    // so there's no point in continuing the request processing. Report this error and abort.
+		    LOGGER.log(WARNING, new StringBuilder().append("API token matched for user ").append(username).append(" but the impersonation failed").toString(), x);
+		    throw new ServletException(x);
+		} catch (DataAccessException x) {
+		    throw new ServletException(x);
+		}
+		req.setAttribute(BasicHeaderApiTokenAuthenticator.class.getName(), true);
+		return auth;
     }
-
-    private static final Logger LOGGER = Logger.getLogger(BasicHeaderApiTokenAuthenticator.class.getName());
 }

@@ -78,6 +78,95 @@ public abstract class SimpleBuildWrapper extends BuildWrapper {
     public abstract void setUp(Context context, Run<?,?> build, FilePath workspace, Launcher launcher, TaskListener listener, EnvVars initialEnvironment) throws IOException, InterruptedException;
 
     /**
+     * By default, when run as part of an {@link AbstractBuild}, will run late, in the {@link #setUp(AbstractBuild, Launcher, BuildListener)} phase.
+     * May be overridden to return true, in which case this will run earlier, in the {@link #preCheckout} phase.
+     * Ignored when not run as part of an {@link AbstractBuild}.
+     */
+    protected boolean runPreCheckout() {
+        return false;
+    }
+
+	@Override public final Environment setUp(AbstractBuild build, final Launcher launcher, BuildListener listener) throws IOException, InterruptedException {
+        if (runPreCheckout()) {
+            return new Environment() {};
+        } else {
+            final Context c = new Context();
+            setUp(c, build, build.getWorkspace(), launcher, listener, build.getEnvironment(listener));
+            return new EnvironmentWrapper(c, launcher);
+        }
+    }
+
+	@Override public final void preCheckout(AbstractBuild build, final Launcher launcher, BuildListener listener) throws IOException, InterruptedException {
+        if (!runPreCheckout()) {
+			return;
+		}
+		final Context c = new Context();
+		setUp(c, build, build.getWorkspace(), launcher, listener, build.getEnvironment(listener));
+		build.getEnvironments().add(new EnvironmentWrapper(c, launcher));
+    }
+
+	/**
+     * Allows this wrapper to decorate log output.
+     * @param build as is passed to {@link #setUp(Context, Run, FilePath, Launcher, TaskListener, EnvVars)}
+     * @return a filter which ignores its {@code build} parameter and is {@link Serializable}; or null (the default)
+     * @since 1.608
+     */
+    public @CheckForNull ConsoleLogFilter createLoggerDecorator(@Nonnull Run<?,?> build) {
+        return null;
+    }
+
+	@Override public final OutputStream decorateLogger(AbstractBuild build, OutputStream logger) throws IOException, InterruptedException {
+        ConsoleLogFilter filter = createLoggerDecorator(build);
+        return filter != null ? filter.decorateLogger(build, logger) : logger;
+    }
+
+	/**
+     * May be overridden but this will only take effect when used as a {@link BuildWrapper} on an {@link AbstractProject}.
+     * <p>{@inheritDoc}
+     * @since 1.608
+     */
+    @Override public Launcher decorateLauncher(AbstractBuild build, Launcher launcher, BuildListener listener) throws IOException, InterruptedException {
+        return super.decorateLauncher(build, launcher, listener);
+        // TODO reasonable to decorate Launcher within a dynamic scope, but this signature does not mix well with Context pattern.
+        // Called from AbstractBuildExecution.createLauncher; how do we track what is decorating what?
+        // Would have to keep something like a LaunchedDecorator, not an actual Launcher, in Context.
+        // And createLauncher is called before even preCheckout, so much too early for the Context to have been prepared.
+        // Could perhaps create a proxy Launcher whose launch method checks some field in the Context remembered for the build.
+    }
+
+	/**
+     * May be overridden but this will only take effect when used as a {@link BuildWrapper} on an {@link AbstractProject}.
+     * <p>{@inheritDoc}
+     * @since 1.608
+     */
+    @Override public void makeBuildVariables(AbstractBuild build, Map<String,String> variables) {
+        super.makeBuildVariables(build, variables);
+    }
+
+	/**
+     * May be overridden but this will only take effect when used as a {@link BuildWrapper} on an {@link AbstractProject}.
+     * <p>{@inheritDoc}
+     * @since 1.608
+     */
+    @Override public void makeSensitiveBuildVariables(AbstractBuild build, Set<String> sensitiveVariables) {
+        super.makeSensitiveBuildVariables(build, sensitiveVariables);
+        // TODO determine if there is a meaningful way to generalize this; perhaps as a new [Run]Action recording sensitiveVariables?
+        // Complicated by the fact that in principle someone could call getSensitiveBuildVariables *before* the wrapper starts and actually sets those variables,
+        // though in practice the likely use cases would come later, and perhaps it is acceptable to omit the names of variables which are yet to be set.
+        // Also unclear if there is any use case for calling this method after the build is done (or Jenkins is restarted);
+        // most likely it is only used during the build itself.
+        // Would be much cleaner if EnvVars itself recorded which keys had sensitive values.
+    }
+
+	/**
+     * {@inheritDoc}
+     * @return an empty set; this might never be called if the step is not part of the static configuration of a project; instead, add a {@link SimpleBuildStep.LastBuildAction} to a build when run
+     */
+    @Override public final Collection<? extends Action> getProjectActions(AbstractProject job) {
+        return Collections.emptySet();
+    }
+
+	/**
      * Parameter passed to {@link #setUp} to allow an implementation to specify its behavior after the initial setup.
      */
     public static final class Context {
@@ -116,7 +205,7 @@ public abstract class SimpleBuildWrapper extends BuildWrapper {
      * An optional callback to run at the end of the wrapped block.
      * Must be safely serializable, so it receives runtime context comparable to that of the original setup.
      */
-    public static abstract class Disposer implements Serializable {
+    public abstract static class Disposer implements Serializable {
         /**
          * Attempt to clean up anything that was done in the initial setup.
          * @param build a build being run
@@ -127,33 +216,6 @@ public abstract class SimpleBuildWrapper extends BuildWrapper {
          * @throws InterruptedException if tear down is interrupted
          */
         public abstract void tearDown(Run<?,?> build, FilePath workspace, Launcher launcher, TaskListener listener) throws IOException, InterruptedException;
-    }
-
-    /**
-     * By default, when run as part of an {@link AbstractBuild}, will run late, in the {@link #setUp(AbstractBuild, Launcher, BuildListener)} phase.
-     * May be overridden to return true, in which case this will run earlier, in the {@link #preCheckout} phase.
-     * Ignored when not run as part of an {@link AbstractBuild}.
-     */
-    protected boolean runPreCheckout() {
-        return false;
-    }
-
-    @Override public final Environment setUp(AbstractBuild build, final Launcher launcher, BuildListener listener) throws IOException, InterruptedException {
-        if (runPreCheckout()) {
-            return new Environment() {};
-        } else {
-            final Context c = new Context();
-            setUp(c, build, build.getWorkspace(), launcher, listener, build.getEnvironment(listener));
-            return new EnvironmentWrapper(c, launcher);
-        }
-    }
-
-    @Override public final void preCheckout(AbstractBuild build, final Launcher launcher, BuildListener listener) throws IOException, InterruptedException {
-        if (runPreCheckout()) {
-            final Context c = new Context();
-            setUp(c, build, build.getWorkspace(), launcher, listener, build.getEnvironment(listener));
-            build.getEnvironments().add(new EnvironmentWrapper(c, launcher));
-        }
     }
 
     private class EnvironmentWrapper extends Environment {
@@ -176,67 +238,6 @@ public abstract class SimpleBuildWrapper extends BuildWrapper {
             }
             return true;
         }
-    }
-
-    /**
-     * Allows this wrapper to decorate log output.
-     * @param build as is passed to {@link #setUp(Context, Run, FilePath, Launcher, TaskListener, EnvVars)}
-     * @return a filter which ignores its {@code build} parameter and is {@link Serializable}; or null (the default)
-     * @since 1.608
-     */
-    public @CheckForNull ConsoleLogFilter createLoggerDecorator(@Nonnull Run<?,?> build) {
-        return null;
-    }
-
-    @Override public final OutputStream decorateLogger(AbstractBuild build, OutputStream logger) throws IOException, InterruptedException, Run.RunnerAbortedException {
-        ConsoleLogFilter filter = createLoggerDecorator(build);
-        return filter != null ? filter.decorateLogger(build, logger) : logger;
-    }
-
-    /**
-     * May be overridden but this will only take effect when used as a {@link BuildWrapper} on an {@link AbstractProject}.
-     * <p>{@inheritDoc}
-     * @since 1.608
-     */
-    @Override public Launcher decorateLauncher(AbstractBuild build, Launcher launcher, BuildListener listener) throws IOException, InterruptedException, Run.RunnerAbortedException {
-        return super.decorateLauncher(build, launcher, listener);
-        // TODO reasonable to decorate Launcher within a dynamic scope, but this signature does not mix well with Context pattern.
-        // Called from AbstractBuildExecution.createLauncher; how do we track what is decorating what?
-        // Would have to keep something like a LaunchedDecorator, not an actual Launcher, in Context.
-        // And createLauncher is called before even preCheckout, so much too early for the Context to have been prepared.
-        // Could perhaps create a proxy Launcher whose launch method checks some field in the Context remembered for the build.
-    }
-
-    /**
-     * May be overridden but this will only take effect when used as a {@link BuildWrapper} on an {@link AbstractProject}.
-     * <p>{@inheritDoc}
-     * @since 1.608
-     */
-    @Override public void makeBuildVariables(AbstractBuild build, Map<String,String> variables) {
-        super.makeBuildVariables(build, variables);
-    }
-
-    /**
-     * May be overridden but this will only take effect when used as a {@link BuildWrapper} on an {@link AbstractProject}.
-     * <p>{@inheritDoc}
-     * @since 1.608
-     */
-    @Override public void makeSensitiveBuildVariables(AbstractBuild build, Set<String> sensitiveVariables) {
-        super.makeSensitiveBuildVariables(build, sensitiveVariables);
-        // TODO determine if there is a meaningful way to generalize this; perhaps as a new [Run]Action recording sensitiveVariables?
-        // Complicated by the fact that in principle someone could call getSensitiveBuildVariables *before* the wrapper starts and actually sets those variables,
-        // though in practice the likely use cases would come later, and perhaps it is acceptable to omit the names of variables which are yet to be set.
-        // Also unclear if there is any use case for calling this method after the build is done (or Jenkins is restarted);
-        // most likely it is only used during the build itself.
-        // Would be much cleaner if EnvVars itself recorded which keys had sensitive values.
-    }
-
-    /**
-     * {@inheritDoc}
-     * @return an empty set; this might never be called if the step is not part of the static configuration of a project; instead, add a {@link SimpleBuildStep.LastBuildAction} to a build when run
-     */
-    @Override public final Collection<? extends Action> getProjectActions(AbstractProject job) {
-        return Collections.emptySet();
     }
 
 }

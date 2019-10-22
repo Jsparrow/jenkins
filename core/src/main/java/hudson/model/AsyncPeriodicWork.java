@@ -80,42 +80,41 @@ public abstract class AsyncPeriodicWork extends PeriodicWork {
     /**
      * Schedules this periodic work now in a new thread, if one isn't already running.
      */
-    @SuppressWarnings("deprecation") // in this case we really want to use PeriodicWork.logger since it reports the impl class
+    @Override
+	@SuppressWarnings("deprecation") // in this case we really want to use PeriodicWork.logger since it reports the impl class
     public final void doRun() {
         try {
             if(thread!=null && thread.isAlive()) {
                 logger.log(this.getSlowLoggingLevel(), "{0} thread is still running. Execution aborted.", name);
                 return;
             }
-            thread = new Thread(new Runnable() {
-                public void run() {
-                    logger.log(getNormalLoggingLevel(), "Started {0}", name);
-                    long startTime = System.currentTimeMillis();
-                    long stopTime;
+            thread = new Thread(() -> {
+			    logger.log(getNormalLoggingLevel(), "Started {0}", name);
+			    long startTime = System.currentTimeMillis();
+			    long stopTime;
 
-                    StreamTaskListener l = createListener();
-                    try {
-                        l.getLogger().printf("Started at %tc%n", new Date(startTime));
-                        ACL.impersonate(ACL.SYSTEM);
+			    StreamTaskListener l = createListener();
+			    try {
+			        l.getLogger().printf("Started at %tc%n", new Date(startTime));
+			        ACL.impersonate(ACL.SYSTEM);
 
-                        execute(l);
-                    } catch (IOException e) {
-                        Functions.printStackTrace(e, l.fatalError(e.getMessage()));
-                    } catch (InterruptedException e) {
-                        Functions.printStackTrace(e, l.fatalError("aborted"));
-                    } finally {
-                        stopTime = System.currentTimeMillis();
-                        try {
-                            l.getLogger().printf("Finished at %tc. %dms%n", new Date(stopTime), stopTime - startTime);
-                        } finally {
-                            l.closeQuietly();
-                        }
-                    }
+			        execute(l);
+			    } catch (IOException e) {
+			        Functions.printStackTrace(e, l.fatalError(e.getMessage()));
+			    } catch (InterruptedException e) {
+			        Functions.printStackTrace(e, l.fatalError("aborted"));
+			    } finally {
+			        stopTime = System.currentTimeMillis();
+			        try {
+			            l.getLogger().printf("Finished at %tc. %dms%n", new Date(stopTime), stopTime - startTime);
+			        } finally {
+			            l.closeQuietly();
+			        }
+			    }
 
-                    logger.log(getNormalLoggingLevel(), "Finished {0}. {1,number} ms",
-                            new Object[]{name, stopTime - startTime});
-                }
-            },name+" thread");
+			    logger.log(getNormalLoggingLevel(), "Finished {0}. {1,number} ms",
+			            new Object[]{name, stopTime - startTime});
+			},name+" thread");
             thread.start();
         } catch (Throwable t) {
             LogRecord lr = new LogRecord(this.getErrorLoggingLevel(), "{0} thread failed with error");
@@ -127,18 +126,17 @@ public abstract class AsyncPeriodicWork extends PeriodicWork {
 
     protected StreamTaskListener createListener() {
         File f = getLogFile();
-        if (!f.getParentFile().isDirectory()) {
-            if (!f.getParentFile().mkdirs()) {
-                logger.log(getErrorLoggingLevel(), "Could not create directory {0}", f.getParentFile());
-            }
-        }
+        boolean condition = !f.getParentFile().isDirectory() && !f.getParentFile().mkdirs();
+		if (condition) {
+		    logger.log(getErrorLoggingLevel(), "Could not create directory {0}", f.getParentFile());
+		}
         if (f.isFile()) {
             if ((lastRotateMillis + logRotateMillis < System.currentTimeMillis())
                     || (logRotateSize > 0 && f.length() > logRotateSize)) {
                 lastRotateMillis = System.currentTimeMillis();
                 File prev = null;
                 for (int i = 5; i >= 0; i--) {
-                    File curr = i == 0 ? f : new File(f.getParentFile(), f.getName() + "." + i);
+                    File curr = i == 0 ? f : new File(f.getParentFile(), new StringBuilder().append(f.getName()).append(".").append(i).toString());
                     if (curr.isFile()) {
                         if (prev != null && !prev.exists()) {
                             if (!curr.renameTo(prev)) {
@@ -183,7 +181,7 @@ public abstract class AsyncPeriodicWork extends PeriodicWork {
      * Determines the log file that records the result of this task.
      */
     protected File getLogFile() {
-        return new File(getLogsRoot(), "/tasks/" + name + ".log");
+        return new File(getLogsRoot(), new StringBuilder().append("/tasks/").append(name).append(".log").toString());
     }
     
     /**

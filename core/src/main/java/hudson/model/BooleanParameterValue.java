@@ -64,18 +64,20 @@ public class BooleanParameterValue extends ParameterValue {
 
     @Override
     public VariableResolver<String> createVariableResolver(AbstractBuild<?, ?> build) {
-        return new VariableResolver<String>() {
-            public String resolve(String name) {
-                return BooleanParameterValue.this.name.equals(name) ? Boolean.toString(value) : null;
-            }
-        };
+        return (String name) -> BooleanParameterValue.this.name.equals(name) ? Boolean.toString(value) : null;
     }
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
+        if (this == o) {
+			return true;
+		}
+        if (o == null || getClass() != o.getClass()) {
+			return false;
+		}
+        if (!super.equals(o)) {
+			return false;
+		}
 
         BooleanParameterValue that = (BooleanParameterValue) o;
 
@@ -91,11 +93,11 @@ public class BooleanParameterValue extends ParameterValue {
 
     @Override
     public String toString() {
-    	return "(BooleanParameterValue) " + getName() + "='" + value + "'";
+    	return new StringBuilder().append("(BooleanParameterValue) ").append(getName()).append("='").append(value).append("'").toString();
     }
 
     @Override public String getShortDescription() {
-        return name + '=' + value;
+        return new StringBuilder().append(name).append('=').append(value).toString();
     }
 
 }

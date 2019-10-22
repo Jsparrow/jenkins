@@ -36,22 +36,23 @@ import java.util.regex.Pattern;
  * @author Kohsuke Kawaguchi
  */
 public class MavenErrorNote extends ConsoleNote {
-    public MavenErrorNote() {
+    public static Pattern PATTERN = Pattern.compile("^\\[ERROR\\]");
+
+	public MavenErrorNote() {
     }
 
-    @Override
+	@Override
     public ConsoleAnnotator annotate(Object context, MarkupText text, int charPos) {
         text.addMarkup(0,text.length(),"<span class=error-inline>","</span>");
         return null;
     }
 
-    @Extension @Symbol("mavenErrors")
+	@Extension @Symbol("mavenErrors")
     public static final class DescriptorImpl extends ConsoleAnnotationDescriptor {
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return "Maven Errors";
         }
     }
-
-    public static Pattern PATTERN = Pattern.compile("^\\[ERROR\\]");
 }
 

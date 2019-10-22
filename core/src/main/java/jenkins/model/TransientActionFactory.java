@@ -50,53 +50,6 @@ import org.kohsuke.accmod.restrictions.NoExternalUse;
  */
 public abstract class TransientActionFactory<T> implements ExtensionPoint {
 
-    /**
-     * The type of object this factory cares about.
-     * Declared separately, rather than by having {@link #createFor} do a check-cast,
-     * so that method bodies are not loaded until actually needed.
-     * @return the type of {@link T}
-     */
-    public abstract Class<T> type();
-
-    /**
-     * A supertype of any actions this factory might produce.
-     * Defined so that factories which produce irrelevant actions need not be consulted by, e.g., {@link Actionable#getAction(Class)}.
-     * For historical reasons this defaults to {@link Action} itself.
-     * If your implementation was returning multiple disparate kinds of actions, it is best to split it into two factories.
-     * <p>If an API defines a abstract {@link Action} subtype and you are providing a concrete implementation,
-     * you may return the API type here to delay class loading.
-     * @return a bound for the result of {@link #createFor}
-     * @since 2.34
-     */
-    public /* abstract */ Class<? extends Action> actionType() {
-        return Action.class;
-    }
-
-    /**
-     * Creates actions for a given object.
-     * This may be called frequently for the same object, so if your implementation is expensive, do your own caching.
-     * @param target an actionable object
-     * @return a possible empty set of actions (typically either using {@link Collections#emptySet} or {@link Collections#singleton})
-     */
-    public abstract @Nonnull Collection<? extends Action> createFor(@Nonnull T target);
-
-    /** @see <a href="http://stackoverflow.com/a/24336841/12916">no pairs/tuples in Java</a> */
-    private static class CacheKey {
-        private final Class<?> type;
-        private final Class<? extends Action> actionType;
-        CacheKey(Class<?> type, Class<? extends Action> actionType) {
-            this.type = type;
-            this.actionType = actionType;
-        }
-        @Override
-        public boolean equals(Object obj) {
-            return obj instanceof CacheKey && type == ((CacheKey) obj).type && actionType == ((CacheKey) obj).actionType;
-        }
-        @Override
-        public int hashCode() {
-            return type.hashCode() ^ actionType.hashCode();
-        }
-    }
     @SuppressWarnings("rawtypes")
     private static final LoadingCache<ExtensionList<TransientActionFactory>, LoadingCache<CacheKey, List<TransientActionFactory<?>>>> cache =
         CacheBuilder.newBuilder().weakKeys().build(new CacheLoader<ExtensionList<TransientActionFactory>, LoadingCache<CacheKey, List<TransientActionFactory<?>>>>() {
@@ -126,9 +79,57 @@ public abstract class TransientActionFactory<T> implements ExtensionPoint {
         }
     });
 
-    @Restricted(NoExternalUse.class) // pending a need for it outside Actionable
+	/**
+     * The type of object this factory cares about.
+     * Declared separately, rather than by having {@link #createFor} do a check-cast,
+     * so that method bodies are not loaded until actually needed.
+     * @return the type of {@link T}
+     */
+    public abstract Class<T> type();
+
+	/**
+     * A supertype of any actions this factory might produce.
+     * Defined so that factories which produce irrelevant actions need not be consulted by, e.g., {@link Actionable#getAction(Class)}.
+     * For historical reasons this defaults to {@link Action} itself.
+     * If your implementation was returning multiple disparate kinds of actions, it is best to split it into two factories.
+     * <p>If an API defines a abstract {@link Action} subtype and you are providing a concrete implementation,
+     * you may return the API type here to delay class loading.
+     * @return a bound for the result of {@link #createFor}
+     * @since 2.34
+     */
+    public /* abstract */ Class<? extends Action> actionType() {
+        return Action.class;
+    }
+
+	/**
+     * Creates actions for a given object.
+     * This may be called frequently for the same object, so if your implementation is expensive, do your own caching.
+     * @param target an actionable object
+     * @return a possible empty set of actions (typically either using {@link Collections#emptySet} or {@link Collections#singleton})
+     */
+    public abstract @Nonnull Collection<? extends Action> createFor(@Nonnull T target);
+
+	@Restricted(NoExternalUse.class) // pending a need for it outside Actionable
     public static Iterable<? extends TransientActionFactory<?>> factoriesFor(Class<?> type, Class<? extends Action> actionType) {
         return cache.getUnchecked(ExtensionList.lookup(TransientActionFactory.class)).getUnchecked(new CacheKey(type, actionType));
+    }
+
+	/** @see <a href="http://stackoverflow.com/a/24336841/12916">no pairs/tuples in Java</a> */
+    private static class CacheKey {
+        private final Class<?> type;
+        private final Class<? extends Action> actionType;
+        CacheKey(Class<?> type, Class<? extends Action> actionType) {
+            this.type = type;
+            this.actionType = actionType;
+        }
+        @Override
+        public boolean equals(Object obj) {
+            return obj instanceof CacheKey && type == ((CacheKey) obj).type && actionType == ((CacheKey) obj).actionType;
+        }
+        @Override
+        public int hashCode() {
+            return type.hashCode() ^ actionType.hashCode();
+        }
     }
 
 }

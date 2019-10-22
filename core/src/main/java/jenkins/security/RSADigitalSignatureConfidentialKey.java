@@ -35,21 +35,23 @@ import java.util.Base64;
  * @author Kohsuke Kawaguchi
  */
 public class RSADigitalSignatureConfidentialKey extends RSAConfidentialKey {
-    public RSADigitalSignatureConfidentialKey(String id) {
+    static final String SIGNING_ALGORITHM = "SHA256";
+
+	public RSADigitalSignatureConfidentialKey(String id) {
         super(id);
     }
 
-    public RSADigitalSignatureConfidentialKey(Class owner, String shortName) {
+	public RSADigitalSignatureConfidentialKey(Class owner, String shortName) {
         super(owner, shortName);
     }
 
-    /**
+	/**
      * Sign a message and base64 encode the signature.
      */
     public String sign(String msg) {
         try {
             RSAPrivateKey key = getPrivateKey();
-            Signature sig = Signature.getInstance(SIGNING_ALGORITHM + "with" + key.getAlgorithm());
+            Signature sig = Signature.getInstance(new StringBuilder().append(SIGNING_ALGORITHM).append("with").append(key.getAlgorithm()).toString());
             sig.initSign(key);
             sig.update(msg.getBytes(StandardCharsets.UTF_8));
             return Base64.getEncoder().encodeToString(sig.sign());
@@ -57,6 +59,4 @@ public class RSADigitalSignatureConfidentialKey extends RSAConfidentialKey {
             throw new SecurityException(e);
         }
     }
-
-    static final String SIGNING_ALGORITHM = "SHA256";
 }
