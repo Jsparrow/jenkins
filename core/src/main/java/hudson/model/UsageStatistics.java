@@ -68,45 +68,56 @@ import jenkins.util.SystemProperties;
  */
 @Extension
 public class UsageStatistics extends PageDecorator implements PersistentDescriptor {
-    private final String keyImage;
-
     /**
+     * Public key to encrypt the usage statistics
+     */
+    private static final String DEFAULT_KEY_BYTES = "30819f300d06092a864886f70d010101050003818d0030818902818100c14970473bd90fd1f2d20e4fa6e36ea21f7d46db2f4104a3a8f2eb097d6e26278dfadf3fe9ed05bbbb00a4433f4b7151e6683a169182e6ff2f6b4f2bb6490b2cddef73148c37a2a7421fc75f99fb0fadab46f191806599a208652f4829fd6f76e13195fb81ff3f2fce15a8e9a85ebe15c07c90b34ebdb416bd119f0d74105f3b0203010001";
+
+	private static final long DAY = DAYS.toMillis(1);
+
+	public static boolean DISABLED = SystemProperties.getBoolean(UsageStatistics.class.getName()+".disabled");
+
+	private final String keyImage;
+
+	/**
      * Lazily computed {@link PublicKey} representation of {@link #keyImage}.
      */
-    private volatile transient RSAPublicKey key;
+    private transient volatile RSAPublicKey key;
 
-    /**
+	/**
      * When was the last time we asked a browser to send the usage stats for us?
      */
-    private volatile transient long lastAttempt = -1;
+    private transient volatile long lastAttempt = -1;
 
-    public UsageStatistics() {
+	public UsageStatistics() {
         this(DEFAULT_KEY_BYTES);
     }
 
-    /**
+	/**
      * Creates an instance with a specific public key image.
      */
     public UsageStatistics(String keyImage) {
         this.keyImage = keyImage;
     }
 
-    /**
+	/**
      * Returns true if it's time for us to check for new version.
      */
     public boolean isDue() {
         // user opted out. no data collection.
-        if(!Jenkins.get().isUsageStatisticsCollected() || DISABLED)     return false;
+        if(!Jenkins.get().isUsageStatisticsCollected() || DISABLED) {
+			return false;
+		}
         
         long now = System.currentTimeMillis();
-        if(now - lastAttempt > DAY) {
-            lastAttempt = now;
-            return true;
-        }
-        return false;
+        if (!(now - lastAttempt > DAY)) {
+			return false;
+		}
+		lastAttempt = now;
+		return true;
     }
 
-    private RSAPublicKey getKey() {
+	private RSAPublicKey getKey() {
         try {
             if (key == null) {
                 KeyFactory keyFactory = KeyFactory.getInstance("RSA");
@@ -118,7 +129,7 @@ public class UsageStatistics extends PageDecorator implements PersistentDescript
         }
     }
 
-    /**
+	/**
      * Gets the encrypted usage stat data to be sent to the Hudson server.
      */
     public String getStatData() throws IOException {
@@ -148,7 +159,10 @@ public class UsageStatistics extends PageDecorator implements PersistentDescript
 
         List<JSONObject> plugins = new ArrayList<>();
         for( PluginWrapper pw : j.getPluginManager().getPlugins() ) {
-            if(!pw.isActive())  continue;   // treat disabled plugins as if they are uninstalled
+            if(!pw.isActive())
+			 {
+				continue;   // treat disabled plugins as if they are uninstalled
+			}
             JSONObject p = new JSONObject();
             p.put("name",pw.getShortName());
             p.put("version",pw.getVersion());
@@ -192,7 +206,7 @@ public class UsageStatistics extends PageDecorator implements PersistentDescript
         }
     }
 
-    @Override
+	@Override
     public boolean configure(StaplerRequest req, JSONObject json) throws FormException {
         try {
             // for backward compatibility reasons, this configuration is stored in Jenkins
@@ -203,7 +217,18 @@ public class UsageStatistics extends PageDecorator implements PersistentDescript
         }
     }
 
-    /**
+	private static String getKeyAlgorithm(String algorithm) {
+        int index = algorithm.indexOf('/');
+        return (index>0)?algorithm.substring(0,index):algorithm;
+    }
+
+	private static Cipher toCipher(RSAKey key, int mode) throws GeneralSecurityException {
+        Cipher cipher = Cipher.getInstance("RSA");
+        cipher.init(mode, (Key)key);
+        return cipher;
+    }
+
+	/**
      * Asymmetric cipher is slow and in case of Sun RSA implementation it can only encrypt the first block.
      *
      * So first create a symmetric key, then place this key in the beginning of the stream by encrypting it
@@ -260,24 +285,4 @@ public class UsageStatistics extends PageDecorator implements PersistentDescript
             this(in,toCipher(key,Cipher.DECRYPT_MODE),algorithm,key.getModulus().bitLength());
         }
     }
-
-    private static String getKeyAlgorithm(String algorithm) {
-        int index = algorithm.indexOf('/');
-        return (index>0)?algorithm.substring(0,index):algorithm;
-    }
-
-    private static Cipher toCipher(RSAKey key, int mode) throws GeneralSecurityException {
-        Cipher cipher = Cipher.getInstance("RSA");
-        cipher.init(mode, (Key)key);
-        return cipher;
-    }
-
-    /**
-     * Public key to encrypt the usage statistics
-     */
-    private static final String DEFAULT_KEY_BYTES = "30819f300d06092a864886f70d010101050003818d0030818902818100c14970473bd90fd1f2d20e4fa6e36ea21f7d46db2f4104a3a8f2eb097d6e26278dfadf3fe9ed05bbbb00a4433f4b7151e6683a169182e6ff2f6b4f2bb6490b2cddef73148c37a2a7421fc75f99fb0fadab46f191806599a208652f4829fd6f76e13195fb81ff3f2fce15a8e9a85ebe15c07c90b34ebdb416bd119f0d74105f3b0203010001";
-
-    private static final long DAY = DAYS.toMillis(1);
-
-    public static boolean DISABLED = SystemProperties.getBoolean(UsageStatistics.class.getName()+".disabled");
 }

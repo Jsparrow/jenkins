@@ -75,175 +75,97 @@ public class InstallState implements ExtensionPoint {
      */
     @Extension
     public static final InstallState UNKNOWN = new Unknown();
-    private static class Unknown extends InstallState {
-        Unknown() {
-            super("UNKNOWN", true);
-        }
-        @Override
-        public void initializeState() {
-            InstallUtil.proceedToNextStateFrom(this);
-        }
-    }
-    
-    /**
+
+	/**
      * After any setup / restart / etc. hooks are done, states should be running
      */
     @Extension
     public static final InstallState RUNNING = new InstallState("RUNNING", true);
-    
-    /**
+
+	/**
      * The initial set up has been completed
      */
     @Extension
     public static final InstallState INITIAL_SETUP_COMPLETED = new InitialSetupCompleted();
-    private static final class InitialSetupCompleted extends InstallState {
-        InitialSetupCompleted() {
-            super("INITIAL_SETUP_COMPLETED", true);
-        }
-        public void initializeState() {
-            Jenkins j = Jenkins.get();
-            try {
-                j.getSetupWizard().completeSetup();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-            j.setInstallState(RUNNING);
-        }
-    }
-    
-    /**
+
+	/**
      * Creating an admin user for an initial Jenkins install.
      */
     @Extension
     public static final InstallState CREATE_ADMIN_USER = new CreateAdminUser();
-    private static final class CreateAdminUser extends InstallState {
-        CreateAdminUser() {
-            super("CREATE_ADMIN_USER", false);
-        }
-        public void initializeState() {
-            Jenkins j = Jenkins.get();
-            // Skip this state if not using the security defaults
-            // e.g. in an init script set up security already
-            if (!j.getSetupWizard().isUsingSecurityDefaults()) {
-                InstallUtil.proceedToNextStateFrom(this);
-            }
-        }
-    }
-    
-    @Extension
+
+	@Extension
     public static final InstallState CONFIGURE_INSTANCE = new ConfigureInstance();
-    private static final class ConfigureInstance extends InstallState {
-        ConfigureInstance() {
-            super("CONFIGURE_INSTANCE", false);
-        }
-        public void initializeState() {
-            // Skip this state if a boot script already configured the root URL
-            // in case we add more fields in this page, this should be adapted
-            if (StringUtils.isNotBlank(JenkinsLocationConfiguration.getOrDie().getUrl())) {
-                InstallUtil.proceedToNextStateFrom(this);
-            }
-        }
-    }
-    
-    /**
+
+	/**
      * New Jenkins install. The user has kicked off the process of installing an
      * initial set of plugins (via the install wizard).
      */
     @Extension
     public static final InstallState INITIAL_PLUGINS_INSTALLING = new InstallState("INITIAL_PLUGINS_INSTALLING", false);
 
-    /**
+	/**
      * Security setup for a new Jenkins install.
      */
     @Extension
     public static final InstallState INITIAL_SECURITY_SETUP = new InitialSecuritySetup();
-    private static final class InitialSecuritySetup extends InstallState {
-        InitialSecuritySetup() {
-            super("INITIAL_SECURITY_SETUP", false);
-        }
-        public void initializeState() {
-            try {
-                Jenkins.get().getSetupWizard().init(true);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
 
-            InstallUtil.proceedToNextStateFrom(INITIAL_SECURITY_SETUP);
-        }
-    }
-    
-    /**
+	/**
      * New Jenkins install.
      */
     @Extension
     public static final InstallState NEW = new InstallState("NEW", false);
 
-    /**
+	/**
      * Restart of an existing Jenkins install.
      */
     @Extension
     public static final InstallState RESTART = new Restart();
-    private static final class Restart extends InstallState {
-        Restart() {
-            super("RESTART", true);
-        }
-        public void initializeState() {
-            InstallUtil.saveLastExecVersion();
-        }
-    }
-    
-    /**
+
+	/**
      * Upgrade of an existing Jenkins install.
      */
     @Extension
     public static final InstallState UPGRADE = new UpgradeWizard();
-    
-    /**
+
+	/**
      * Downgrade of an existing Jenkins install.
      */
     @Extension
     public static final InstallState DOWNGRADE = new Downgrade();
-    private static final class Downgrade extends InstallState {
-        Downgrade() {
-            super("DOWNGRADE", true);
-        }
-        public void initializeState() {
-            InstallUtil.saveLastExecVersion();
-        }
-    }
-    
-    private static final Logger LOGGER = Logger.getLogger(InstallState.class.getName());
-    
-    /**
+
+	private static final Logger LOGGER = Logger.getLogger(InstallState.class.getName());
+
+	/**
      * Jenkins started in test mode (JenkinsRule).
      */
     public static final InstallState TEST = new InstallState("TEST", true);
-    
-    /**
+
+	/**
      * Jenkins started in development mode: Boolean.getBoolean("hudson.Main.development").
      * Can be run normally with the -Djenkins.install.runSetupWizard=true
      */
     public static final InstallState DEVELOPMENT = new InstallState("DEVELOPMENT", true);
 
-    private final transient boolean isSetupComplete;
+	private final transient boolean isSetupComplete;
 
-    /**
+	/**
      * Link with the pluginSetupWizardGui.js map: "statsHandlers"
      */
     private final String name;
 
-    public InstallState(@Nonnull String name, boolean isSetupComplete) {
+	public InstallState(@Nonnull String name, boolean isSetupComplete) {
         this.name = name;
         this.isSetupComplete = isSetupComplete;
     }
-    
-    /**
+
+	/**
      * Process any initialization this install state requires
      */
     public void initializeState() {
     }
 
-    /**
+	/**
      * The actual class name is irrelevant; this is functionally an enum.
      * <p>Creating a {@code writeReplace} does not help much since XStream then just saves:
      * {@code <installState class="jenkins.install.InstallState$CreateAdminUser" resolves-to="jenkins.install.InstallState">}
@@ -259,63 +181,147 @@ public class InstallState implements ExtensionPoint {
         }
         
         InstallState state = InstallState.valueOf(name);
-        if (state == null) {
-            LOGGER.log(Level.WARNING, "Cannot locate an extension point for the state ''{0}''. It will be ignored", name);
-            return UNKNOWN;
-        }
-        
-        // Otherwise we return the actual state
-        return state;
+        if (state != null) {
+			// Otherwise we return the actual state
+			return state;
+		}
+		LOGGER.log(Level.WARNING, "Cannot locate an extension point for the state ''{0}''. It will be ignored", name);
+		return UNKNOWN;
     }
 
-    /**
+	/**
      * Indicates the initial setup is complete
      */
     public boolean isSetupComplete() {
         return isSetupComplete;
     }
-    
-    public String name() {
+
+	public String name() {
         return name;
     }
-    
-    @Override
+
+	@Override
     public int hashCode() {
         return name.hashCode();
     }
-    
-    @Override
+
+	@Override
     public boolean equals(Object obj) {
         if(obj instanceof InstallState) {
             return name.equals(((InstallState)obj).name());
         }
         return false;
     }
-    
-    @Override
+
+	@Override
     public String toString() {
-        return "InstallState (" + name + ")";
+        return new StringBuilder().append("InstallState (").append(name).append(")").toString();
     }
 
-    /**
+	/**
      * Find an install state by name
      * @param name
      * @return
      */
     @CheckForNull
     public static InstallState valueOf(@Nonnull String name) {
-        for (InstallState state : all()) {
-            if (name.equals(state.name)) {
-                return state;
-            }
-        }
-        return null;
+        return all().stream().filter(state -> name.equals(state.name)).findFirst().orElse(null);
     }
 
-    /**
+	/**
      * Returns all install states in the system
      */
     static ExtensionList<InstallState> all() {
         return ExtensionList.lookup(InstallState.class);
+    }
+    private static class Unknown extends InstallState {
+        Unknown() {
+            super("UNKNOWN", true);
+        }
+        @Override
+        public void initializeState() {
+            InstallUtil.proceedToNextStateFrom(this);
+        }
+    }
+    
+    private static final class InitialSetupCompleted extends InstallState {
+        InitialSetupCompleted() {
+            super("INITIAL_SETUP_COMPLETED", true);
+        }
+        @Override
+		public void initializeState() {
+            Jenkins j = Jenkins.get();
+            try {
+                j.getSetupWizard().completeSetup();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            j.setInstallState(RUNNING);
+        }
+    }
+    
+    private static final class CreateAdminUser extends InstallState {
+        CreateAdminUser() {
+            super("CREATE_ADMIN_USER", false);
+        }
+        @Override
+		public void initializeState() {
+            Jenkins j = Jenkins.get();
+            // Skip this state if not using the security defaults
+            // e.g. in an init script set up security already
+            if (!j.getSetupWizard().isUsingSecurityDefaults()) {
+                InstallUtil.proceedToNextStateFrom(this);
+            }
+        }
+    }
+    
+    private static final class ConfigureInstance extends InstallState {
+        ConfigureInstance() {
+            super("CONFIGURE_INSTANCE", false);
+        }
+        @Override
+		public void initializeState() {
+            // Skip this state if a boot script already configured the root URL
+            // in case we add more fields in this page, this should be adapted
+            if (StringUtils.isNotBlank(JenkinsLocationConfiguration.getOrDie().getUrl())) {
+                InstallUtil.proceedToNextStateFrom(this);
+            }
+        }
+    }
+    
+    private static final class InitialSecuritySetup extends InstallState {
+        InitialSecuritySetup() {
+            super("INITIAL_SECURITY_SETUP", false);
+        }
+        @Override
+		public void initializeState() {
+            try {
+                Jenkins.get().getSetupWizard().init(true);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+
+            InstallUtil.proceedToNextStateFrom(INITIAL_SECURITY_SETUP);
+        }
+    }
+    
+    private static final class Restart extends InstallState {
+        Restart() {
+            super("RESTART", true);
+        }
+        @Override
+		public void initializeState() {
+            InstallUtil.saveLastExecVersion();
+        }
+    }
+    
+    private static final class Downgrade extends InstallState {
+        Downgrade() {
+            super("DOWNGRADE", true);
+        }
+        @Override
+		public void initializeState() {
+            InstallUtil.saveLastExecVersion();
+        }
     }
 }

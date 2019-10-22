@@ -78,9 +78,11 @@ public class ZipExtractionInstaller extends ToolInstaller {
         return subdir;
     }
 
-    public FilePath performInstallation(ToolInstallation tool, Node node, TaskListener log) throws IOException, InterruptedException {
+    @Override
+	public FilePath performInstallation(ToolInstallation tool, Node node, TaskListener log) throws IOException, InterruptedException {
         FilePath dir = preferredLocation(tool, node);
-        if (dir.installIfNecessaryFrom(new URL(url), log, "Unpacking " + url + " to " + dir + " on " + node.getDisplayName())) {
+        if (dir.installIfNecessaryFrom(new URL(url), log, new StringBuilder().append("Unpacking ").append(url).append(" to ").append(dir).append(" on ").append(node.getDisplayName())
+				.toString())) {
             dir.act(new ChmodRecAPlusX());
         }
         if (subdir == null) {
@@ -93,7 +95,8 @@ public class ZipExtractionInstaller extends ToolInstaller {
     @Extension @Symbol("zip")
     public static class DescriptorImpl extends ToolInstallerDescriptor<ZipExtractionInstaller> {
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.ZipExtractionInstaller_DescriptorImpl_displayName();
         }
 
@@ -104,11 +107,10 @@ public class ZipExtractionInstaller extends ToolInstaller {
             try {
                 URLConnection conn = ProxyConfiguration.open(new URL(value));
                 conn.connect();
-                if (conn instanceof HttpURLConnection) {
-                    if (((HttpURLConnection) conn).getResponseCode() != HttpURLConnection.HTTP_OK) {
-                        return FormValidation.error(Messages.ZipExtractionInstaller_bad_connection());
-                    }
-                }
+                boolean condition = conn instanceof HttpURLConnection && ((HttpURLConnection) conn).getResponseCode() != HttpURLConnection.HTTP_OK;
+				if (condition) {
+				    return FormValidation.error(Messages.ZipExtractionInstaller_bad_connection());
+				}
                 return FormValidation.ok();
             } catch (MalformedURLException x) {
                 return FormValidation.error(Messages.ZipExtractionInstaller_malformed_url());
@@ -125,9 +127,11 @@ public class ZipExtractionInstaller extends ToolInstaller {
      */
     static class ChmodRecAPlusX extends MasterToSlaveFileCallable<Void> {
         private static final long serialVersionUID = 1L;
-        public Void invoke(File d, VirtualChannel channel) throws IOException {
-            if(!Functions.isWindows())
-                process(d);
+        @Override
+		public Void invoke(File d, VirtualChannel channel) throws IOException {
+            if(!Functions.isWindows()) {
+				process(d);
+			}
             return null;
         }
         private void process(File f) {

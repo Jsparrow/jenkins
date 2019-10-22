@@ -43,21 +43,22 @@ import java.util.List;
  */
 @Extension
 public class GroovyCommand extends CLICommand {
-    @Override
-    public String getShortDescription() {
-        return Messages.GroovyCommand_ShortDescription();
-    }
-
     @Argument(metaVar="SCRIPT",usage="Script to be executed. Only '=' (to represent stdin) is supported.")
     public String script;
 
-    /**
+	/**
      * Remaining arguments.
      */
     @Argument(metaVar="ARGUMENTS", index=1, usage="Command line arguments to pass into script.")
     public List<String> remaining = new ArrayList<>();
 
-    protected int run() throws Exception {
+	@Override
+    public String getShortDescription() {
+        return Messages.GroovyCommand_ShortDescription();
+    }
+
+	@Override
+	protected int run() throws Exception {
         // this allows the caller to manipulate the JVM state, so require the execute script privilege.
         Jenkins.getActiveInstance().checkPermission(Jenkins.RUN_SCRIPTS);
 
@@ -72,14 +73,16 @@ public class GroovyCommand extends CLICommand {
         return 0;
     }
 
-    /**
+	/**
      * Loads the script from the argument.
      */
     private String loadScript() throws CmdLineException, IOException, InterruptedException {
-        if(script==null)
-            throw new CmdLineException(null, "No script is specified");
-        if (script.equals("="))
-            return IOUtils.toString(stdin);
+        if(script==null) {
+			throw new CmdLineException(null, "No script is specified");
+		}
+        if ("=".equals(script)) {
+			return IOUtils.toString(stdin);
+		}
 
         checkChannel();
         return null; // never called

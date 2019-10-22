@@ -32,6 +32,7 @@ import org.powermock.core.classloader.annotations.PowerMockIgnore;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.core.classloader.annotations.SuppressStaticInitializationFor;
 import org.powermock.modules.junit4.PowerMockRunner;
+import java.util.Collections;
 
 @RunWith(PowerMockRunner.class)
 @PrepareForTest(Jenkins.class)
@@ -118,7 +119,7 @@ public class ListJobsCommandTest {
         when(rootView.getViews()).thenReturn(Arrays.asList(leftView, rightView));
         when(rootView.getItems()).thenReturn(Arrays.asList(rootJob, sharedJob));
         when(leftView.getItems()).thenReturn(Arrays.asList(leftJob, sharedJob));
-        when(rightView.getItems()).thenReturn(Arrays.asList(rightJob));
+        when(rightView.getItems()).thenReturn(Collections.singletonList(rightJob));
 
         when(jenkins.getView("Root")).thenReturn(rootView);
 

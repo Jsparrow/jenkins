@@ -59,19 +59,104 @@ public final class Permission {
          */
         // break eclipse compilation 
         //Override
-        public int compare(@Nonnull Permission one, @Nonnull Permission two) {
+        @Override
+		public int compare(@Nonnull Permission one, @Nonnull Permission two) {
             return one.getId().compareTo(two.getId());
         }
     };
 
-    public final @Nonnull Class owner;
+	/**
+     * All permissions in the system but in a single list.
+     */
+    private static final List<Permission> ALL = new CopyOnWriteArrayList<>();
 
-    public final @Nonnull PermissionGroup group;
+	private static final List<Permission> ALL_VIEW = Collections.unmodifiableList(ALL);
 
-    // if some plugin serialized old version of this class using XStream, `id` can be null
+	//
+	//
+	// Because of the initialization order issue, these two fields need to be defined here,
+	// even though they logically belong to Jenkins.
+	//
+	
+	    /**
+	     * {@link PermissionGroup} for {@link jenkins.model.Jenkins}.
+	     *
+	     * @deprecated since 2009-01-23.
+	     *      Access {@link jenkins.model.Jenkins#PERMISSIONS} instead.
+	     */
+	    @Deprecated
+	    public static final PermissionGroup HUDSON_PERMISSIONS = new PermissionGroup(Hudson.class, hudson.model.Messages._Hudson_Permissions_Title());
+
+	/**
+     * {@link Permission} that represents the God-like access. Equivalent of Unix root.
+     *
+     * <p>
+     * All permissions are eventually {@linkplain Permission#impliedBy implied by} this permission.
+     *
+     * @deprecated since 2009-01-23.
+     *      Access {@link jenkins.model.Jenkins#ADMINISTER} instead.
+     */
+    @Deprecated
+    public static final Permission HUDSON_ADMINISTER = new Permission(HUDSON_PERMISSIONS,"Administer", hudson.model.Messages._Hudson_AdministerPermission_Description(),null);
+
+	//
+	//
+	// Root Permissions.
+	//
+	// These permissions are meant to be used as the 'impliedBy' permission for other more specific permissions.
+	// The intention is to allow a simplified AuthorizationStrategy implementation agnostic to
+	// specific permissions.
+	
+	    public static final PermissionGroup GROUP = new PermissionGroup(Permission.class,Messages._Permission_Permissions_Title());
+
+	/**
+     * Historically this was separate from {@link #HUDSON_ADMINISTER} but such a distinction doesn't make sense
+     * any more, so deprecated.
+     *
+     * @deprecated since 2009-01-23.
+     *      Use {@link jenkins.model.Jenkins#ADMINISTER}.
+     */
+    @Deprecated
+    public static final Permission FULL_CONTROL = new Permission(GROUP, "FullControl",null, HUDSON_ADMINISTER);
+
+	/**
+     * Generic read access.
+     */
+    public static final Permission READ = new Permission(GROUP,"GenericRead",null,HUDSON_ADMINISTER);
+
+	/**
+     * Generic write access.
+     */
+    public static final Permission WRITE = new Permission(GROUP,"GenericWrite",null,HUDSON_ADMINISTER);
+
+	/**
+     * Generic create access.
+     */
+    public static final Permission CREATE = new Permission(GROUP,"GenericCreate",null,WRITE);
+
+	/**
+     * Generic update access.
+     */
+    public static final Permission UPDATE = new Permission(GROUP,"GenericUpdate",null,WRITE);
+
+	/**
+     * Generic delete access.
+     */
+    public static final Permission DELETE = new Permission(GROUP,"GenericDelete",null,WRITE);
+
+	/**
+     * Generic configuration access.
+     */
+    public static final Permission CONFIGURE = new Permission(GROUP,"GenericConfigure",null,UPDATE);
+
+	public final @Nonnull Class owner;
+
+	public final @Nonnull PermissionGroup group;
+
+	// if some plugin serialized old version of this class using XStream, `id` can be null
     private final @CheckForNull String id;
 
-    /**
+	/**
      * Human readable ID of the permission.
      *
      * <p>
@@ -82,7 +167,7 @@ public final class Permission {
      */
     public final @Nonnull String name;
 
-    /**
+	/**
      * Human-readable description of this permission.
      * Used as a tooltip to explain this permission, so this message
      * should be a couple of sentences long.
@@ -92,7 +177,7 @@ public final class Permission {
      */
     public final @CheckForNull Localizable description;
 
-    /**
+	/**
      * Bundled {@link Permission} that also implies this permission.
      *
      * <p>
@@ -107,7 +192,7 @@ public final class Permission {
      */
     public final @CheckForNull Permission impliedBy;
 
-    /**
+	/**
      * Whether this permission is available for use.
      *
      * <p>
@@ -119,12 +204,12 @@ public final class Permission {
      */
     public boolean enabled;
 
-    /**
+	/**
      * Scopes that this permission is directly contained by.
      */
     private final @Nonnull Set<PermissionScope> scopes;
 
-    /**
+	/**
      * Defines a new permission.
      *
      * @param group
@@ -151,9 +236,10 @@ public final class Permission {
      */
     public Permission(@Nonnull PermissionGroup group, @Nonnull String name, 
             @CheckForNull Localizable description, @CheckForNull Permission impliedBy, boolean enable, 
-            @Nonnull PermissionScope[] scopes) throws IllegalStateException {
-        if(!JSONUtils.isJavaIdentifier(name))
-            throw new IllegalArgumentException(name+" is not a Java identifier");
+            @Nonnull PermissionScope[] scopes) {
+        if(!JSONUtils.isJavaIdentifier(name)) {
+			throw new IllegalArgumentException(name+" is not a Java identifier");
+		}
         this.owner = group.owner;
         this.group = group;
         this.name = name;
@@ -161,19 +247,19 @@ public final class Permission {
         this.impliedBy = impliedBy;
         this.enabled = enable;
         this.scopes = ImmutableSet.copyOf(scopes);
-        this.id = owner.getName() + '.' + name;
+        this.id = new StringBuilder().append(owner.getName()).append('.').append(name).toString();
 
         group.add(this);
         ALL.add(this);
     }
 
-    public Permission(@Nonnull PermissionGroup group, @Nonnull String name, 
+	public Permission(@Nonnull PermissionGroup group, @Nonnull String name, 
             @CheckForNull Localizable description, @CheckForNull Permission impliedBy, @Nonnull PermissionScope scope) {
         this(group,name,description,impliedBy,true,new PermissionScope[]{scope});
         assert scope!=null;
     }
 
-    /**
+	/**
      * @deprecated as of 1.421
      *      Use {@link #Permission(PermissionGroup, String, Localizable, Permission, boolean, PermissionScope[])}
      */
@@ -182,7 +268,7 @@ public final class Permission {
         this(group,name,description,impliedBy,enable,new PermissionScope[]{PermissionScope.JENKINS});
     }
 
-    /**
+	/**
      * @deprecated as of 1.421
      *      Use {@link #Permission(PermissionGroup, String, Localizable, Permission, PermissionScope)}
      */
@@ -191,7 +277,7 @@ public final class Permission {
         this(group, name, description, impliedBy, PermissionScope.JENKINS);
     }
 
-    /**
+	/**
      * @deprecated since 1.257.
      *      Use {@link #Permission(PermissionGroup, String, Localizable, Permission)}
      */
@@ -200,22 +286,18 @@ public final class Permission {
         this(group,name,null,impliedBy);
     }
 
-    private Permission(@Nonnull PermissionGroup group, @Nonnull String name) {
+	private Permission(@Nonnull PermissionGroup group, @Nonnull String name) {
         this(group,name,null,null);
     }
 
-    /**
+	/**
      * Checks if this permission is contained in the specified scope, (either directly or indirectly.)
      */
     public boolean isContainedBy(@Nonnull PermissionScope s) {
-        for (PermissionScope c : scopes) {
-            if (c.isContainedBy(s))
-                return true;
-        }
-        return false;
+        return scopes.stream().anyMatch(c -> c.isContainedBy(s));
     }
 
-    /**
+	/**
      * Returns the string representation of this {@link Permission},
      * which can be converted back to {@link Permission} via the
      * {@link #fromId(String)} method.
@@ -227,20 +309,20 @@ public final class Permission {
      */
     public @Nonnull String getId() {
         if (id == null) {
-            return owner.getName() + '.' + name;
+            return new StringBuilder().append(owner.getName()).append('.').append(name).toString();
         }
         return id;
     }
 
-    @Override public boolean equals(Object o) {
+	@Override public boolean equals(Object o) {
         return o instanceof Permission && getId().equals(((Permission) o).getId());
     }
 
-    @Override public int hashCode() {
+	@Override public int hashCode() {
         return getId().hashCode();
     }
 
-    /**
+	/**
      * Convert the ID representation into {@link Permission} object.
      *
      * @return
@@ -249,33 +331,37 @@ public final class Permission {
      */
     public static @CheckForNull Permission fromId(@Nonnull String id) {
         int idx = id.lastIndexOf('.');
-        if(idx<0)   return null;
+        if(idx<0) {
+			return null;
+		}
 
         try {
             // force the initialization so that it will put all its permissions into the list.
             Class cl = Class.forName(id.substring(0,idx),true, Jenkins.get().getPluginManager().uberClassLoader);
             PermissionGroup g = PermissionGroup.get(cl);
-            if(g ==null)  return null;
+            if(g ==null) {
+				return null;
+			}
             return g.find(id.substring(idx+1));
         } catch (ClassNotFoundException e) {
             return null;
         }
     }
 
-    @Override
+	@Override
     public String toString() {
-        return "Permission["+owner+','+name+']';
+        return new StringBuilder().append("Permission[").append(owner).append(',').append(name).append(']').toString();
     }
 
-    public void setEnabled(boolean enable) {
+	public void setEnabled(boolean enable) {
         enabled = enable;
     }
 
-    public boolean getEnabled() {
+	public boolean getEnabled() {
         return enabled;
     }
-    
-    /**
+
+	/**
      * Returns all the {@link Permission}s available in the system.
      * @return
      *      always non-null. Read-only.
@@ -283,87 +369,4 @@ public final class Permission {
     public static @Nonnull List<Permission> getAll() {
         return ALL_VIEW;
     }
-
-    /**
-     * All permissions in the system but in a single list.
-     */
-    private static final List<Permission> ALL = new CopyOnWriteArrayList<>();
-
-    private static final List<Permission> ALL_VIEW = Collections.unmodifiableList(ALL);
-
-//
-//
-// Because of the initialization order issue, these two fields need to be defined here,
-// even though they logically belong to Jenkins.
-//
-
-    /**
-     * {@link PermissionGroup} for {@link jenkins.model.Jenkins}.
-     *
-     * @deprecated since 2009-01-23.
-     *      Access {@link jenkins.model.Jenkins#PERMISSIONS} instead.
-     */
-    @Deprecated
-    public static final PermissionGroup HUDSON_PERMISSIONS = new PermissionGroup(Hudson.class, hudson.model.Messages._Hudson_Permissions_Title());
-    /**
-     * {@link Permission} that represents the God-like access. Equivalent of Unix root.
-     *
-     * <p>
-     * All permissions are eventually {@linkplain Permission#impliedBy implied by} this permission.
-     *
-     * @deprecated since 2009-01-23.
-     *      Access {@link jenkins.model.Jenkins#ADMINISTER} instead.
-     */
-    @Deprecated
-    public static final Permission HUDSON_ADMINISTER = new Permission(HUDSON_PERMISSIONS,"Administer", hudson.model.Messages._Hudson_AdministerPermission_Description(),null);
-
-//
-//
-// Root Permissions.
-//
-// These permissions are meant to be used as the 'impliedBy' permission for other more specific permissions.
-// The intention is to allow a simplified AuthorizationStrategy implementation agnostic to
-// specific permissions.
-
-    public static final PermissionGroup GROUP = new PermissionGroup(Permission.class,Messages._Permission_Permissions_Title());
-
-    /**
-     * Historically this was separate from {@link #HUDSON_ADMINISTER} but such a distinction doesn't make sense
-     * any more, so deprecated.
-     *
-     * @deprecated since 2009-01-23.
-     *      Use {@link jenkins.model.Jenkins#ADMINISTER}.
-     */
-    @Deprecated
-    public static final Permission FULL_CONTROL = new Permission(GROUP, "FullControl",null, HUDSON_ADMINISTER);
-
-    /**
-     * Generic read access.
-     */
-    public static final Permission READ = new Permission(GROUP,"GenericRead",null,HUDSON_ADMINISTER);
-
-    /**
-     * Generic write access.
-     */
-    public static final Permission WRITE = new Permission(GROUP,"GenericWrite",null,HUDSON_ADMINISTER);
-
-    /**
-     * Generic create access.
-     */
-    public static final Permission CREATE = new Permission(GROUP,"GenericCreate",null,WRITE);
-
-    /**
-     * Generic update access.
-     */
-    public static final Permission UPDATE = new Permission(GROUP,"GenericUpdate",null,WRITE);
-
-    /**
-     * Generic delete access.
-     */
-    public static final Permission DELETE = new Permission(GROUP,"GenericDelete",null,WRITE);
-
-    /**
-     * Generic configuration access.
-     */
-    public static final Permission CONFIGURE = new Permission(GROUP,"GenericConfigure",null,UPDATE);
 }

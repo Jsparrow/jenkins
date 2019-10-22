@@ -26,14 +26,9 @@ import java.util.logging.Logger;
  */
 @Restricted(NoExternalUse.class) // used implicitly via listener
 public class CallableDirectionChecker extends RoleChecker {
-    /**
-     * Context parameter given to {@link ChannelConfigurator#onChannelBuilding(ChannelBuilder, Object)}.
-     */
-    private final Object context;
-
     private static final String BYPASS_PROP = CallableDirectionChecker.class.getName()+".allow";
 
-    /**
+	/**
      * Switch to disable all the defense mechanism completely.
      *
      * This is an escape hatch in case the fix breaks something critical, to allow the user
@@ -41,12 +36,19 @@ public class CallableDirectionChecker extends RoleChecker {
      */
     public static boolean BYPASS = SystemProperties.getBoolean(BYPASS_PROP);
 
-    private CallableDirectionChecker(Object context) {
+	private static final Logger LOGGER = Logger.getLogger(CallableDirectionChecker.class.getName());
+
+	/**
+     * Context parameter given to {@link ChannelConfigurator#onChannelBuilding(ChannelBuilder, Object)}.
+     */
+    private final Object context;
+
+	private CallableDirectionChecker(Object context) {
         this.context = context;
     }
 
-    @Override
-    public void check(RoleSensitive subject, @Nonnull Collection<Role> expected) throws SecurityException {
+	@Override
+    public void check(RoleSensitive subject, @Nonnull Collection<Role> expected) {
         final String name = subject.getClass().getName();
 
         if (expected.contains(Roles.MASTER)) {
@@ -60,21 +62,17 @@ public class CallableDirectionChecker extends RoleChecker {
             return;
         }
 
-        throw new SecurityException("Sending " + name + " from agent to master is prohibited.\nSee https://jenkins.io/redirect/security-144 for more details");
+        throw new SecurityException(new StringBuilder().append("Sending ").append(name).append(" from agent to master is prohibited.\nSee https://jenkins.io/redirect/security-144 for more details").toString());
     }
 
-    /**
+	/**
      * Is this subject class name whitelisted?
      */
     private boolean isWhitelisted(RoleSensitive subject, Collection<Role> expected) {
-        for (CallableWhitelist w : CallableWhitelist.all()) {
-            if (w.isWhitelisted(subject, expected, context))
-                return true;
-        }
-        return false;
+        return CallableWhitelist.all().stream().anyMatch(w -> w.isWhitelisted(subject, expected, context));
     }
 
-    /**
+	/**
      * Installs {@link CallableDirectionChecker} to every channel.
      */
     @Restricted(DoNotUse.class) // impl
@@ -104,6 +102,4 @@ public class CallableDirectionChecker extends RoleChecker {
             return BYPASS;
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(CallableDirectionChecker.class.getName());
 }

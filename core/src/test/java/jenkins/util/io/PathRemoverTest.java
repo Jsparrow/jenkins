@@ -377,9 +377,7 @@ public class PathRemoverTest {
         remover.forceRemoveRecursive(path);
 
         assertTrue("Unable to delete directory: " + path, Files.notExists(path));
-        for (File file : Arrays.asList(d1, d1f1, f2)) {
-            assertTrue("Should not have deleted target: " + file, file.exists());
-        }
+        Arrays.asList(d1, d1f1, f2).forEach(file -> assertTrue("Should not have deleted target: " + file, file.exists()));
     }
 
     @Test

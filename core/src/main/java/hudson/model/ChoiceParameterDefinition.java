@@ -32,30 +32,19 @@ public class ChoiceParameterDefinition extends SimpleParameterDefinition {
     private /* quasi-final */ List<String> choices;
     private final String defaultValue;
 
-    public static boolean areValidChoices(String choices) {
-        String strippedChoices = choices.trim();
-        return !StringUtils.isEmpty(strippedChoices) && strippedChoices.split(CHOICES_DELIMITER).length > 0;
-    }
-
     public ChoiceParameterDefinition(String name, String choices, String description) {
         super(name, description);
         setChoicesText(choices);
         defaultValue = null;
     }
 
-    public ChoiceParameterDefinition(String name, String[] choices, String description) {
+	public ChoiceParameterDefinition(String name, String[] choices, String description) {
         super(name, description);
         this.choices = new ArrayList<>(Arrays.asList(choices));
         defaultValue = null;
     }
 
-    private ChoiceParameterDefinition(String name, List<String> choices, String defaultValue, String description) {
-        super(name, description);
-        this.choices = choices;
-        this.defaultValue = defaultValue;
-    }
-
-    /**
+	/**
      * Databound constructor for reflective instantiation.
      *
      * @param name parameter name
@@ -71,7 +60,18 @@ public class ChoiceParameterDefinition extends SimpleParameterDefinition {
         this.defaultValue = null;
     }
 
-    /**
+	private ChoiceParameterDefinition(String name, List<String> choices, String defaultValue, String description) {
+        super(name, description);
+        this.choices = choices;
+        this.defaultValue = defaultValue;
+    }
+
+	public static boolean areValidChoices(String choices) {
+        String strippedChoices = choices.trim();
+        return !StringUtils.isEmpty(strippedChoices) && strippedChoices.split(CHOICES_DELIMITER).length > 0;
+    }
+
+	/**
      * Set the list of choices. Legal arguments are String (in which case the arguments gets split into lines) and Collection
      * which sets the list of legal parameters to the String representations of the argument's non-null entries.
      *
@@ -105,11 +105,11 @@ public class ChoiceParameterDefinition extends SimpleParameterDefinition {
         throw new IllegalArgumentException("expected String or List, but got " + choices.getClass().getName());
     }
 
-    private void setChoicesText(String choices) {
+	private void setChoicesText(String choices) {
         this.choices = Arrays.asList(choices.split(CHOICES_DELIMITER));
     }
 
-    @Override
+	@Override
     public ParameterDefinition copyWithDefaultValue(ParameterValue defaultValue) {
         if (defaultValue instanceof StringParameterValue) {
             StringParameterValue value = (StringParameterValue) defaultValue;
@@ -119,38 +119,40 @@ public class ChoiceParameterDefinition extends SimpleParameterDefinition {
         }
     }
 
-    @Exported
+	@Exported
     public List<String> getChoices() {
         return choices;
     }
 
-    public String getChoicesText() {
+	public String getChoicesText() {
         return StringUtils.join(choices, "\n");
     }
 
-    @Override
+	@Override
     public StringParameterValue getDefaultParameterValue() {
         return new StringParameterValue(getName(), defaultValue == null ? choices.get(0) : defaultValue, getDescription());
     }
 
-    private StringParameterValue checkValue(StringParameterValue value) {
-        if (!choices.contains(value.value))
-            throw new IllegalArgumentException("Illegal choice for parameter " + getName() + ": " + value.value);
+	private StringParameterValue checkValue(StringParameterValue value) {
+        if (!choices.contains(value.value)) {
+			throw new IllegalArgumentException(new StringBuilder().append("Illegal choice for parameter ").append(getName()).append(": ").append(value.value).toString());
+		}
         return value;
     }
 
-    @Override
+	@Override
     public ParameterValue createValue(StaplerRequest req, JSONObject jo) {
         StringParameterValue value = req.bindJSON(StringParameterValue.class, jo);
         value.setDescription(getDescription());
         return checkValue(value);
     }
 
-    public StringParameterValue createValue(String value) {
+	@Override
+	public StringParameterValue createValue(String value) {
         return checkValue(new StringParameterValue(getName(), value, getDescription()));
     }
 
-    @Extension @Symbol({"choice","choiceParam"})
+	@Extension @Symbol({"choice","choiceParam"})
     public static class DescriptorImpl extends ParameterDescriptor {
         @Override
         public String getDisplayName() {

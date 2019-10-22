@@ -38,7 +38,17 @@ import org.jvnet.hudson.test.Issue;
 
 public class ArgumentListBuilderTest {
 
-    @Test
+    private static final Map<String, String> KEY_VALUES = new HashMap<String, String>() {{
+        put("key1", "value1");
+        put("key2", "value2");
+        put("key3", "value3");
+    }};
+
+	private static final Set<String> MASKS = new HashSet<String>() {{
+        add("key2");
+    }};
+
+	@Test
     public void assertEmptyMask() {
         ArgumentListBuilder builder = new ArgumentListBuilder();
         builder.add("arg");
@@ -50,7 +60,7 @@ public class ArgumentListBuilderTest {
         assertThat("The mask array was incorrect", array, is(new boolean[] { false, false, false }));
     }
 
-    @Test
+	@Test
     public void assertLastArgumentIsMasked() {
         ArgumentListBuilder builder = new ArgumentListBuilder();
         builder.add("arg");
@@ -62,7 +72,7 @@ public class ArgumentListBuilderTest {
         assertThat("The mask array was incorrect", array, is(new boolean[] { false, true }));
     }
 
-    @Test
+	@Test
     public void assertSeveralMaskedArguments() {
         ArgumentListBuilder builder = new ArgumentListBuilder();
         builder.add("arg");
@@ -76,7 +86,7 @@ public class ArgumentListBuilderTest {
         assertThat("The mask array was incorrect", array, is(new boolean[] { false, true, false, true }));
     }
 
-    @Test
+	@Test
     public void assertPrependAfterAddingMasked() {
         ArgumentListBuilder builder = new ArgumentListBuilder();
         builder.addMasked("ismasked");
@@ -89,7 +99,7 @@ public class ArgumentListBuilderTest {
         assertThat("The mask array was incorrect", array, is(new boolean[] { false, false, true, false }));
     }
 
-    @Test
+	@Test
     public void assertPrependBeforeAddingMasked() {
         ArgumentListBuilder builder = new ArgumentListBuilder();
         builder.prepend("first", "second");
@@ -102,7 +112,7 @@ public class ArgumentListBuilderTest {
         assertThat("The mask array was incorrect", array, is(new boolean[] { false, false, true, false }));
     }
 
-    @Test
+	@Test
     public void testToWindowsCommand() {
         ArgumentListBuilder builder = new ArgumentListBuilder().
                 add("ant.bat").add("-Dfoo1=abc").  // nothing special, no quotes
@@ -131,8 +141,8 @@ public class ArgumentListBuilderTest {
         // Pass flag to escape %VAR%
         assertThat(builder.toWindowsCommand(true).toString(), is("cmd.exe /C \"ant.bat -Dfoo1=abc \"\"-Dfoo2=foo bar\"\" \"-Dfoo3=/u*r\" \"-Dfoo4=/us?\" \"-Dfoo10=bar,baz\" \"-Dfoo5=foo;bar^baz\" \"-Dfoo6=<xml>&here;</xml>\" \"-Dfoo7=foo|bar\"\"baz\" \"\"-Dfoo8=% %\"Q\"ED% %\"c\"omspec% %-%(%.%\"\" -Dfoo9=%'''%%@% ****** && exit %%ERRORLEVEL%%\""));
     }
-    
-    @Test
+
+	@Test
     @Ignore("It's only for reproduce JENKINS-28790 issue. It's added to testToWindowsCommand")
     @Issue("JENKINS-28790")
     public void testToWindowsCommandMasked() {
@@ -151,7 +161,7 @@ public class ArgumentListBuilderTest {
         assertThat(builder.toWindowsCommand(true).toString(), is("cmd.exe /C \"ant.bat -Dfoo1=abc \"\"-Dfoo2=foo bar\"\" \"-Dfoo3=/u*r\" \"-Dfoo4=/us?\" \"-Dfoo10=bar,baz\" \"-Dfoo5=foo;bar^baz\" \"-Dfoo6=<xml>&here;</xml>\" \"-Dfoo7=foo|bar\"\"baz\" \"\"-Dfoo8=% %\"Q\"ED% %\"c\"omspec% %-%(%.%\"\" -Dfoo9=%'''%%@% ****** && exit %%ERRORLEVEL%%\""));
     }
 
-    @Test
+	@Test
     public void assertMaskOnClone() {
         ArgumentListBuilder builder = new ArgumentListBuilder();
         builder.add("arg1");
@@ -164,18 +174,8 @@ public class ArgumentListBuilderTest {
         assertNotNull("The mask array should not be null", array);
         assertThat("The mask array was incorrect", array, is(builder.toMaskArray()));
     }
-    
-    private static final Map<String, String> KEY_VALUES = new HashMap<String, String>() {{
-        put("key1", "value1");
-        put("key2", "value2");
-        put("key3", "value3");
-    }};
 
-    private static final Set<String> MASKS = new HashSet<String>() {{
-        add("key2");
-    }};
-    
-    @Test
+	@Test
     public void assertKeyValuePairsWithMask() {
         ArgumentListBuilder builder = new ArgumentListBuilder();
         builder.addKeyValuePairs(null, KEY_VALUES, MASKS);
@@ -187,7 +187,7 @@ public class ArgumentListBuilderTest {
 
     }
 
-    @Test
+	@Test
     public void assertKeyValuePairs() {
         ArgumentListBuilder builder = new ArgumentListBuilder();
         builder.addKeyValuePairs(null, KEY_VALUES);
@@ -198,7 +198,7 @@ public class ArgumentListBuilderTest {
         assertThat("The mask array was incorrect", array, is(new boolean[] { false, false, false }));
     }
 
-    @Test
+	@Test
     public void addKeyValuePairsFromPropertyString() throws IOException {
         final Map<String, String> map = new HashMap<>();
         map.put("PATH", "C:\\Windows");
@@ -215,7 +215,7 @@ public class ArgumentListBuilderTest {
         assertEquals("my.path=C:\\Windows", builder.toString());
     }
 
-    @Test
+	@Test
     public void numberOfBackslashesInPropertiesShouldBePreservedAfterMacroExpansion() throws IOException {
         final Map<String, String> map = new HashMap<>();
         map.put("ONE", "one\\backslash");

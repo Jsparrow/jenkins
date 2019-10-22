@@ -45,25 +45,34 @@ import java.util.Random;
  * @since 1.448
  */
 public abstract class Hash {
-    /*package*/ Hash() {}
+    private static final Hash ZERO = new Hash() {
+        @Override
+        public int next(int n) {
+            return 0;
+        }
+    };
 
-    /**
+	/*package*/ Hash() {}
+
+	/**
      * Produces an integer in [0,n)
      */
     public abstract int next(int n);
-    
-    public static Hash from(String seed) {
+
+	public static Hash from(String seed) {
         try {
             MessageDigest md5 = MessageDigest.getInstance("MD5");
             md5.update(seed.getBytes(StandardCharsets.UTF_8));
             byte[] digest = md5.digest();
 
-            for (int i=8; i<digest.length; i++)
-                digest[i%8] ^= digest[i];
+            for (int i=8; i<digest.length; i++) {
+				digest[i%8] ^= digest[i];
+			}
 
             long l = 0;
-            for (int i=0; i<8; i++)
-                l = (l<<8)+(digest[i]&0xFF);
+            for (int i=0; i<8; i++) {
+				l = (l<<8)+(digest[i]&0xFF);
+			}
 
             final Random rnd = new Random(l);
             return new Hash() {
@@ -77,17 +86,10 @@ public abstract class Hash {
         }
     }
 
-    /**
+	/**
      * Creates a hash that always return 0.
      */
     public static Hash zero() {
         return ZERO;
     }
-
-    private static final Hash ZERO = new Hash() {
-        @Override
-        public int next(int n) {
-            return 0;
-        }
-    };
 }

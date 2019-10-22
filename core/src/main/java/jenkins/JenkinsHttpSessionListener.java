@@ -47,24 +47,24 @@ public final class JenkinsHttpSessionListener implements javax.servlet.http.Http
     
     @Override
     public void sessionCreated(HttpSessionEvent httpSessionEvent) {
-        for (HttpSessionListener listener : HttpSessionListener.all()) {
+        HttpSessionListener.all().forEach(listener -> {
             try {
                 listener.sessionCreated(httpSessionEvent);
             } catch (Exception e) {
                 LOGGER.log(Level.SEVERE, "Error calling HttpSessionListener ExtensionPoint sessionCreated().", e);
             }
-        }
+        });
     }
 
     @Override
     public void sessionDestroyed(HttpSessionEvent httpSessionEvent) {
-        for (HttpSessionListener listener : HttpSessionListener.all()) {
+        HttpSessionListener.all().forEach(listener -> {
             try {
                 listener.sessionDestroyed(httpSessionEvent);
             } catch (Exception e) {
                 LOGGER.log(Level.SEVERE, "Error calling HttpSessionListener ExtensionPoint sessionDestroyed().", e);
             }
-        }
+        });
     }
 
 }

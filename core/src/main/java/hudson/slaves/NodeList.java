@@ -147,7 +147,9 @@ public final class NodeList extends ArrayList<Node> {
         public void marshal(Object source, HierarchicalStreamWriter writer, MarshallingContext context) {
             for (Node o : (NodeList) source) {
                 if(o instanceof EphemeralNode)
-                    continue;   // skip
+				 {
+					continue;   // skip
+				}
                 writeItem(o, context, writer);
             }
         }

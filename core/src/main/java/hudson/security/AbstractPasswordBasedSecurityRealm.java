@@ -65,9 +65,9 @@ public abstract class AbstractPasswordBasedSecurityRealm extends SecurityRealm i
      * If the user name and the password pair doesn't match, throw {@link AuthenticationException} to reject the login
      * attempt.
      */
-    protected abstract UserDetails authenticate(String username, String password) throws AuthenticationException;
+    protected abstract UserDetails authenticate(String username, String password);
 
-    private UserDetails doAuthenticate(String username, String password) throws AuthenticationException {
+    private UserDetails doAuthenticate(String username, String password) {
         try {
             UserDetails user = authenticate(username, password);
             SecurityListener.fireAuthenticated(user);
@@ -87,7 +87,7 @@ public abstract class AbstractPasswordBasedSecurityRealm extends SecurityRealm i
      * a query like this, just always throw {@link UsernameNotFoundException}.
      */
     @Override
-    public abstract UserDetails loadUserByUsername(String username) throws UsernameNotFoundException, DataAccessException;
+    public abstract UserDetails loadUserByUsername(String username);
 
     /**
      * Retrieves information about a group by its name.
@@ -95,14 +95,16 @@ public abstract class AbstractPasswordBasedSecurityRealm extends SecurityRealm i
      * This method is the group version of the {@link #loadUserByUsername(String)}.
      */
     @Override
-    public abstract GroupDetails loadGroupByGroupname(String groupname) throws UsernameNotFoundException, DataAccessException;
+    public abstract GroupDetails loadGroupByGroupname(String groupname);
 
     class Authenticator extends AbstractUserDetailsAuthenticationProvider {
-        protected void additionalAuthenticationChecks(UserDetails userDetails, UsernamePasswordAuthenticationToken authentication) throws AuthenticationException {
+        @Override
+		protected void additionalAuthenticationChecks(UserDetails userDetails, UsernamePasswordAuthenticationToken authentication) {
             // authentication is assumed to be done already in the retrieveUser method
         }
 
-        protected UserDetails retrieveUser(String username, UsernamePasswordAuthenticationToken authentication) throws AuthenticationException {
+        @Override
+		protected UserDetails retrieveUser(String username, UsernamePasswordAuthenticationToken authentication) {
             return doAuthenticate(username,authentication.getCredentials().toString());
         }
     }

@@ -45,18 +45,18 @@ import java.util.logging.Logger;
 @Extension
 public class ReloadJobCommand extends CLICommand {
 
-    @Argument(usage="Name of the job(s) to reload", required=true, multiValued=true)
-    private List<String> jobs;
-
     private static final Logger LOGGER = Logger.getLogger(ReloadJobCommand.class.getName());
 
-    @Override
+	@Argument(usage="Name of the job(s) to reload", required=true, multiValued=true)
+    private List<String> jobs;
+
+	@Override
     public String getShortDescription() {
 
         return Messages.ReloadJobCommand_ShortDescription();
     }
 
-    @Override
+	@Override
     protected int run() throws Exception {
 
         boolean errorOccurred = false;
@@ -78,7 +78,7 @@ public class ReloadJobCommand extends CLICommand {
                 if(job == null) {
                     AbstractItem project = Items.findNearest(AbstractItem.class, job_s, jenkins);
                     throw new IllegalArgumentException(project == null ?
-                        "No such item \u2018" + job_s + "\u2019 exists." :
+                        new StringBuilder().append("No such item \u2018").append(job_s).append("\u2019 exists.").toString() :
                         String.format("No such item \u2018%s\u2019 exists. Perhaps you meant \u2018%s\u2019?",
                                 job_s, project.getFullName()));
                 }
@@ -90,7 +90,7 @@ public class ReloadJobCommand extends CLICommand {
                     throw e;
                 }
 
-                final String errorMsg = job_s + ": " + e.getMessage();
+                final String errorMsg = new StringBuilder().append(job_s).append(": ").append(e.getMessage()).toString();
                 stderr.println(errorMsg);
                 errorOccurred = true;
                 continue;

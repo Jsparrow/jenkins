@@ -40,27 +40,6 @@ import org.kohsuke.accmod.restrictions.NoExternalUse;
 public class FreeStyleProject extends Project<FreeStyleProject,FreeStyleBuild> implements TopLevelItem {
 
     /**
-     * @deprecated as of 1.390
-     */
-    @Deprecated
-    public FreeStyleProject(Jenkins parent, String name) {
-        super(parent, name);
-    }
-
-    public FreeStyleProject(ItemGroup parent, String name) {
-        super(parent, name);
-    }
-
-    @Override
-    protected Class<FreeStyleBuild> getBuildClass() {
-        return FreeStyleBuild.class;
-    }
-
-    public DescriptorImpl getDescriptor() {
-        return (DescriptorImpl)Jenkins.get().getDescriptorOrDie(getClass());
-    }
-
-    /**
      * Descriptor is instantiated as a field purely for backward compatibility.
      * Do not do this in your code. Put @Extension on your DescriptorImpl class instead.
      *
@@ -70,45 +49,69 @@ public class FreeStyleProject extends Project<FreeStyleProject,FreeStyleBuild> i
     @Restricted(NoExternalUse.class)
     public static /*almost final*/ DescriptorImpl DESCRIPTOR;
 
-    @Extension(ordinal=1000) @Symbol({"freeStyle","freeStyleJob"})
+	/**
+     * @deprecated as of 1.390
+     */
+    @Deprecated
+    public FreeStyleProject(Jenkins parent, String name) {
+        super(parent, name);
+    }
+
+	public FreeStyleProject(ItemGroup parent, String name) {
+        super(parent, name);
+    }
+
+	@Override
+    protected Class<FreeStyleBuild> getBuildClass() {
+        return FreeStyleBuild.class;
+    }
+
+	@Override
+	public DescriptorImpl getDescriptor() {
+        return (DescriptorImpl)Jenkins.get().getDescriptorOrDie(getClass());
+    }
+
+	@Extension(ordinal=1000) @Symbol({"freeStyle","freeStyleJob"})
     public static class DescriptorImpl extends AbstractProjectDescriptor {
-        public DescriptorImpl() {
-            DESCRIPTOR = this;
-        }
-
-        public String getDisplayName() {
-            return Messages.FreeStyleProject_DisplayName();
-        }
-
-        public FreeStyleProject newInstance(ItemGroup parent, String name) {
-            return new FreeStyleProject(parent,name);
-        }
-
-        @Override
-        public String getDescription() {
-            return Messages.FreeStyleProject_Description();
-        }
-
-        @Override
-        public String getCategoryId() {
-            return StandaloneProjectsCategory.ID;
-        }
-
-        @Override
-        public String getIconFilePathPattern() {
-            return (Jenkins.RESOURCE_PATH + "/images/:size/freestyleproject.png").replaceFirst("^/", "");
-        }
-
-        @Override
-        public String getIconClassName() {
-            return "icon-freestyle-project";
-        }
-
         static {
             IconSet.icons.addIcon(new Icon("icon-freestyle-project icon-sm", "16x16/freestyleproject.png", Icon.ICON_SMALL_STYLE));
             IconSet.icons.addIcon(new Icon("icon-freestyle-project icon-md", "24x24/freestyleproject.png", Icon.ICON_MEDIUM_STYLE));
             IconSet.icons.addIcon(new Icon("icon-freestyle-project icon-lg", "32x32/freestyleproject.png", Icon.ICON_LARGE_STYLE));
             IconSet.icons.addIcon(new Icon("icon-freestyle-project icon-xlg", "48x48/freestyleproject.png", Icon.ICON_XLARGE_STYLE));
+        }
+
+		public DescriptorImpl() {
+            DESCRIPTOR = this;
+        }
+
+		@Override
+		public String getDisplayName() {
+            return Messages.FreeStyleProject_DisplayName();
+        }
+
+		@Override
+		public FreeStyleProject newInstance(ItemGroup parent, String name) {
+            return new FreeStyleProject(parent,name);
+        }
+
+		@Override
+        public String getDescription() {
+            return Messages.FreeStyleProject_Description();
+        }
+
+		@Override
+        public String getCategoryId() {
+            return StandaloneProjectsCategory.ID;
+        }
+
+		@Override
+        public String getIconFilePathPattern() {
+            return (Jenkins.RESOURCE_PATH + "/images/:size/freestyleproject.png").replaceFirst("^/", "");
+        }
+
+		@Override
+        public String getIconClassName() {
+            return "icon-freestyle-project";
         }
     }
 }

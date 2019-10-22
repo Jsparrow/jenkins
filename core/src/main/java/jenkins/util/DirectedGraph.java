@@ -29,6 +29,66 @@ public abstract class DirectedGraph<N> {
     protected abstract Collection<N> forward(N node);
 
     /**
+     * Performs the Tarjan's algorithm and computes strongly-connected components from the
+     * sink to source order.
+     *
+     * See http://en.wikipedia.org/wiki/Tarjan's_strongly_connected_components_algorithm
+     */
+    public List<SCC<N>> getStronglyConnectedComponents() {
+        final Map<N, Node> nodes = new HashMap<>();
+        nodes().forEach(n -> nodes.put(n, new Node(n)));
+
+        final List<SCC<N>> sccs = new ArrayList<>();
+
+        class Tarjan {
+            int index = 0;
+            int sccIndex = 0;
+            /**
+             * Nodes not yet classified for the strongly connected components
+             */
+            Stack<Node> pending = new Stack<>();
+            
+            void traverse() {
+                nodes.values().stream().filter(n -> n.index==-1).forEach(this::visit);
+            }
+            
+            void visit(Node v) {
+                v.index = v.lowlink = index++;
+                pending.push(v);
+
+                v.edges().stream().map(nodes::get).forEach(w -> {
+					if (w.index==-1) {
+                        visit(w);
+                        v.lowlink = Math.min(v.lowlink,w.lowlink);
+                    } else
+                    if (pending.contains(w)) {
+                        v.lowlink = Math.min(v.lowlink,w.index);
+                    }
+				});
+
+                if (v.lowlink != v.index) {
+					return;
+				}
+				// found a new SCC
+				SCC<N> scc = new SCC<>(sccIndex++);
+				sccs.add(scc);
+				Node w;
+				do {
+				    w = pending.pop();
+				    w.scc = scc;
+				    scc.members.add(w.n);
+				} while(w!=v);
+            }
+        }
+
+        new Tarjan().traverse();
+
+        Collections.reverse(sccs);
+
+        return sccs;
+    }
+
+	/**
      * Strongly connected component (SCC) of a graph.
      */
     public static class SCC<N> extends AbstractSet<N> {
@@ -85,71 +145,5 @@ public abstract class DirectedGraph<N> {
         Collection<N> edges() {
             return forward(n);
         }
-    }
-
-    /**
-     * Performs the Tarjan's algorithm and computes strongly-connected components from the
-     * sink to source order.
-     *
-     * See http://en.wikipedia.org/wiki/Tarjan's_strongly_connected_components_algorithm
-     */
-    public List<SCC<N>> getStronglyConnectedComponents() {
-        final Map<N, Node> nodes = new HashMap<>();
-        for (N n : nodes()) {
-            nodes.put(n,new Node(n));
-        }
-
-        final List<SCC<N>> sccs = new ArrayList<>();
-
-        class Tarjan {
-            int index = 0;
-            int sccIndex = 0;
-            /**
-             * Nodes not yet classified for the strongly connected components
-             */
-            Stack<Node> pending = new Stack<>();
-            
-            void traverse() {
-                for (Node n : nodes.values()) {
-                    if (n.index==-1)
-                        visit(n);
-                }
-            }
-            
-            void visit(Node v) {
-                v.index = v.lowlink = index++;
-                pending.push(v);
-
-                for (N q : v.edges()) {
-                    Node w = nodes.get(q);
-                    if (w.index==-1) {
-                        visit(w);
-                        v.lowlink = Math.min(v.lowlink,w.lowlink);
-                    } else
-                    if (pending.contains(w)) {
-                        v.lowlink = Math.min(v.lowlink,w.index);
-                    }
-                }
-
-                if (v.lowlink==v.index) {
-                    // found a new SCC
-                    SCC<N> scc = new SCC<>(sccIndex++);
-                    sccs.add(scc);
-
-                    Node w;
-                    do {
-                        w = pending.pop();
-                        w.scc = scc;
-                        scc.members.add(w.n);
-                    } while(w!=v);
-                }
-            }
-        }
-
-        new Tarjan().traverse();
-
-        Collections.reverse(sccs);
-
-        return sccs;
     }
 }

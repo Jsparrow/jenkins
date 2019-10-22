@@ -33,5 +33,5 @@ import java.io.IOException;
  */
 @Deprecated
 public abstract class CliAuthenticator {
-    public abstract Authentication authenticate() throws AuthenticationException, IOException, InterruptedException;
+    public abstract Authentication authenticate() throws IOException, InterruptedException;
 }

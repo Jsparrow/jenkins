@@ -40,29 +40,31 @@ import java.io.Serializable;
  */
 @ExportedBean
 public final class TimeSeries implements Serializable {
-    /**
+    private static final long serialVersionUID = 1L;
+
+	/**
      * Decay ratio. Normally 1-e for some small e.
      */
     private final float decay;
 
-    /**
+	/**
      * Historical exponential moving average data. Newer ones first.
      */
     @CopyOnWrite
     private volatile float[] history;
 
-    /**
+	/**
      * Maximum history size.
      */
     private final int historySize;
 
-    public TimeSeries(float initialValue, float decay, int historySize) {
+	public TimeSeries(float initialValue, float decay, int historySize) {
         this.history = new float[]{initialValue};
         this.decay = decay;
         this.historySize = historySize;
     }
 
-    /**
+	/**
      * Pushes a new data point.
      *
      * <p>
@@ -79,7 +81,7 @@ public final class TimeSeries implements Serializable {
         history = r;
     }
 
-    /**
+	/**
      * Gets the history data of the exponential moving average. The returned array should be treated
      * as read-only and immutable.
      *
@@ -91,7 +93,7 @@ public final class TimeSeries implements Serializable {
         return history;
     }
 
-    /**
+	/**
      * Gets the most up-to-date data point value. {@code getHistory[0]}.
      */
     @Exported
@@ -99,10 +101,8 @@ public final class TimeSeries implements Serializable {
         return history[0];
     }
 
-    @Override
+	@Override
     public String toString() {
         return Float.toString(history[0]);
     }
-
-    private static final long serialVersionUID = 1L;
 }

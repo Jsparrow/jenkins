@@ -51,15 +51,21 @@ import org.kohsuke.stapler.QueryParameter;
  */
 public abstract class ProjectNamingStrategy implements Describable<ProjectNamingStrategy>, ExtensionPoint {
 
-    public ProjectNamingStrategyDescriptor getDescriptor() {
+    /**
+     * The default naming strategy which does not restrict the name of a job.
+     */
+    public static final ProjectNamingStrategy DEFAULT_NAMING_STRATEGY = new DefaultProjectNamingStrategy();
+
+	@Override
+	public ProjectNamingStrategyDescriptor getDescriptor() {
         return (ProjectNamingStrategyDescriptor) Jenkins.get().getDescriptor(getClass());
     }
 
-    public static DescriptorExtensionList<ProjectNamingStrategy, ProjectNamingStrategyDescriptor> all() {
+	public static DescriptorExtensionList<ProjectNamingStrategy, ProjectNamingStrategyDescriptor> all() {
         return Jenkins.get().getDescriptorList(ProjectNamingStrategy.class);
     }
 
-    /**
+	/**
      * Called when creating a new job.
      * 
      * @param name
@@ -67,11 +73,11 @@ public abstract class ProjectNamingStrategy implements Describable<ProjectNaming
      * @throws Failure
      *             if the user has to be informed about an illegal name, forces the user to change the name before submitting. The message of the failure will be presented to the user.
      */
-    public void checkName(String name) throws Failure {
+    public void checkName(String name) {
         // no op
     }
 
-    /**
+	/**
      * This flag can be used to force existing jobs to be migrated to a new naming strategy - if this method returns true, the naming will be enforced at every config change. If <code>false</code> is
      * returned, only new jobs have to follow the strategy.
      * 
@@ -81,12 +87,7 @@ public abstract class ProjectNamingStrategy implements Describable<ProjectNaming
         return false;
     }
 
-    /**
-     * The default naming strategy which does not restrict the name of a job.
-     */
-    public static final ProjectNamingStrategy DEFAULT_NAMING_STRATEGY = new DefaultProjectNamingStrategy();
-
-    /**
+	/**
      * Default implementation which does not restrict the name to any form.
      */
     public static final class DefaultProjectNamingStrategy extends ProjectNamingStrategy implements Serializable {
@@ -98,7 +99,7 @@ public abstract class ProjectNamingStrategy implements Describable<ProjectNaming
         }
 
         @Override
-        public void checkName(String origName) throws Failure {
+        public void checkName(String origName) {
             // default - should just do nothing (this is how Jenkins worked before introducing this ExtensionPoint)
         }
 
@@ -153,13 +154,12 @@ public abstract class ProjectNamingStrategy implements Describable<ProjectNaming
 
         @Override
         public void checkName(String name) {
-            if (StringUtils.isNotBlank(namePattern) && StringUtils.isNotBlank(name)) {
-                if (!Pattern.matches(namePattern, name)) {
-                    throw new Failure(StringUtils.isEmpty(description) ?
-                        Messages.Hudson_JobNameConventionNotApplyed(name, namePattern) :
-                        description);
-                }
-            }
+            boolean condition = StringUtils.isNotBlank(namePattern) && StringUtils.isNotBlank(name) && !Pattern.matches(namePattern, name);
+			if (condition) {
+			    throw new Failure(StringUtils.isEmpty(description) ?
+			        Messages.Hudson_JobNameConventionNotApplyed(name, namePattern) :
+			        description);
+			}
         }
 
         public String getNamePattern() {
@@ -171,7 +171,8 @@ public abstract class ProjectNamingStrategy implements Describable<ProjectNaming
             return description;
         }
 
-        public boolean isForceExistingJobs() {
+        @Override
+		public boolean isForceExistingJobs() {
             return forceExistingJobs;
         }
 
@@ -206,7 +207,7 @@ public abstract class ProjectNamingStrategy implements Describable<ProjectNaming
         }
     }
 
-    public static abstract class ProjectNamingStrategyDescriptor extends Descriptor<ProjectNamingStrategy> {
+    public abstract static class ProjectNamingStrategyDescriptor extends Descriptor<ProjectNamingStrategy> {
     }
 
 }

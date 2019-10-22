@@ -32,9 +32,7 @@ public abstract class TransientViewActionFactory implements ExtensionPoint {
      */
 	public static List<Action> createAllFor(View v) {
 		List<Action> result = new ArrayList<>();
-		for (TransientViewActionFactory f: all()) {
-			result.addAll(f.createFor(v));
-		}
+		all().forEach(f -> result.addAll(f.createFor(v)));
 		return result;
 	}
 

@@ -382,9 +382,7 @@ public class AbstractLazyLoadRunMapTest {
     @Issue("JENKINS-18065")
     @Test
     public void entrySetContains() {
-        for (Entry<Integer, Build> e : a.entrySet()) {
-            assertTrue(a.entrySet().contains(e));
-        }
+        a.entrySet().forEach(e -> assertTrue(a.entrySet().contains(e)));
     }
 
     @Issue("JENKINS-22767")

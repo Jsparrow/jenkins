@@ -64,23 +64,25 @@ public abstract class SafeTimerTask extends TimerTask {
      */
     private static boolean ALREADY_LOGGED = false;
 
-    public final void run() {
+	private static final Logger LOGGER = Logger.getLogger(SafeTimerTask.class.getName());
+
+	@Override
+	public final void run() {
         // background activity gets system credential,
         // just like executors get it.
         SecurityContext oldContext = ACL.impersonate(ACL.SYSTEM);
         try {
             doRun();
         } catch(Throwable t) {
-            LOGGER.log(Level.SEVERE, "Timer task "+this+" failed",t);
+            LOGGER.log(Level.SEVERE, new StringBuilder().append("Timer task ").append(this).append(" failed").toString(),t);
         } finally {
             SecurityContextHolder.setContext(oldContext);
         }
     }
 
-    protected abstract void doRun() throws Exception;
+	protected abstract void doRun() throws Exception;
 
-
-    /**
+	/**
      * The root path that should be used to put logs related to the tasks running in Jenkins.
      *
      * @see AsyncAperiodicWork#getLogFile()
@@ -104,6 +106,4 @@ public abstract class SafeTimerTask extends TimerTask {
             return new File(tagsLogsPath);
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(SafeTimerTask.class.getName());
 }

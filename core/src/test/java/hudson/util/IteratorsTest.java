@@ -39,7 +39,9 @@ import org.jvnet.hudson.test.Issue;
  */
 public class IteratorsTest {
 
-    @Test
+    public static final CountingPredicate<Integer> EVEN = (index, input) -> input % 2 == 0;
+
+	@Test
     public void reverseSequence() {
         List<Integer> lst = Iterators.reverseSequence(1, 4);
         assertEquals(3,(int)lst.get(0));
@@ -48,7 +50,7 @@ public class IteratorsTest {
         assertEquals(3,lst.size());
     }
 
-    @Test
+	@Test
     public void sequence() {
         List<Integer> lst = Iterators.sequence(1,4);
         assertEquals(1,(int)lst.get(0));
@@ -57,7 +59,7 @@ public class IteratorsTest {
         assertEquals(3, lst.size());
     }
 
-    @Test
+	@Test
     public void wrap() {
         List<Integer> lst = Iterators.sequence(1,4);
         Iterable<Integer> wrapped = Iterators.wrap(lst);
@@ -72,15 +74,13 @@ public class IteratorsTest {
         assertFalse(iter.hasNext());
     }
 
-    @Test
+	@Test
     public void limit() {
         assertEquals("[0]",com.google.common.collect.Iterators.toString(Iterators.limit(asList(0,1,2,3,4).iterator(), EVEN)));
         assertEquals("[]", com.google.common.collect.Iterators.toString(Iterators.limit(asList(1,2,4,6).iterator(), EVEN)));
     }
 
-    public static final CountingPredicate<Integer> EVEN = (index, input) -> input % 2 == 0;
-
-    @Issue("JENKINS-51779")
+	@Issue("JENKINS-51779")
     @Test
     public void skip() {
         List<Integer> lst = Iterators.sequence(1, 4);

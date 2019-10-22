@@ -59,12 +59,6 @@ public class ClassicPluginStrategyTest {
     }
 
     private DetachedPlugin findPlugin(String shortName, List<DetachedPlugin> list) {
-        for (DetachedPlugin detachedPlugin : list) {
-            if (detachedPlugin.getShortName().equals(shortName)) {
-                return detachedPlugin;
-            }
-        }
-
-        return null;
+        return list.stream().filter(detachedPlugin -> detachedPlugin.getShortName().equals(shortName)).findFirst().orElse(null);
     }
 }

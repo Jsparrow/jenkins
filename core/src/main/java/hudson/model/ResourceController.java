@@ -48,15 +48,18 @@ public class ResourceController {
      * View of {@link #inProgress} that exposes its {@link ResourceList}.
      */
     private final Collection<ResourceList> resourceView = new AbstractCollection<ResourceList>() {
-        public Iterator<ResourceList> iterator() {
+        @Override
+		public Iterator<ResourceList> iterator() {
             return new AdaptedIterator<ResourceActivity,ResourceList>(inProgress.iterator()) {
-                protected ResourceList adapt(ResourceActivity item) {
+                @Override
+				protected ResourceList adapt(ResourceActivity item) {
                     return item.getResourceList();
                 }
             };
         }
 
-        public int size() {
+        @Override
+		public int size() {
             return inProgress.size();
         }
     };
@@ -97,14 +100,11 @@ public class ResourceController {
             task.run();
         } finally {
            // TODO if AsynchronousExecution, do that later
-            _withLock(new Runnable() {
-                @Override
-                public void run() {
-                    inProgress.remove(activity);
-                    inUse = ResourceList.union(resourceView);
-                    _signalAll();
-                }
-            });
+            _withLock(() -> {
+			    inProgress.remove(activity);
+			    inUse = ResourceList.union(resourceView);
+			    _signalAll();
+			});
         }
     }
 
@@ -119,12 +119,7 @@ public class ResourceController {
      */
     public boolean canRun(final ResourceList resources) {
         try {
-            return _withLock(new Callable<Boolean>() {
-                @Override
-                public Boolean call() {
-                    return !inUse.isCollidingWith(resources);
-                }
-            });
+            return _withLock(() -> !inUse.isCollidingWith(resources));
         } catch (Exception e) {
             throw new IllegalStateException("Inner callable does not throw exception");
         }
@@ -140,12 +135,7 @@ public class ResourceController {
      */
     public Resource getMissingResource(final ResourceList resources) {
         try {
-            return _withLock(new Callable<Resource>() {
-                @Override
-                public Resource call() {
-                    return resources.getConflict(inUse);
-                }
-            });
+            return _withLock(() -> resources.getConflict(inUse));
         } catch (Exception e) {
             throw new IllegalStateException("Inner callable does not throw exception");
         }
@@ -158,10 +148,7 @@ public class ResourceController {
      */
     public ResourceActivity getBlockingActivity(ResourceActivity activity) {
         ResourceList res = activity.getResourceList();
-        for (ResourceActivity a : inProgress)
-            if(res.isCollidingWith(a.getResourceList()))
-                return a;
-        return null;
+        return inProgress.stream().filter(a -> res.isCollidingWith(a.getResourceList())).findFirst().orElse(null);
     }
 
     protected void _await() throws InterruptedException {

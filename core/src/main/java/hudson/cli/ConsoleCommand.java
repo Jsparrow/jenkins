@@ -23,24 +23,25 @@ import org.apache.commons.io.IOUtils;
  */
 @Extension
 public class ConsoleCommand extends CLICommand {
-    @Override
+    @Argument(metaVar="JOB",usage="Name of the job",required=true)
+    public Job<?,?> job;
+
+	@Argument(metaVar="BUILD",usage="Build number or permalink to point to the build. Defaults to the last build",required=false,index=1)
+    public String build="lastBuild";
+
+	@Option(name="-f",usage="If the build is in progress, stay around and append console output as it comes, like 'tail -f'")
+    public boolean follow = false;
+
+	@Option(name="-n",metaVar="N",usage="Display the last N lines")
+    public int n = -1;
+
+	@Override
     public String getShortDescription() {
         return Messages.ConsoleCommand_ShortDescription();
     }
 
-    @Argument(metaVar="JOB",usage="Name of the job",required=true)
-    public Job<?,?> job;
-
-    @Argument(metaVar="BUILD",usage="Build number or permalink to point to the build. Defaults to the last build",required=false,index=1)
-    public String build="lastBuild";
-
-    @Option(name="-f",usage="If the build is in progress, stay around and append console output as it comes, like 'tail -f'")
-    public boolean follow = false;
-
-    @Option(name="-n",metaVar="N",usage="Display the last N lines")
-    public int n = -1;
-
-    protected int run() throws Exception {
+	@Override
+	protected int run() throws Exception {
         job.checkPermission(Item.READ);
 
         Run<?,?> run;
@@ -48,15 +49,17 @@ public class ConsoleCommand extends CLICommand {
         try {
             int n = Integer.parseInt(build);
             run = job.getBuildByNumber(n);
-            if (run==null)
-                throw new IllegalArgumentException("No such build #"+n);
+            if (run==null) {
+				throw new IllegalArgumentException("No such build #"+n);
+			}
         } catch (NumberFormatException e) {
             // maybe a permalink?
             Permalink p = job.getPermalinks().get(build);
             if (p!=null) {
                 run = p.resolve(job);
-                if (run==null)
-                    throw new IllegalStateException("Permalink "+build+" produced no build");
+                if (run==null) {
+					throw new IllegalStateException(new StringBuilder().append("Permalink ").append(build).append(" produced no build").toString());
+				}
             } else {
                 Permalink nearest = job.getPermalinks().findNearest(build);
                 throw new IllegalArgumentException(nearest == null ?
@@ -91,7 +94,7 @@ public class ConsoleCommand extends CLICommand {
         return 0;
     }
 
-    /**
+	/**
      * Find the byte offset in the log input stream that marks "last N lines".
      */
     private long seek(Run<?, ?> run) throws IOException {
@@ -100,8 +103,9 @@ public class ConsoleCommand extends CLICommand {
             int ptr=0;
 
             RingBuffer() {
-                for (int i=0; i<n; i++)
-                    lastNlines[i] = -1;
+                for (int i=0; i<n; i++) {
+					lastNlines[i] = -1;
+				}
             }
 
             void add(long pos) {
@@ -111,7 +115,10 @@ public class ConsoleCommand extends CLICommand {
 
             long get() {
                 long v = lastNlines[ptr];
-                if (v<0)    return lastNlines[0];   // didn't even wrap around
+                if (v<0)
+				 {
+					return lastNlines[0];   // didn't even wrap around
+				}
                 return v;
             }
         }
@@ -127,8 +134,12 @@ public class ConsoleCommand extends CLICommand {
                 for (int i=0; i<len; i++) {
                     byte ch = buf[i];
                     boolean isNL = ch=='\r' || ch=='\n';
-                    if (!isNL && prevIsNL)  rb.add(pos);
-                    if (isNL && prevIsNL && !(prev=='\r' && ch=='\n'))  rb.add(pos);
+                    if (!isNL && prevIsNL) {
+						rb.add(pos);
+					}
+                    if (isNL && prevIsNL && !(prev=='\r' && ch=='\n')) {
+						rb.add(pos);
+					}
                     pos++;
                     prev = ch;
                     prevIsNL = isNL;
@@ -139,7 +150,7 @@ public class ConsoleCommand extends CLICommand {
         }
     }
 
-    @Override
+	@Override
     protected void printUsageSummary(PrintStream stderr) {
         stderr.println(
             "Produces the console output of a specific build to stdout, as if you are doing 'cat build.log'"

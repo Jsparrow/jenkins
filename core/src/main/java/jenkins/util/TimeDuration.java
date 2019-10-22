@@ -81,9 +81,11 @@ public class TimeDuration {
     }
 
     public static class StaplerConverterImpl implements Converter {
-        public Object convert(Class type, Object value) {
-            if (value==null)
-                return null;
+        @Override
+		public Object convert(Class type, Object value) {
+            if (value==null) {
+				return null;
+			}
             if (value instanceof String) {
                 return fromString((String) value);
             }

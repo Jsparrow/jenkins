@@ -46,75 +46,93 @@ import java.util.Set;
 public abstract class ProxyInjector implements Injector {
     protected abstract Injector resolve();
 
-    public void injectMembers(Object instance) {
+    @Override
+	public void injectMembers(Object instance) {
         resolve().injectMembers(instance);
     }
 
-    public <T> MembersInjector<T> getMembersInjector(TypeLiteral<T> typeLiteral) {
+    @Override
+	public <T> MembersInjector<T> getMembersInjector(TypeLiteral<T> typeLiteral) {
         return resolve().getMembersInjector(typeLiteral);
     }
 
-    public <T> MembersInjector<T> getMembersInjector(Class<T> type) {
+    @Override
+	public <T> MembersInjector<T> getMembersInjector(Class<T> type) {
         return resolve().getMembersInjector(type);
     }
 
-    public Map<Key<?>, Binding<?>> getBindings() {
+    @Override
+	public Map<Key<?>, Binding<?>> getBindings() {
         return resolve().getBindings();
     }
 
-    public Map<Key<?>, Binding<?>> getAllBindings() {
+    @Override
+	public Map<Key<?>, Binding<?>> getAllBindings() {
         return resolve().getAllBindings();
     }
 
-    public <T> Binding<T> getBinding(Key<T> key) {
+    @Override
+	public <T> Binding<T> getBinding(Key<T> key) {
         return resolve().getBinding(key);
     }
 
-    public <T> Binding<T> getBinding(Class<T> type) {
+    @Override
+	public <T> Binding<T> getBinding(Class<T> type) {
         return resolve().getBinding(type);
     }
 
-    public <T> Binding<T> getExistingBinding(Key<T> key) {
+    @Override
+	public <T> Binding<T> getExistingBinding(Key<T> key) {
         return resolve().getExistingBinding(key);
     }
 
-    public <T> List<Binding<T>> findBindingsByType(TypeLiteral<T> type) {
+    @Override
+	public <T> List<Binding<T>> findBindingsByType(TypeLiteral<T> type) {
         return resolve().findBindingsByType(type);
     }
 
-    public <T> Provider<T> getProvider(Key<T> key) {
+    @Override
+	public <T> Provider<T> getProvider(Key<T> key) {
         return resolve().getProvider(key);
     }
 
-    public <T> Provider<T> getProvider(Class<T> type) {
+    @Override
+	public <T> Provider<T> getProvider(Class<T> type) {
         return resolve().getProvider(type);
     }
 
-    public <T> T getInstance(Key<T> key) {
+    @Override
+	public <T> T getInstance(Key<T> key) {
         return resolve().getInstance(key);
     }
 
-    public <T> T getInstance(Class<T> type) {
+    @Override
+	public <T> T getInstance(Class<T> type) {
         return resolve().getInstance(type);
     }
 
-    public Injector getParent() {
+    @Override
+	public Injector getParent() {
         return resolve().getParent();
     }
 
-    public Injector createChildInjector(Iterable<? extends Module> modules) {
+    @Override
+	public Injector createChildInjector(Iterable<? extends Module> modules) {
         return resolve().createChildInjector(modules);
     }
 
-    public Injector createChildInjector(Module... modules) {
+    @Override
+	public Injector createChildInjector(Module... modules) {
         return resolve().createChildInjector(modules);
     }
 
-    public Map<Class<? extends Annotation>, Scope> getScopeBindings() {
+    @Override
+	public Map<Class<? extends Annotation>, Scope> getScopeBindings() {
         return resolve().getScopeBindings();
     }
 
-    public Set<TypeConverterBinding> getTypeConverterBindings() {
+    @Override
+	public Set<TypeConverterBinding> getTypeConverterBindings() {
         return resolve().getTypeConverterBindings();
     }
 }

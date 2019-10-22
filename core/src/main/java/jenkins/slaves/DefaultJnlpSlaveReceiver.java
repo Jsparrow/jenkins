@@ -53,14 +53,18 @@ public class DefaultJnlpSlaveReceiver extends JnlpAgentReceiver {
     public static boolean disableStrictVerification =
             SystemProperties.getBoolean(DefaultJnlpSlaveReceiver.class.getName() + ".disableStrictVerification");
 
+	private static final Logger LOGGER = Logger.getLogger(DefaultJnlpSlaveReceiver.class.getName());
 
-    @Override
+	private static final String COOKIE_NAME = JnlpSlaveAgentProtocol2.class.getName()+".cookie";
+
+
+	@Override
     public boolean owns(String clientName) {
         Computer computer = Jenkins.get().getComputer(clientName);
         return computer != null;
     }
 
-    private static ComputerLauncher getDelegate(ComputerLauncher launcher) {
+	private static ComputerLauncher getDelegate(ComputerLauncher launcher) {
         try {
             Method getDelegate = launcher.getClass().getMethod("getDelegate");
             if (ComputerLauncher.class.isAssignableFrom(getDelegate.getReturnType())) {
@@ -80,7 +84,7 @@ public class DefaultJnlpSlaveReceiver extends JnlpAgentReceiver {
         return null;
     }
 
-    @Override
+	@Override
     public void afterProperties(@Nonnull JnlpConnectionState event) {
         String clientName = event.getProperty(JnlpConnectionState.CLIENT_NAME_KEY);
         SlaveComputer computer = (SlaveComputer) Jenkins.get().getComputer(clientName);
@@ -107,12 +111,7 @@ public class DefaultJnlpSlaveReceiver extends JnlpAgentReceiver {
                             new Object[]{clientName, computer.getLauncher().getClass()});
                     break;
                 } else {
-                    LOGGER.log(Level.WARNING, "Rejecting connection to {0} from {1} as an inbound agent as the launcher "
-                                    + "{2} does not extend JNLPLauncher or does not implement "
-                                    + "DelegatingComputerLauncher with a delegation chain leading to a JNLPLauncher. "
-                                    + "Set system property "
-                                    + "jenkins.slaves.DefaultJnlpSlaveReceiver.disableStrictVerification=true to allow"
-                                    + "connections until the plugin has been fixed.",
+                    LOGGER.log(Level.WARNING, new StringBuilder().append("Rejecting connection to {0} from {1} as an inbound agent as the launcher ").append("{2} does not extend JNLPLauncher or does not implement ").append("DelegatingComputerLauncher with a delegation chain leading to a JNLPLauncher. ").append("Set system property ").append("jenkins.slaves.DefaultJnlpSlaveReceiver.disableStrictVerification=true to allow").append("connections until the plugin has been fixed.").toString(),
                             new Object[]{clientName, event.getSocket().getRemoteSocketAddress(), computer.getLauncher().getClass()});
                     event.reject(new ConnectionRefusalException(String.format("%s is not an inbound agent", clientName)));
                     return;
@@ -142,7 +141,7 @@ public class DefaultJnlpSlaveReceiver extends JnlpAgentReceiver {
         event.setStash(new State(computer));
     }
 
-    @Override
+	@Override
     public void beforeChannel(@Nonnull JnlpConnectionState event) {
         DefaultJnlpSlaveReceiver.State state = event.getStash(DefaultJnlpSlaveReceiver.State.class);
         final SlaveComputer computer = state.getNode();
@@ -150,9 +149,7 @@ public class DefaultJnlpSlaveReceiver extends JnlpAgentReceiver {
         state.setLog(log);
         PrintWriter logw = new PrintWriter(log, true);
         logw.println("Inbound agent connected from " + event.getSocket().getInetAddress());
-        for (ChannelConfigurator cc : ChannelConfigurator.all()) {
-            cc.onChannelBuilding(event.getChannelBuilder(), computer);
-        }
+        ChannelConfigurator.all().forEach(cc -> cc.onChannelBuilding(event.getChannelBuilder(), computer));
         event.getChannelBuilder().withHeaderStream(log);
         String cookie = event.getProperty(JnlpConnectionState.COOKIE_KEY);
         if (cookie != null) {
@@ -160,7 +157,7 @@ public class DefaultJnlpSlaveReceiver extends JnlpAgentReceiver {
         }
     }
 
-    @Override
+	@Override
     public void afterChannel(@Nonnull JnlpConnectionState event) {
         DefaultJnlpSlaveReceiver.State state = event.getStash(DefaultJnlpSlaveReceiver.State.class);
         final SlaveComputer computer = state.getNode();
@@ -177,17 +174,18 @@ public class DefaultJnlpSlaveReceiver extends JnlpAgentReceiver {
         }
     }
 
-    @Override
+	@Override
     public void channelClosed(@Nonnull JnlpConnectionState event) {
         final String nodeName = event.getProperty(JnlpConnectionState.CLIENT_NAME_KEY);
         IOException cause = event.getCloseCause();
         if (cause instanceof ClosedChannelException) {
             LOGGER.log(Level.INFO, "{0} for {1} terminated: {2}", new Object[] {Thread.currentThread().getName(), nodeName, cause});
         } else if (cause != null) {
-            LOGGER.log(Level.WARNING, Thread.currentThread().getName() + " for " + nodeName + " terminated",
+            LOGGER.log(Level.WARNING, new StringBuilder().append(Thread.currentThread().getName()).append(" for ").append(nodeName).append(" terminated").toString(),
                     cause);
         }
     }
+
 
     private static class State implements JnlpConnectionState.ListenerState {
         @Nonnull
@@ -213,8 +211,4 @@ public class DefaultJnlpSlaveReceiver extends JnlpAgentReceiver {
             this.log = log;
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(DefaultJnlpSlaveReceiver.class.getName());
-
-    private static final String COOKIE_NAME = JnlpSlaveAgentProtocol2.class.getName()+".cookie";
 }

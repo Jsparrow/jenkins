@@ -34,6 +34,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Represents the components that's newly discovered during {@link ExtensionFinder#refresh()}.
@@ -43,6 +44,16 @@ import java.util.List;
  */
 public abstract class ExtensionComponentSet {
     /**
+     * Constant that has zero component in it.
+     */
+    public static final ExtensionComponentSet EMPTY = new ExtensionComponentSet() {
+        @Override
+        public <T> Collection<ExtensionComponent<T>> find(Class<T> type) {
+            return Collections.emptyList();
+        }
+    };
+
+	/**
      * Discover extensions of the given type.
      *
      * <p>
@@ -58,7 +69,7 @@ public abstract class ExtensionComponentSet {
      */
     public abstract <T> Collection<ExtensionComponent<T>> find(Class<T> type);
 
-    /**
+	/**
      * Apply {@link ExtensionFilter}s and returns a filtered set.
      */
     public final ExtensionComponentSet filtered() {
@@ -67,26 +78,13 @@ public abstract class ExtensionComponentSet {
             @Override
             public <T> Collection<ExtensionComponent<T>> find(Class<T> type) {
                 List<ExtensionComponent<T>> a = Lists.newArrayList();
-                for (ExtensionComponent<T> c : base.find(type)) {
-                    if (ExtensionFilter.isAllowed(type,c))
-                        a.add(c);
-                }
+                a.addAll(base.find(type).stream().filter(c -> ExtensionFilter.isAllowed(type,c)).collect(Collectors.toList()));
                 return a;
             }
         };
     }
 
-    /**
-     * Constant that has zero component in it.
-     */
-    public static final ExtensionComponentSet EMPTY = new ExtensionComponentSet() {
-        @Override
-        public <T> Collection<ExtensionComponent<T>> find(Class<T> type) {
-            return Collections.emptyList();
-        }
-    };
-
-    /**
+	/**
      * Computes the union of all the given delta.
      */
     public static ExtensionComponentSet union(final Collection<? extends ExtensionComponentSet> base) {
@@ -94,18 +92,17 @@ public abstract class ExtensionComponentSet {
             @Override
             public <T> Collection<ExtensionComponent<T>> find(Class<T> type) {
                 List<ExtensionComponent<T>> r = Lists.newArrayList();
-                for (ExtensionComponentSet d : base)
-                    r.addAll(d.find(type));
+                base.forEach(d -> r.addAll(d.find(type)));
                 return r;
             }
         };
     }
 
-    public static ExtensionComponentSet union(ExtensionComponentSet... members) {
+	public static ExtensionComponentSet union(ExtensionComponentSet... members) {
         return union(Arrays.asList(members));
     }
 
-    /**
+	/**
      * Wraps {@link ExtensionFinder} into {@link ExtensionComponentSet}.
      */
     public static ExtensionComponentSet allOf(final ExtensionFinder f) {

@@ -66,7 +66,7 @@ public class StandardArtifactManager extends ArtifactManager {
 
     @Override public void archive(FilePath workspace, Launcher launcher, BuildListener listener, final Map<String,String> artifacts) throws IOException, InterruptedException {
         File dir = getArtifactsDir();
-        String description = "transfer of " + artifacts.size() + " files"; // TODO improve when just one file
+        String description = new StringBuilder().append("transfer of ").append(artifacts.size()).append(" files").toString(); // TODO improve when just one file
         workspace.copyRecursiveTo(new FilePath.ExplicitlySpecifiedDirScanner(artifacts), new FilePath(dir), description, TAR_COMPRESSION);
     }
 

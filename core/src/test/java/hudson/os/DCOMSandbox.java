@@ -42,21 +42,22 @@ public class DCOMSandbox {
                 defaults.put("rpc.connectionContext","rpc.security.ntlm.NtlmConnectionContext");
         }
 
-        protected String getSyntax() {
-            return "99fcfec4-5260-101b-bbcb-00aa0021347a:0.0";
-        }
-
         public JIComOxidStub(String address, String domain, String username, String password) {
             setTransportFactory(JIComTransportFactory.getSingleTon());
             setProperties(new Properties(defaults));
             getProperties().setProperty("rpc.security.username", username);
             getProperties().setProperty("rpc.security.password", password);
             getProperties().setProperty("rpc.ntlm.domain", domain);
-            setAddress("ncacn_ip_tcp:" + address + "[135]");
+            setAddress(new StringBuilder().append("ncacn_ip_tcp:").append(address).append("[135]").toString());
 
         }
 
-        public void serverAlive() throws Exception {
+		@Override
+		protected String getSyntax() {
+            return "99fcfec4-5260-101b-bbcb-00aa0021347a:0.0";
+        }
+
+		public void serverAlive() throws Exception {
             call(Endpoint.IDEMPOTENT, new ServerAlive());
         }
     }
@@ -64,15 +65,18 @@ public class DCOMSandbox {
     static class ServerAlive extends NdrObject {
         // see http://www.hsc.fr/ressources/articles/win_net_srv/rpcss_dcom_interfaces.html
 
-        public int getOpnum() {
+        @Override
+		public int getOpnum() {
             return 3;
         }
 
-        public void write(NetworkDataRepresentation ndr) {
+        @Override
+		public void write(NetworkDataRepresentation ndr) {
             // no parameter
         }
 
-        public void read(NetworkDataRepresentation ndr) {
+        @Override
+		public void read(NetworkDataRepresentation ndr) {
             System.out.println("Got " + ndr.readUnsignedLong());
         }
     }

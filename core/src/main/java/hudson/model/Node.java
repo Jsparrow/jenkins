@@ -104,13 +104,17 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
      * Newly copied agents get this flag set, so that Jenkins doesn't try to start/remove this node until its configuration
      * is saved once.
      */
-    protected volatile transient boolean holdOffLaunchUntilSave;
+    protected transient volatile boolean holdOffLaunchUntilSave;
 
-    public String getDisplayName() {
+	private OfflineCause temporaryOfflineCause;
+
+	@Override
+	public String getDisplayName() {
         return getNodeName(); // default implementation
     }
 
-    public String getSearchUrl() {
+	@Override
+	public String getSearchUrl() {
         Computer c = toComputer();
         if (c != null) {
             return c.getUrl();
@@ -118,11 +122,11 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
         return "computer/" + Util.rawEncode(getNodeName());
     }
 
-    public boolean isHoldOffLaunchUntilSave() {
+	public boolean isHoldOffLaunchUntilSave() {
         return holdOffLaunchUntilSave;
     }
 
-    /**
+	/**
      * {@inheritDoc}
      * @since 1.635.
      */
@@ -140,7 +144,7 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
         }
     }
 
-    /**
+	/**
      * Name of this node.
      *
      * @return
@@ -150,7 +154,7 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
     @Nonnull
     public abstract String getNodeName();
 
-    /**
+	/**
      * When the user clones a {@link Node}, Hudson uses this method to change the node name right after
      * the cloned {@link Node} object is instantiated.
      *
@@ -163,13 +167,13 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
     @Deprecated
     public abstract void setNodeName(String name);
 
-    /**
+	/**
      * Human-readable description of this node.
      */
     @Exported
     public abstract String getNodeDescription();
 
-    /**
+	/**
      * Returns a {@link Launcher} for executing programs on this node.
      *
      * <p>
@@ -177,7 +181,7 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
      */
     public abstract Launcher createLauncher(TaskListener listener);
 
-    /**
+	/**
      * Returns the number of {@link Executor}s.
      *
      * This may be different from <code>getExecutors().size()</code>
@@ -186,7 +190,7 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
     @Exported
     public abstract int getNumExecutors();
 
-    /**
+	/**
      * Returns {@link Mode#EXCLUSIVE} if this node is only available
      * for those jobs that exclusively specifies this node
      * as the assigned node.
@@ -194,7 +198,7 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
     @Exported
     public abstract Mode getMode();
 
-    /**
+	/**
      * Gets the corresponding {@link Computer} object.
      *
      * @return
@@ -207,7 +211,7 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
         return ciBase.getComputer(this);
     }
 
-    /**
+	/**
      * Gets the current channel, if the node is connected and online, or null.
      *
      * This is just a convenience method for {@link Computer#getChannel()} with null check.
@@ -218,7 +222,7 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
         return c==null ? null : c.getChannel();
     }
 
-    /**
+	/**
      * Creates a new {@link Computer} object that acts as the UI peer of this {@link Node}.
      * 
      * Nobody but {@link Jenkins#updateComputerList()} should call this method.
@@ -229,7 +233,7 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
     @Restricted(ProtectedExternally.class)
     protected abstract Computer createComputer();
 
-    /**
+	/**
      * Returns {@code true} if the node is accepting tasks. Needed to allow agents programmatic suspension of task
      * scheduling that does not overlap with being offline. Called by {@link Computer#isAcceptingTasks()}.
      * This method is distinct from {@link Computer#isAcceptingTasks()} as sometimes the {@link Node} concrete
@@ -243,27 +247,7 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
         return true;
     }
 
-    /**
-     * Let Nodes be aware of the lifecycle of their own {@link Computer}.
-     */
-    @Extension
-    public static class InternalComputerListener extends ComputerListener {
-        @Override
-        public void onOnline(Computer c, TaskListener listener) {
-            Node node = c.getNode();
-
-            // At startup, we need to restore any previously in-effect temp offline cause.
-            // We wait until the computer is started rather than getting the data to it sooner
-            // so that the normal computer start up processing works as expected.
-            if (node!= null && node.temporaryOfflineCause != null && node.temporaryOfflineCause != c.getOfflineCause()) {
-                c.setTemporarilyOffline(true, node.temporaryOfflineCause);
-            }
-        }
-    }
-
-    private OfflineCause temporaryOfflineCause;
-
-    /**
+	/**
      * Enable a {@link Computer} to inform its node when it is taken
      * temporarily offline.
      */
@@ -278,17 +262,14 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
         }
     }
 
-    /**
+	/**
      * Return the possibly empty tag cloud for the labels of this node.
      */
     public TagCloud<LabelAtom> getLabelCloud() {
-        return new TagCloud<>(getAssignedLabels(), new WeightFunction<LabelAtom>() {
-            public float weight(LabelAtom item) {
-                return item.getTiedJobCount();
-            }
-        });
+        return new TagCloud<>(getAssignedLabels(), LabelAtom::getTiedJobCount);
     }
-    /**
+
+	/**
      * Returns the possibly empty set of labels that are assigned to this node,
      * including the automatic {@link #getSelfLabel() self label}, manually
      * assigned labels and dynamically assigned labels via the
@@ -306,7 +287,7 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
         return Collections.unmodifiableSet(r);
     }
 
-    /**
+	/**
      * Return all the labels assigned dynamically to this node.
      * This calls all the LabelFinder implementations with the node converts
      * the results into Labels.
@@ -314,17 +295,14 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
      */
     private HashSet<LabelAtom> getDynamicLabels() {
         HashSet<LabelAtom> result = new HashSet<>();
-        for (LabelFinder labeler : LabelFinder.all()) {
-            // Filter out any bad(null) results from plugins
-            // for compatibility reasons, findLabels may return LabelExpression and not atom.
-            for (Label label : labeler.findLabels(this))
-                if (label instanceof LabelAtom) result.add((LabelAtom)label);
-        }
+        // Filter out any bad(null) results from plugins
+		// for compatibility reasons, findLabels may return LabelExpression and not atom.
+		LabelFinder.all().forEach(labeler -> labeler.findLabels(this).stream().filter(label -> label instanceof LabelAtom)
+				.forEach(label -> result.add((LabelAtom) label)));
         return result;
     }
 
-
-    /**
+	/**
      * Returns the manually configured label for a node. The list of assigned
      * and dynamically determined labels is available via
      * {@link #getAssignedLabels()} and includes all labels that have been
@@ -334,7 +312,7 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
      */
     public abstract String getLabelString();
 
-    /**
+	/**
      * Sets the label string for a node. This value will be returned by {@link #getLabelString()}.
      *
      * @param labelString
@@ -345,7 +323,7 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
         throw new UnsupportedOperationException();
     }
 
-    /**
+	/**
      * Gets the special label that represents this node itself.
      */
     @Nonnull
@@ -354,7 +332,7 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
         return LabelAtom.get(getNodeName());
     }
 
-    /**
+	/**
      * Called by the {@link Queue} to determine whether or not this node can
      * take the given task. The default checks include whether or not this node
      * is part of the task's assigned label, whether this node is in
@@ -371,7 +349,7 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
         return null;
     }
 
-    /**
+	/**
      * Called by the {@link Queue} to determine whether or not this node can
      * take the given task. The default checks include whether or not this node
      * is part of the task's assigned label, whether this node is in
@@ -384,18 +362,19 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
     public CauseOfBlockage canTake(Queue.BuildableItem item) {
         Label l = item.getAssignedLabel();
         if(l!=null && !l.contains(this))
-            return CauseOfBlockage.fromMessage(Messages._Node_LabelMissing(getDisplayName(), l));   // the task needs to be executed on label that this node doesn't have.
+		 {
+			return CauseOfBlockage.fromMessage(Messages._Node_LabelMissing(getDisplayName(), l));   // the task needs to be executed on label that this node doesn't have.
+		}
 
-        if(l==null && getMode()== Mode.EXCLUSIVE) {
-            // flyweight tasks need to get executed somewhere, if every node
-            if (!(item.task instanceof Queue.FlyweightTask && (
-                    this instanceof Jenkins
-                            || Jenkins.get().getNumExecutors() < 1
-                            || Jenkins.get().getMode() == Mode.EXCLUSIVE)
-            )) {
-                return CauseOfBlockage.fromMessage(Messages._Node_BecauseNodeIsReserved(getDisplayName()));   // this node is reserved for tasks that are tied to it
-            }
-        }
+        boolean condition = l==null && getMode()== Mode.EXCLUSIVE && !(item.task instanceof Queue.FlyweightTask && (
+		        this instanceof Jenkins
+		                || Jenkins.get().getNumExecutors() < 1
+		                || Jenkins.get().getMode() == Mode.EXCLUSIVE)
+		);
+		// flyweight tasks need to get executed somewhere, if every node
+		if(condition) {
+		    return CauseOfBlockage.fromMessage(Messages._Node_BecauseNodeIsReserved(getDisplayName()));   // this node is reserved for tasks that are tied to it
+		}
 
         Authentication identity = item.authenticate();
         if (!(SKIP_BUILD_CHECK_ON_FLYWEIGHTS && item.task instanceof Queue.FlyweightTask) && !hasPermission(identity, Computer.BUILD)) {
@@ -407,7 +386,9 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
         // taking the task
         for (NodeProperty prop: getNodeProperties()) {
             CauseOfBlockage c = prop.canTake(item);
-            if (c!=null)    return c;
+            if (c!=null) {
+				return c;
+			}
         }
 
         if (!isAcceptingTasks()) {
@@ -418,7 +399,7 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
         return null;
     }
 
-    /**
+	/**
      * Returns a "workspace" directory for the given {@link TopLevelItem}.
      *
      * <p>
@@ -431,7 +412,7 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
     // TODO: should this be modified now that getWorkspace is moved from AbstractProject to AbstractBuild?
     public abstract @CheckForNull FilePath getWorkspaceFor(TopLevelItem item);
 
-    /**
+	/**
      * Gets the root directory of this node.
      *
      * <p>
@@ -444,26 +425,29 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
      */
     public abstract @CheckForNull FilePath getRootPath();
 
-    /**
+	/**
      * Gets the {@link FilePath} on this node.
      */
     public @CheckForNull FilePath createPath(String absolutePath) {
         VirtualChannel ch = getChannel();
-        if(ch==null)    return null;    // offline
+        if(ch==null)
+		 {
+			return null;    // offline
+		}
         return new FilePath(ch,absolutePath);
     }
 
-    public FileSystemProvisioner getFileSystemProvisioner() {
+	public FileSystemProvisioner getFileSystemProvisioner() {
         // TODO: make this configurable or auto-detectable or something else
         return FileSystemProvisioner.DEFAULT;
     }
 
-    /**
+	/**
      * Gets the {@link NodeProperty} instances configured for this {@link Node}.
      */
     public abstract @Nonnull DescribableList<NodeProperty<?>, NodePropertyDescriptor> getNodeProperties();
 
-    /**
+	/**
      * Gets the specified property or null if the property is not configured for this Node.
      * 
      * @param clazz the type of the property
@@ -483,7 +467,7 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
         return null;      
     }
 
-    /**
+	/**
      * Gets the property from the given classname or null if the property 
      * is not configured for this Node.
      * 
@@ -504,17 +488,21 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
         return null;      
     }
 
-    // used in the Jelly script to expose descriptors
+	// used in the Jelly script to expose descriptors
     public List<NodePropertyDescriptor> getNodePropertyDescriptors() {
         return NodeProperty.for_(this);
     }
 
-    public ACL getACL() {
+	@Override
+	public ACL getACL() {
         return Jenkins.get().getAuthorizationStrategy().getACL(this);
     }
 
-    public Node reconfigure(final StaplerRequest req, JSONObject form) throws FormException {
-        if (form==null)     return null;
+	@Override
+	public Node reconfigure(final StaplerRequest req, JSONObject form) throws FormException {
+        if (form==null) {
+			return null;
+		}
 
         final JSONObject jsonForProperties = form.optJSONObject("nodeProperties");
         final AtomicReference<BindInterceptor> old = new AtomicReference<>();
@@ -529,9 +517,7 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
                     DescribableList<NodeProperty<?>, NodePropertyDescriptor> tmp = new DescribableList<>(Saveable.NOOP, getNodeProperties().toList());
                     tmp.rebuild(req, jsonForProperties, NodeProperty.all());
                     return tmp.toList();
-                } catch (FormException e) {
-                    throw new IllegalArgumentException(e);
-                } catch (IOException e) {
+                } catch (IOException | FormException e) {
                     throw new IllegalArgumentException(e);
                 }
             }
@@ -544,9 +530,10 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
         }
     }
 
-    public abstract NodeDescriptor getDescriptor();
+	@Override
+	public abstract NodeDescriptor getDescriptor();
 
-    /**
+	/**
      * Estimates the clock difference with this agent.
      *
      * @return
@@ -556,13 +543,14 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
      */
     public ClockDifference getClockDifference() throws IOException, InterruptedException {
         VirtualChannel channel = getChannel();
-        if(channel==null)
-            throw new IOException(getNodeName()+" is offline");
+        if(channel==null) {
+			throw new IOException(getNodeName()+" is offline");
+		}
 
         return channel.call(getClockDifferenceCallable());
     }
 
-    /**
+	/**
      * Returns a {@link Callable} that when run on the channel, estimates the clock difference.
      *
      * @return
@@ -571,7 +559,7 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
      */
     public abstract Callable<ClockDifference,IOException> getClockDifferenceCallable();
 
-    /**
+	/**
      * Constants that control how Hudson allocates jobs to agents.
      */
     public enum Mode {
@@ -594,6 +582,24 @@ public abstract class Node extends AbstractModelObject implements Reconfigurable
 
         static {
             Stapler.CONVERT_UTILS.register(new EnumConverter(), Mode.class);
+        }
+    }
+
+    /**
+     * Let Nodes be aware of the lifecycle of their own {@link Computer}.
+     */
+    @Extension
+    public static class InternalComputerListener extends ComputerListener {
+        @Override
+        public void onOnline(Computer c, TaskListener listener) {
+            Node node = c.getNode();
+
+            // At startup, we need to restore any previously in-effect temp offline cause.
+            // We wait until the computer is started rather than getting the data to it sooner
+            // so that the normal computer start up processing works as expected.
+            if (node!= null && node.temporaryOfflineCause != null && node.temporaryOfflineCause != c.getOfflineCause()) {
+                c.setTemporarilyOffline(true, node.temporaryOfflineCause);
+            }
         }
     }
 

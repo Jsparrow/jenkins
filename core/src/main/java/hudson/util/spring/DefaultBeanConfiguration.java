@@ -27,6 +27,7 @@ import org.springframework.beans.factory.support.ChildBeanDefinition;
 import org.springframework.beans.factory.support.RootBeanDefinition;
 
 import java.util.*;
+import java.util.Collections;
 
 /**
  * Default implementation of the BeanConfiguration interface
@@ -50,82 +51,8 @@ class DefaultBeanConfiguration extends GroovyObjectSupport implements BeanConfig
     private static final String PARENT = "parent";
     private static final String BY_TYPE = "byType";
     private static final String BY_CONSTRUCTOR = "constructor";
-    private static final Set<String> DYNAMIC_PROPS = new HashSet<>(Arrays.asList(AUTOWIRE, CONSTRUCTOR_ARGS, DESTROY_METHOD, FACTORY_BEAN, FACTORY_METHOD, INIT_METHOD, BY_NAME, BY_TYPE, BY_CONSTRUCTOR));
+    private static final Set<String> DYNAMIC_PROPS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(AUTOWIRE, CONSTRUCTOR_ARGS, DESTROY_METHOD, FACTORY_BEAN, FACTORY_METHOD, INIT_METHOD, BY_NAME, BY_TYPE, BY_CONSTRUCTOR)));
     private String parentName;
-
-    @Override
-    public Object getProperty(String property) {
-		getBeanDefinition();
-		if(wrapper.isReadableProperty(property)) {
-			return wrapper.getPropertyValue(property);
-		}
-		else if(DYNAMIC_PROPS.contains(property)) {
-			return null;
-		}
-		return super.getProperty(property);
-	}
-
-    @Override
-    public void setProperty(String property, Object newValue) {
-        if(PARENT.equals(property)) {
-            setParent(newValue);
-        }
-        else {
-            AbstractBeanDefinition bd = getBeanDefinition();
-            if(AUTOWIRE.equals(property)) {
-                if(BY_NAME.equals(newValue)) {
-                    bd.setAutowireMode(AutowireCapableBeanFactory.AUTOWIRE_BY_NAME);
-                }
-                else if(BY_TYPE.equals(newValue)) {
-                    bd.setAutowireMode(AutowireCapableBeanFactory.AUTOWIRE_BY_TYPE);
-                }
-                else if(Boolean.TRUE.equals(newValue)) {
-                    bd.setAutowireMode(AutowireCapableBeanFactory.AUTOWIRE_BY_NAME);
-                }
-                else if(BY_CONSTRUCTOR.equals(newValue)) {
-                    bd.setAutowireMode(AutowireCapableBeanFactory.AUTOWIRE_CONSTRUCTOR);
-                }
-            }
-            // constructorArgs
-            else if(CONSTRUCTOR_ARGS.equals(property) && newValue instanceof List) {
-                ConstructorArgumentValues cav = new ConstructorArgumentValues();
-                List args = (List)newValue;
-                for (Object e : args) {
-                    cav.addGenericArgumentValue(e);
-                }
-                bd.setConstructorArgumentValues(cav);
-            }
-            // destroyMethod
-            else if(DESTROY_METHOD.equals(property)) {
-                if(newValue != null)
-                    bd.setDestroyMethodName(newValue.toString());
-            }
-            // factoryBean
-            else if(FACTORY_BEAN.equals(property)) {
-                if(newValue != null)
-                    bd.setFactoryBeanName(newValue.toString());
-            }
-            // factoryMethod
-            else if(FACTORY_METHOD.equals(property)) {
-                if(newValue != null)
-                    bd.setFactoryMethodName(newValue.toString());
-            }
-            // initMethod
-            else if(INIT_METHOD.equals(property)) {
-                if(newValue != null)
-                    bd.setInitMethodName(newValue.toString());
-            }
-            else if(wrapper.isWritableProperty(property)) {
-
-                wrapper.setPropertyValue(property, newValue);
-            }
-            // autowire
-            else {
-                super.setProperty(property, newValue);
-            }
-        }
-	}
-
 	private Class clazz;
 	private String name;
 	private boolean singleton = true;
@@ -167,17 +94,98 @@ class DefaultBeanConfiguration extends GroovyObjectSupport implements BeanConfig
 		this.constructorArgs = constructorArguments;
 	}
 
+	@Override
+    public Object getProperty(String property) {
+		getBeanDefinition();
+		if(wrapper.isReadableProperty(property)) {
+			return wrapper.getPropertyValue(property);
+		}
+		else if(DYNAMIC_PROPS.contains(property)) {
+			return null;
+		}
+		return super.getProperty(property);
+	}
+
+	@Override
+    public void setProperty(String property, Object newValue) {
+        if(PARENT.equals(property)) {
+            setParent(newValue);
+        }
+        else {
+            AbstractBeanDefinition bd = getBeanDefinition();
+            if(AUTOWIRE.equals(property)) {
+                if(BY_NAME.equals(newValue)) {
+                    bd.setAutowireMode(AutowireCapableBeanFactory.AUTOWIRE_BY_NAME);
+                }
+                else if(BY_TYPE.equals(newValue)) {
+                    bd.setAutowireMode(AutowireCapableBeanFactory.AUTOWIRE_BY_TYPE);
+                }
+                else if(Boolean.TRUE.equals(newValue)) {
+                    bd.setAutowireMode(AutowireCapableBeanFactory.AUTOWIRE_BY_NAME);
+                }
+                else if(BY_CONSTRUCTOR.equals(newValue)) {
+                    bd.setAutowireMode(AutowireCapableBeanFactory.AUTOWIRE_CONSTRUCTOR);
+                }
+            }
+            // constructorArgs
+            else if(CONSTRUCTOR_ARGS.equals(property) && newValue instanceof List) {
+                ConstructorArgumentValues cav = new ConstructorArgumentValues();
+                List args = (List)newValue;
+                for (Object e : args) {
+                    cav.addGenericArgumentValue(e);
+                }
+                bd.setConstructorArgumentValues(cav);
+            }
+            // destroyMethod
+            else if(DESTROY_METHOD.equals(property)) {
+                if(newValue != null) {
+					bd.setDestroyMethodName(newValue.toString());
+				}
+            }
+            // factoryBean
+            else if(FACTORY_BEAN.equals(property)) {
+                if(newValue != null) {
+					bd.setFactoryBeanName(newValue.toString());
+				}
+            }
+            // factoryMethod
+            else if(FACTORY_METHOD.equals(property)) {
+                if(newValue != null) {
+					bd.setFactoryMethodName(newValue.toString());
+				}
+            }
+            // initMethod
+            else if(INIT_METHOD.equals(property)) {
+                if(newValue != null) {
+					bd.setInitMethodName(newValue.toString());
+				}
+            }
+            else if(wrapper.isWritableProperty(property)) {
+
+                wrapper.setPropertyValue(property, newValue);
+            }
+            // autowire
+            else {
+                super.setProperty(property, newValue);
+            }
+        }
+	}
+
+	@Override
 	public String getName() {
 		return this.name;
 	}
 
+	@Override
 	public boolean isSingleton() {
 		return this.singleton ;
 	}
 
+	@Override
 	public AbstractBeanDefinition getBeanDefinition() {
-		if (definition == null)
+		if (definition == null) {
 			definition = createBeanDefinition();
+		}
 		return definition;
 	}
 
@@ -210,6 +218,7 @@ class DefaultBeanConfiguration extends GroovyObjectSupport implements BeanConfig
 		return bd;
 	}
 
+	@Override
 	public BeanConfiguration addProperty(String propertyName, Object propertyValue) {
 		if(propertyValue instanceof BeanConfiguration) {
 			propertyValue = ((BeanConfiguration)propertyValue).getBeanDefinition();
@@ -221,27 +230,32 @@ class DefaultBeanConfiguration extends GroovyObjectSupport implements BeanConfig
 		return this;
 	}
 
+	@Override
 	public BeanConfiguration setDestroyMethod(String methodName) {
 		getBeanDefinition().setDestroyMethodName(methodName);
 		return this;
 	}
 
+	@Override
 	public BeanConfiguration setDependsOn(String[] dependsOn) {
 		getBeanDefinition().setDependsOn(dependsOn);
 		return this;
 	}
 
+	@Override
 	public BeanConfiguration setFactoryBean(String beanName) {
 		getBeanDefinition().setFactoryBeanName(beanName);
 
 		return this;
 	}
 
+	@Override
 	public BeanConfiguration setFactoryMethod(String methodName) {
 		getBeanDefinition().setFactoryMethodName(methodName);
 		return this;
 	}
 
+	@Override
 	public BeanConfiguration setAutowire(String type) {
 		if("byName".equals(type)) {
 			getBeanDefinition().setAutowireMode(AbstractBeanDefinition.AUTOWIRE_BY_NAME);
@@ -252,10 +266,12 @@ class DefaultBeanConfiguration extends GroovyObjectSupport implements BeanConfig
 		return this;
 	}
 
-    public void setName(String beanName) {
+	@Override
+	public void setName(String beanName) {
         this.name = beanName;
     }
 
+	@Override
 	public Object getPropertyValue(String name) {
 		return getBeanDefinition()
 					.getPropertyValues()
@@ -263,24 +279,30 @@ class DefaultBeanConfiguration extends GroovyObjectSupport implements BeanConfig
 					.getValue();
 	}
 
+	@Override
 	public boolean hasProperty(String name) {
 		return getBeanDefinition().getPropertyValues().contains(name);
 	}
 
+	@Override
 	public void setPropertyValue(String property, Object newValue) {
 		getBeanDefinition().getPropertyValues().addPropertyValue(property, newValue);
 	}
 
-    public BeanConfiguration setAbstract(boolean isAbstract) {
+	@Override
+	public BeanConfiguration setAbstract(boolean isAbstract) {
         getBeanDefinition().setAbstract(isAbstract);
         return this;
     }
 
-    public void setParent(Object obj) {
-        if(obj == null) throw new IllegalArgumentException("Parent bean cannot be set to a null runtime bean reference!");
-        if(obj instanceof String)
-            this.parentName = (String)obj;
-        else if(obj instanceof RuntimeBeanReference) {
+	@Override
+	public void setParent(Object obj) {
+        if(obj == null) {
+			throw new IllegalArgumentException("Parent bean cannot be set to a null runtime bean reference!");
+		}
+        if(obj instanceof String) {
+			this.parentName = (String)obj;
+		} else if(obj instanceof RuntimeBeanReference) {
             this.parentName = ((RuntimeBeanReference)obj).getBeanName();
         }
         else if(obj instanceof BeanConfiguration) {

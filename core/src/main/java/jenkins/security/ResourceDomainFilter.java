@@ -37,6 +37,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.logging.Logger;
+import java.util.Collections;
 
 /**
  * Prohibit requests to Jenkins coming through a resource domain URL configured with
@@ -49,7 +50,7 @@ public class ResourceDomainFilter implements Filter {
 
     private static final Logger LOGGER = Logger.getLogger(ResourceDomainFilter.class.getName());
 
-    private static final Set<String> ALLOWED_PATHS = new HashSet<>(Arrays.asList("/" + ResourceDomainRootAction.URL, "/favicon.ico", "/robots.txt"));
+    private static final Set<String> ALLOWED_PATHS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList("/" + ResourceDomainRootAction.URL, "/favicon.ico", "/robots.txt")));
     public static final String ERROR_RESPONSE = "Jenkins serves only static files on this domain.";
 
     @Initializer(after = InitMilestone.EXTENSIONS_AUGMENTED)
@@ -66,11 +67,11 @@ public class ResourceDomainFilter implements Filter {
             if (ResourceDomainConfiguration.isResourceRequest(httpServletRequest)) {
                 String path = httpServletRequest.getPathInfo();
                 if (!path.startsWith("/" + ResourceDomainRootAction.URL + "/") && !ALLOWED_PATHS.contains(path)) {
-                    LOGGER.fine(() -> "Rejecting request to " + httpServletRequest.getRequestURL() + " from " + httpServletRequest.getRemoteAddr() + " on resource domain");
+                    LOGGER.fine(() -> new StringBuilder().append("Rejecting request to ").append(httpServletRequest.getRequestURL()).append(" from ").append(httpServletRequest.getRemoteAddr()).append(" on resource domain").toString());
                     httpServletResponse.sendError(404, ERROR_RESPONSE);
                     return;
                 }
-                LOGGER.finer(() -> "Accepting request to " + httpServletRequest.getRequestURL() + " from " + httpServletRequest.getRemoteAddr() + " on resource domain");
+                LOGGER.finer(() -> new StringBuilder().append("Accepting request to ").append(httpServletRequest.getRequestURL()).append(" from ").append(httpServletRequest.getRemoteAddr()).append(" on resource domain").toString());
             }
         }
         filterChain.doFilter(servletRequest, servletResponse);

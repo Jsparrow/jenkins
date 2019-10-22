@@ -110,7 +110,8 @@ public class UnlabeledLoadStatistics extends LoadStatistics {
             return n != null && n.getMode() == Mode.NORMAL;
         }
 
-        public void remove() {
+        @Override
+		public void remove() {
             // why does Iterators.FilterIterator do the stupid thing and allow remove?
             // (remove should remove the object last returned by next(), but it won't if hasNext() is called
             // the way Iterators.FilterIterator is written... it should just return a read-only

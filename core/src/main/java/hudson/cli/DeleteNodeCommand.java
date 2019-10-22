@@ -65,7 +65,7 @@ public class DeleteNodeCommand extends CLICommand {
                 node = jenkins.getNode(node_s);
 
                 if (node == null) {
-                    throw new IllegalArgumentException("No such node '" + node_s + "'");
+                    throw new IllegalArgumentException(new StringBuilder().append("No such node '").append(node_s).append("'").toString());
                 }
 
                 node.toComputer().doDoDelete();
@@ -74,7 +74,7 @@ public class DeleteNodeCommand extends CLICommand {
                     throw e;
                 }
 
-                final String errorMsg = node_s + ": " + e.getMessage();
+                final String errorMsg = new StringBuilder().append(node_s).append(": ").append(e.getMessage()).toString();
                 stderr.println(errorMsg);
                 errorOccurred = true;
                 continue;

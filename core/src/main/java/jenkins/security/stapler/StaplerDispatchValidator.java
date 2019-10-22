@@ -91,29 +91,28 @@ public class StaplerDispatchValidator implements DispatchValidator {
      * Escape hatch to disable dispatch validation.
      */
     public static /* script-console editable */ boolean DISABLED = SystemProperties.getBoolean(ESCAPE_HATCH);
+	private final ValidatorCache cache;
 
-    private static @CheckForNull Boolean setStatus(@Nonnull StaplerRequest req, @CheckForNull Boolean status) {
-        if (status == null) {
-            return null;
-        }
-        LOGGER.fine(() -> "Request dispatch set status to " + status + " for URL " + req.getPathInfo());
-        req.setAttribute(ATTRIBUTE_NAME, status);
-        return status;
-    }
-
-    private static @CheckForNull Boolean computeStatusIfNull(@Nonnull StaplerRequest req, @Nonnull Supplier<Boolean> statusIfNull) {
-        Object requestStatus = req.getAttribute(ATTRIBUTE_NAME);
-        return requestStatus instanceof Boolean ? (Boolean) requestStatus : setStatus(req, statusIfNull.get());
-    }
-
-    private final ValidatorCache cache;
-
-    public StaplerDispatchValidator() {
+	public StaplerDispatchValidator() {
         cache = new ValidatorCache();
         cache.load();
     }
 
-    @Override
+	private static @CheckForNull Boolean setStatus(@Nonnull StaplerRequest req, @CheckForNull Boolean status) {
+        if (status == null) {
+            return null;
+        }
+        LOGGER.fine(() -> new StringBuilder().append("Request dispatch set status to ").append(status).append(" for URL ").append(req.getPathInfo()).toString());
+        req.setAttribute(ATTRIBUTE_NAME, status);
+        return status;
+    }
+
+	private static @CheckForNull Boolean computeStatusIfNull(@Nonnull StaplerRequest req, @Nonnull Supplier<Boolean> statusIfNull) {
+        Object requestStatus = req.getAttribute(ATTRIBUTE_NAME);
+        return requestStatus instanceof Boolean ? (Boolean) requestStatus : setStatus(req, statusIfNull.get());
+    }
+
+	@Override
     public @CheckForNull Boolean isDispatchAllowed(@Nonnull StaplerRequest req, @Nonnull StaplerResponse rsp) {
         if (DISABLED) {
             return true;
@@ -127,17 +126,17 @@ public class StaplerDispatchValidator implements DispatchValidator {
             }
             return null;
         });
-        LOGGER.finer(() -> req.getRequestURI() + " -> " + status);
+        LOGGER.finer(() -> new StringBuilder().append(req.getRequestURI()).append(" -> ").append(status).toString());
         return status;
     }
 
-    @Override
+	@Override
     public @CheckForNull Boolean isDispatchAllowed(@Nonnull StaplerRequest req, @Nonnull StaplerResponse rsp, @Nonnull String viewName, @CheckForNull Object node) {
         if (DISABLED) {
             return true;
         }
         Boolean status = computeStatusIfNull(req, () -> {
-            if (viewName.equals("index")) {
+            if ("index".equals(viewName)) {
                 return true;
             }
             if (node == null) {
@@ -145,11 +144,12 @@ public class StaplerDispatchValidator implements DispatchValidator {
             }
             return cache.find(node.getClass()).isViewValid(viewName);
         });
-        LOGGER.finer(() -> "<" + req.getRequestURI() + ", " + viewName + ", " + node + "> -> " + status);
+        LOGGER.finer(() -> new StringBuilder().append("<").append(req.getRequestURI()).append(", ").append(viewName).append(", ").append(node)
+				.append("> -> ").append(status).toString());
         return status;
     }
 
-    @Override
+	@Override
     public void allowDispatch(@Nonnull StaplerRequest req, @Nonnull StaplerResponse rsp) {
         if (DISABLED) {
             return;
@@ -157,24 +157,25 @@ public class StaplerDispatchValidator implements DispatchValidator {
         setStatus(req, true);
     }
 
-    @Override
-    public void requireDispatchAllowed(@Nonnull StaplerRequest req, @Nonnull StaplerResponse rsp) throws CancelRequestHandlingException {
+	@Override
+    public void requireDispatchAllowed(@Nonnull StaplerRequest req, @Nonnull StaplerResponse rsp) {
         if (DISABLED) {
             return;
         }
         Boolean status = isDispatchAllowed(req, rsp);
-        if (status == null || !status) {
-            LOGGER.fine(() -> "Cancelling dispatch for " + req.getRequestURI());
-            throw new CancelRequestHandlingException();
-        }
+        if (!(status == null || !status)) {
+			return;
+		}
+		LOGGER.fine(() -> "Cancelling dispatch for " + req.getRequestURI());
+		throw new CancelRequestHandlingException();
     }
 
-    @VisibleForTesting
+	@VisibleForTesting
     static StaplerDispatchValidator getInstance(@Nonnull ServletContext context) {
         return (StaplerDispatchValidator) WebApp.get(context).getDispatchValidator();
     }
 
-    @VisibleForTesting
+	@VisibleForTesting
     void loadWhitelist(@Nonnull InputStream in) throws IOException {
         cache.loadWhitelist(IOUtils.readLines(in));
     }
@@ -249,7 +250,7 @@ public class StaplerDispatchValidator implements DispatchValidator {
                 try {
                     return findParents(loader.loadClass(className));
                 } catch (ClassNotFoundException e) {
-                    LOGGER.log(Level.WARNING, e, () -> "Could not load class " + className + " to validate views");
+                    LOGGER.log(Level.WARNING, e, () -> new StringBuilder().append("Could not load class ").append(className).append(" to validate views").toString());
                     return Collections.emptySet();
                 }
             });

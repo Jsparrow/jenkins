@@ -28,8 +28,12 @@ public class ServerTcpPort {
      * Parses the value back into the port number
      */
     public int getPort() {
-        if (type.equals("fixed"))   return value;
-        if (type.equals("random"))  return 0;
+        if ("fixed".equals(type)) {
+			return value;
+		}
+        if ("random".equals(type)) {
+			return 0;
+		}
         return -1;
     }
 }

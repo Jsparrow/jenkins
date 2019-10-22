@@ -68,47 +68,60 @@ import java.util.TreeMap;
  */
 public final class RemotingDiagnostics {
     public static Map<Object,Object> getSystemProperties(VirtualChannel channel) throws IOException, InterruptedException {
-        if(channel==null)
-            return Collections.singletonMap("N/A","N/A");
+        if(channel==null) {
+			return Collections.singletonMap("N/A","N/A");
+		}
         return channel.call(new GetSystemProperties());
     }
 
-    private static final class GetSystemProperties extends MasterToSlaveCallable<Map<Object,Object>,RuntimeException> {
-        public Map<Object,Object> call() {
-            return new TreeMap<>(System.getProperties());
-        }
-        private static final long serialVersionUID = 1L;
-    }
-
     public static Map<String,String> getThreadDump(VirtualChannel channel) throws IOException, InterruptedException {
-        if(channel==null)
-            return Collections.singletonMap("N/A","N/A");
+        if(channel==null) {
+			return Collections.singletonMap("N/A","N/A");
+		}
         return channel.call(new GetThreadDump());
     }
 
-    public static Future<Map<String,String>> getThreadDumpAsync(VirtualChannel channel) throws IOException, InterruptedException {
-        if(channel==null)
-            return new AsyncFutureImpl<>(Collections.singletonMap("N/A", "offline"));
+	public static Future<Map<String,String>> getThreadDumpAsync(VirtualChannel channel) throws IOException, InterruptedException {
+        if(channel==null) {
+			return new AsyncFutureImpl<>(Collections.singletonMap("N/A", "offline"));
+		}
         return channel.callAsync(new GetThreadDump());
     }
 
-    private static final class GetThreadDump extends MasterToSlaveCallable<Map<String,String>,RuntimeException> {
-        public Map<String,String> call() {
-            Map<String,String> r = new LinkedHashMap<>();
-                ThreadInfo[] data = Functions.getThreadInfos();
-                Functions.ThreadGroupMap map = Functions.sortThreadsAndGetGroupMap(data);
-                for (ThreadInfo ti : data)
-                    r.put(ti.getThreadName(),Functions.dumpThreadInfo(ti,map));
-            return r;
-        }
-        private static final long serialVersionUID = 1L;
-    }
-
-    /**
+	/**
      * Executes Groovy script remotely.
      */
     public static String executeGroovy(String script, @Nonnull VirtualChannel channel) throws IOException, InterruptedException {
         return channel.call(new Script(script));
+    }
+
+	/**
+     * Obtains the heap dump in an HPROF file.
+     */
+    public static FilePath getHeapDump(VirtualChannel channel) throws IOException, InterruptedException {
+        return channel.call(new GetHeapDump());
+    }
+
+	private static final class GetSystemProperties extends MasterToSlaveCallable<Map<Object,Object>,RuntimeException> {
+        private static final long serialVersionUID = 1L;
+		@Override
+		public Map<Object,Object> call() {
+            return new TreeMap<>(System.getProperties());
+        }
+    }
+
+    private static final class GetThreadDump extends MasterToSlaveCallable<Map<String,String>,RuntimeException> {
+        private static final long serialVersionUID = 1L;
+		@Override
+		public Map<String,String> call() {
+            Map<String,String> r = new LinkedHashMap<>();
+                ThreadInfo[] data = Functions.getThreadInfos();
+                Functions.ThreadGroupMap map = Functions.sortThreadsAndGetGroupMap(data);
+                for (ThreadInfo ti : data) {
+					r.put(ti.getThreadName(),Functions.dumpThreadInfo(ti,map));
+				}
+            return r;
+        }
     }
 
     private static final class Script extends MasterToSlaveCallable<String,RuntimeException> implements DelegatingCallable<String,RuntimeException> {
@@ -120,13 +133,17 @@ public final class RemotingDiagnostics {
             cl = getClassLoader();
         }
 
-        public ClassLoader getClassLoader() {
+        @Override
+		public ClassLoader getClassLoader() {
             return Jenkins.get().getPluginManager().uberClassLoader;
         }
 
-        public String call() throws RuntimeException {
+        @Override
+		public String call() {
             // if we run locally, cl!=null. Otherwise the delegating classloader will be available as context classloader.
-            if (cl==null)       cl = Thread.currentThread().getContextClassLoader();
+            if (cl==null) {
+				cl = Thread.currentThread().getContextClassLoader();
+			}
             CompilerConfiguration cc = new CompilerConfiguration();
             cc.addCompilationCustomizers(new ImportCustomizer().addStarImports(
                     "jenkins",
@@ -140,8 +157,9 @@ public final class RemotingDiagnostics {
             shell.setVariable("out", pw);
             try {
                 Object output = shell.evaluate(script);
-                if(output!=null)
-                pw.println("Result: "+output);
+                if(output!=null) {
+					pw.println("Result: "+output);
+				}
             } catch (Throwable t) {
                 Functions.printStackTrace(t, pw);
             }
@@ -149,29 +167,23 @@ public final class RemotingDiagnostics {
         }
     }
 
-    /**
-     * Obtains the heap dump in an HPROF file.
-     */
-    public static FilePath getHeapDump(VirtualChannel channel) throws IOException, InterruptedException {
-        return channel.call(new GetHeapDump());
-    }
     private static class GetHeapDump extends MasterToSlaveCallable<FilePath, IOException> {
-            @Override
-            public FilePath call() throws IOException {
-                final File hprof = File.createTempFile("hudson-heapdump", "hprof");
-                hprof.delete();
-                try {
-                    MBeanServer server = ManagementFactory.getPlatformMBeanServer();
-                    server.invoke(new ObjectName("com.sun.management:type=HotSpotDiagnostic"), "dumpHeap",
-                            new Object[]{hprof.getAbsolutePath(), true}, new String[]{String.class.getName(), boolean.class.getName()});
-
-                    return new FilePath(hprof);
-                } catch (JMException e) {
-                    throw new IOException(e);
-                }
-            }
-
             private static final long serialVersionUID = 1L;
+
+		@Override
+		public FilePath call() throws IOException {
+		    final File hprof = File.createTempFile("hudson-heapdump", "hprof");
+		    hprof.delete();
+		    try {
+		        MBeanServer server = ManagementFactory.getPlatformMBeanServer();
+		        server.invoke(new ObjectName("com.sun.management:type=HotSpotDiagnostic"), "dumpHeap",
+		                new Object[]{hprof.getAbsolutePath(), true}, new String[]{String.class.getName(), boolean.class.getName()});
+
+		        return new FilePath(hprof);
+		    } catch (JMException e) {
+		        throw new IOException(e);
+		    }
+		}
     }
 
     /**

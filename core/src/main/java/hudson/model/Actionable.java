@@ -40,6 +40,7 @@ import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
 import org.kohsuke.stapler.export.Exported;
 import org.kohsuke.stapler.export.ExportedBean;
+import java.util.stream.Collectors;
 
 /**
  * {@link ModelObject} that can have additional {@link Action}s.
@@ -48,14 +49,15 @@ import org.kohsuke.stapler.export.ExportedBean;
  */
 @ExportedBean
 public abstract class Actionable extends AbstractModelObject implements ModelObjectWithContextMenu {
-    /**
+    private static final Logger LOGGER = Logger.getLogger(Actionable.class.getName());
+	/**
      * Actions contributed to this model object.
      *
      * Typed more strongly than it should to improve the serialization signature.
      */
     private volatile CopyOnWriteArrayList<Action> actions;
 
-    /**
+	/**
      * Gets actions contributed to this object.
      *
      * <p>
@@ -85,7 +87,7 @@ public abstract class Actionable extends AbstractModelObject implements ModelObj
         return actions;
     }
 
-    /**
+	/**
      * Gets all actions, transient or persistent.
      * {@link #getActions} is supplemented with anything contributed by {@link TransientActionFactory}.
      * @return an unmodifiable, possible empty list
@@ -109,7 +111,7 @@ public abstract class Actionable extends AbstractModelObject implements ModelObj
         return Collections.unmodifiableList(_actions);
     }
 
-    private <T> Collection<? extends Action> createFor(TransientActionFactory<T> taf) {
+	private <T> Collection<? extends Action> createFor(TransientActionFactory<T> taf) {
         try {
             Collection<? extends Action> result = taf.createFor(taf.type().cast(this));
             for (Action a : result) {
@@ -120,12 +122,12 @@ public abstract class Actionable extends AbstractModelObject implements ModelObj
             }
             return result;
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Could not load actions from " + taf + " for " + this, e);
+            LOGGER.log(Level.WARNING, new StringBuilder().append("Could not load actions from ").append(taf).append(" for ").append(this).toString(), e);
             return Collections.emptySet();
         }
     }
 
-    /**
+	/**
      * Gets all actions of a specified type that contributed to this object.
      *
      * @param type The type of action to return.
@@ -141,7 +143,7 @@ public abstract class Actionable extends AbstractModelObject implements ModelObj
         return Collections.unmodifiableList(_actions);
     }
 
-    /**
+	/**
      * Adds a new action.
      * Note: calls to {@link #getAllActions()} that happen before calls to this method may not see the update.
      * <strong>Note: this method will always modify the actions</strong>
@@ -155,7 +157,7 @@ public abstract class Actionable extends AbstractModelObject implements ModelObj
         getActions().add(a);
     }
 
-    /**
+	/**
      * Add an action, replacing any existing actions of the (exact) same class.
      * Note: calls to {@link #getAllActions()} that happen before calls to this method may not see the update.
      * Note: this method does not affect transient actions contributed by a {@link TransientActionFactory}.
@@ -176,7 +178,7 @@ public abstract class Actionable extends AbstractModelObject implements ModelObj
         addOrReplaceAction(a);
     }
 
-    /**
+	/**
      * Add an action, replacing any existing actions of the (exact) same class.
      * Note: calls to {@link #getAllActions()} that happen before calls to this method may not see the update.
      * Note: this method does not affect transient actions contributed by a {@link TransientActionFactory}
@@ -213,7 +215,7 @@ public abstract class Actionable extends AbstractModelObject implements ModelObj
         return !found || !old.isEmpty();
     }
 
-    /**
+	/**
      * Remove an action.
      * Note: calls to {@link #getAllActions()} that happen before calls to this method may not see the update.
      * Note: this method does not affect transient actions contributed by a {@link TransientActionFactory}
@@ -235,7 +237,7 @@ public abstract class Actionable extends AbstractModelObject implements ModelObj
         return getActions().removeAll(Collections.singleton(a));
     }
 
-    /**
+	/**
      * Removes any actions of the specified type.
      * Note: calls to {@link #getAllActions()} that happen before calls to this method may not see the update.
      * Note: this method does not affect transient actions contributed by a {@link TransientActionFactory}
@@ -257,15 +259,11 @@ public abstract class Actionable extends AbstractModelObject implements ModelObj
         // CopyOnWriteArrayList does not support Iterator.remove, so need to do it this way:
         List<Action> old = new ArrayList<>();
         List<Action> current = getActions();
-        for (Action a : current) {
-            if (clazz.isInstance(a)) {
-                old.add(a);
-            }
-        }
+        old.addAll(current.stream().filter(clazz::isInstance).collect(Collectors.toList()));
         return current.removeAll(old);
     }
 
-    /**
+	/**
      * Replaces any actions of the specified type by the supplied action.
      * Note: calls to {@link #getAllActions()} that happen before calls to this method may not see the update.
      * Note: this method does not affect transient actions contributed by a {@link TransientActionFactory}
@@ -311,14 +309,16 @@ public abstract class Actionable extends AbstractModelObject implements ModelObj
         return !(old.isEmpty() && found);
     }
 
-    /** @deprecated No clear purpose, since subclasses may have overridden {@link #getActions}, and does not consider {@link TransientActionFactory}. */
+	/** @deprecated No clear purpose, since subclasses may have overridden {@link #getActions}, and does not consider {@link TransientActionFactory}. */
     @Deprecated
     public Action getAction(int index) {
-        if(actions==null)   return null;
+        if(actions==null) {
+			return null;
+		}
         return actions.get(index);
     }
 
-    /**
+	/**
      * Gets the action (first instance to be found) of a specified type that contributed to this build.
      *
      * @param type
@@ -343,22 +343,24 @@ public abstract class Actionable extends AbstractModelObject implements ModelObj
         return null;
     }
 
-    public Object getDynamic(String token, StaplerRequest req, StaplerResponse rsp) {
+	public Object getDynamic(String token, StaplerRequest req, StaplerResponse rsp) {
         for (Action a : getAllActions()) {
             if(a==null)
-                continue;   // be defensive
+			 {
+				continue;   // be defensive
+			}
             String urlName = a.getUrlName();
-            if(urlName==null)
-                continue;
-            if(urlName.equals(token))
-                return a;
+            if(urlName==null) {
+				continue;
+			}
+            if(urlName.equals(token)) {
+				return a;
+			}
         }
         return null;
     }
 
-    @Override public ContextMenu doContextMenu(StaplerRequest request, StaplerResponse response) throws Exception {
+	@Override public ContextMenu doContextMenu(StaplerRequest request, StaplerResponse response) throws Exception {
         return new ContextMenu().from(this,request,response);
     }
-
-    private static final Logger LOGGER = Logger.getLogger(Actionable.class.getName());
 }

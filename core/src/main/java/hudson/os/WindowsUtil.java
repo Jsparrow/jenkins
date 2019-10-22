@@ -43,15 +43,18 @@ import java.util.stream.Collectors;
  */
 public class WindowsUtil {
     private static final Pattern NEEDS_QUOTING = Pattern.compile("[\\s\"]");
+	private static final Pattern CMD_METACHARS = Pattern.compile("[()%!^\"<>&|]");
 
-    /**
+	/**
      * Quotes an argument while escaping special characters interpreted by CreateProcess.
      *
      * @param argument argument to be quoted or escaped for windows shells.
      * @return properly quoted and escaped windows arguemnts.
      */
     public static @Nonnull String quoteArgument(@Nonnull String argument) {
-        if (!NEEDS_QUOTING.matcher(argument).find()) return argument;
+        if (!NEEDS_QUOTING.matcher(argument).find()) {
+			return argument;
+		}
         StringBuilder sb = new StringBuilder();
         sb.append('"');
         int end = argument.length();
@@ -64,7 +67,7 @@ public class WindowsUtil {
 
             if (i == end) {
                 // backslashes at the end of the argument must be escaped so the terminate quote isn't
-                nrBackslashes = nrBackslashes * 2;
+                nrBackslashes *= 2;
             } else if (argument.charAt(i) == '"') {
                 // backslashes preceding a quote all need to be escaped along with the quote
                 nrBackslashes = nrBackslashes * 2 + 1;
@@ -82,9 +85,7 @@ public class WindowsUtil {
         return sb.append('"').toString();
     }
 
-    private static final Pattern CMD_METACHARS = Pattern.compile("[()%!^\"<>&|]");
-
-    /**
+	/**
      * Quotes an argument while escaping special characters suitable for use as an argument to {@code cmd.exe}.
      * @param argument argument to be quoted or escaped for {@code cmd.exe}.
      * @return properly quoted and escaped arguments to {@code cmd.exe}.
@@ -93,7 +94,7 @@ public class WindowsUtil {
         return CMD_METACHARS.matcher(quoteArgument(argument)).replaceAll("^$0");
     }
 
-    /**
+	/**
      * Executes a command and arguments using {@code cmd.exe /C ...}.
      * @param argv arguments to be quoted or escaped for {@code cmd.exe /C ...}.
      * @return properly quoted and escaped arguments to {@code cmd.exe /C ...}.
@@ -103,7 +104,7 @@ public class WindowsUtil {
         return Runtime.getRuntime().exec(new String[]{"cmd.exe", "/C", command});
     }
 
-    /**
+	/**
      * Creates an NTFS junction point if supported. Similar to symbolic links, NTFS provides junction points which
      * provide different features than symbolic links.
      * @param junction NTFS junction point to create
@@ -122,7 +123,8 @@ public class WindowsUtil {
         if (result != 0) {
             String stderr = IOUtils.toString(mklink.getErrorStream());
             String stdout = IOUtils.toString(mklink.getInputStream());
-            throw new IOException("Process exited with " + result + "\nStandard Output:\n" + stdout + "\nError Output:\n" + stderr);
+            throw new IOException(new StringBuilder().append("Process exited with ").append(result).append("\nStandard Output:\n").append(stdout).append("\nError Output:\n").append(stderr)
+					.toString());
         }
         return junction;
     }

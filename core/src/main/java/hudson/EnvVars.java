@@ -45,6 +45,7 @@ import java.util.UUID;
 import java.util.logging.Logger;
 import javax.annotation.Nonnull;
 import javax.annotation.CheckForNull;
+import java.util.stream.Collectors;
 
 /**
  * Environment variables.
@@ -76,7 +77,20 @@ import javax.annotation.CheckForNull;
 public class EnvVars extends TreeMap<String,String> {
     private static final long serialVersionUID = 4320331661987259022L;
     private static Logger LOGGER = Logger.getLogger(EnvVars.class.getName());
-    /**
+	/**
+     * Environmental variables that we've inherited.
+     *
+     * <p>
+     * Despite what the name might imply, this is the environment variable
+     * of the current JVM process. And therefore, it is Jenkins master's environment
+     * variables only when you access this from the master.
+     *
+     * <p>
+     * If you access this field from agents, then this is the environment
+     * variable of the agent.
+     */
+    public static final Map<String,String> masterEnvVars = initMaster();
+	/**
      * If this {@link EnvVars} object represents the whole environment variable set,
      * not just a partial list used for overriding later, then we need to know
      * the platform for which this env vars are targeted for, or else we won't know
@@ -86,29 +100,12 @@ public class EnvVars extends TreeMap<String,String> {
      * So this property remembers that information.
      */
     private Platform platform;
-    
-    /**
-     * Gets the platform for which these env vars targeted.
-     * @since 2.144
-     * @return The platform.
-     */
-    public @CheckForNull Platform getPlatform() {
-        return platform;
-    }
 
-    /**
-     * Sets the platform for which these env vars target.
-     * @since 2.144
-     * @param platform the platform to set.
-     */
-    public void setPlatform(@Nonnull Platform platform) {
-        this.platform = platform;
-    }
-    public EnvVars() {
+	public EnvVars() {
         super(CaseInsensitiveComparator.INSTANCE);
     }
 
-    public EnvVars(@Nonnull Map<String,String> m) {
+	public EnvVars(@Nonnull Map<String,String> m) {
         this();
         putAll(m);
 
@@ -120,31 +117,51 @@ public class EnvVars extends TreeMap<String,String> {
         }
     }
 
-    @SuppressWarnings("CopyConstructorMissesField") // does not set #platform, see its Javadoc
+	@SuppressWarnings("CopyConstructorMissesField") // does not set #platform, see its Javadoc
     public EnvVars(@Nonnull EnvVars m) {
         // this constructor is so that in future we can get rid of the downcasting.
         this((Map)m);
     }
 
-    /**
+	/**
      * Builds an environment variables from an array of the form {@code "key","value","key","value"...}
      */
     public EnvVars(String... keyValuePairs) {
         this();
-        if(keyValuePairs.length%2!=0)
-            throw new IllegalArgumentException(Arrays.asList(keyValuePairs).toString());
-        for( int i=0; i<keyValuePairs.length; i+=2 )
-            put(keyValuePairs[i],keyValuePairs[i+1]);
+        if(keyValuePairs.length%2!=0) {
+			throw new IllegalArgumentException(Arrays.asList(keyValuePairs).toString());
+		}
+        for( int i=0; i<keyValuePairs.length; i+=2 ) {
+			put(keyValuePairs[i],keyValuePairs[i+1]);
+		}
     }
 
-    /**
+	/**
+     * Gets the platform for which these env vars targeted.
+     * @since 2.144
+     * @return The platform.
+     */
+    public @CheckForNull Platform getPlatform() {
+        return platform;
+    }
+
+	/**
+     * Sets the platform for which these env vars target.
+     * @since 2.144
+     * @param platform the platform to set.
+     */
+    public void setPlatform(@Nonnull Platform platform) {
+        this.platform = platform;
+    }
+
+	/**
      * Overrides the current entry by the given entry.
      *
      * <p>
      * Handles {@code PATH+XYZ} notation.
      */
     public void override(String key, String value) {
-        if(value==null || value.length()==0) {
+        if(value==null || value.isEmpty()) {
             remove(key);
             return;
         }
@@ -153,13 +170,14 @@ public class EnvVars extends TreeMap<String,String> {
         if(idx>0) {
             String realKey = key.substring(0,idx);
             String v = get(realKey);
-            if(v==null) v=value;
-            else {
+            if(v==null) {
+				v=value;
+			} else {
                 // we might be handling environment variables for a agent that can have different path separator
                 // than the master, so the following is an attempt to get it right.
                 // it's still more error prone that I'd like.
                 char ch = platform==null ? File.pathSeparatorChar : platform.pathSeparator;
-                v=value+ch+v;
+                v=new StringBuilder().append(value).append(ch).append(v).toString();
             }
             put(realKey,v);
             return;
@@ -168,18 +186,114 @@ public class EnvVars extends TreeMap<String,String> {
         put(key,value);
     }
 
-    /**
+	/**
      * Overrides all values in the map by the given map.
      * See {@link #override(String, String)}.
      * @return this
      */
     public EnvVars overrideAll(Map<String,String> all) {
-        for (Map.Entry<String, String> e : all.entrySet()) {
-            override(e.getKey(),e.getValue());
-        }
+        all.entrySet().forEach(e -> override(e.getKey(), e.getValue()));
         return this;
     }
 
+	/**
+     * Overrides all values in the map by the given map. Expressions in values will be expanded.
+     * See {@link #override(String, String)}.
+     * @return {@code this}
+     */
+    public EnvVars overrideExpandingAll(@Nonnull Map<String,String> all) {
+        new OverrideOrderCalculator(this, all).getOrderedVariableNames().forEach(key -> override(key, expand(all.get(key))));
+        return this;
+    }
+
+	/**
+     * Resolves environment variables against each other.
+     */
+	public static void resolve(Map<String, String> env) {
+		env.entrySet().forEach(entry -> entry.setValue(Util.replaceMacro(entry.getValue(), env)));
+	}
+
+	/**
+     * Convenience message
+     * @since 1.485
+     **/
+    public String get(String key, String defaultValue) {
+        String v = get(key);
+        if (v==null) {
+			v=defaultValue;
+		}
+        return v;
+    }
+
+	@Override
+    public String put(String key, String value) {
+        if (value==null) {
+			throw new IllegalArgumentException("Null value not allowed as an environment variable: "+key);
+		}
+        return super.put(key,value);
+    }
+
+	/**
+     * Add a key/value but only if the value is not-null. Otherwise no-op.
+     * @since 1.556
+     */
+    public void putIfNotNull(String key, String value) {
+        if (value!=null) {
+			put(key,value);
+		}
+    }
+
+	/**
+     * Takes a string that looks like "a=b" and adds that to this map.
+     */
+    public void addLine(String line) {
+        int sep = line.indexOf('=');
+        if(sep > 0) {
+            put(line.substring(0,sep),line.substring(sep+1));
+        }
+    }
+
+	/**
+     * Expands the variables in the given string by using environment variables represented in 'this'.
+     */
+    public String expand(String s) {
+        return Util.replaceMacro(s, this);
+    }
+
+	/**
+     * Creates a magic cookie that can be used as the model environment variable
+     * when we later kill the processes.
+     */
+    public static EnvVars createCookie() {
+        return new EnvVars("HUDSON_COOKIE", UUID.randomUUID().toString());
+    }
+
+	/**
+     * Obtains the environment variables of a remote peer.
+     *
+     * @param channel
+     *      Can be null, in which case the map indicating "N/A" will be returned.
+     * @return
+     *      A fresh copy that can be owned and modified by the caller.
+     */
+    public static EnvVars getRemote(VirtualChannel channel) throws IOException, InterruptedException {
+        if(channel==null) {
+			return new EnvVars("N/A","N/A");
+		}
+        return channel.call(new GetEnvVars());
+    }
+
+	private static EnvVars initMaster() {
+        EnvVars vars = new EnvVars(System.getenv());
+        vars.platform = Platform.current();
+        if(Main.isUnitTest || Main.isDevelopmentMode) {
+			// if unit test is launched with maven debug switch,
+            // we need to prevent forked Maven processes from seeing it, or else
+            // they'll hang
+            vars.remove("MAVEN_OPTS");
+		}
+        return vars;
+    }
     /**
      * Calculates the order to override variables.
      * 
@@ -188,69 +302,30 @@ public class EnvVars extends TreeMap<String,String> {
      * This is package accessible for testing purpose.
      */
     static class OverrideOrderCalculator {
-        /**
-         * Extract variables referred directly from a variable.
-         */
-        private static class TraceResolver implements VariableResolver<String> {
-            private final Comparator<? super String> comparator;
-            public Set<String> referredVariables;
-            
-            public TraceResolver(Comparator<? super String> comparator) {
-                this.comparator = comparator;
-                clear();
-            }
-            
-            public void clear() {
-                referredVariables = new TreeSet<>(comparator);
-            }
-            
-            public String resolve(String name) {
-                referredVariables.add(name);
-                return "";
-            }
-        }
-        
-        private static class VariableReferenceSorter extends CyclicGraphDetector<String> {
-            // map from a variable to a set of variables that variable refers.
-            private final Map<String, Set<String>> refereeSetMap;
-            
-            public VariableReferenceSorter(Map<String, Set<String>> refereeSetMap) {
-                this.refereeSetMap = refereeSetMap;
-            }
-            
-            @Override
-            protected Iterable<? extends String> getEdges(String n) {
-                // return variables referred from the variable.
-                if (!refereeSetMap.containsKey(n)) {
-                    // there is a case a non-existing variable is referred...
-                    return Collections.emptySet();
-                }
-                return refereeSetMap.get(n);
-            }
-        }
-
         private final Comparator<? super String> comparator;
-        
-        @Nonnull
+
+		@Nonnull
         private final EnvVars target;
-        @Nonnull
+
+		@Nonnull
         private final Map<String,String> overrides;
-        
-        private Map<String, Set<String>> refereeSetMap;
-        private List<String> orderedVariableNames;
-        
-        public OverrideOrderCalculator(@Nonnull EnvVars target, @Nonnull Map<String,String> overrides) {
+
+		private Map<String, Set<String>> refereeSetMap;
+
+		private List<String> orderedVariableNames;
+
+		public OverrideOrderCalculator(@Nonnull EnvVars target, @Nonnull Map<String,String> overrides) {
             comparator = target.comparator();
             this.target = target;
             this.overrides = overrides;
             scan();
         }
-        
-        public List<String> getOrderedVariableNames() {
+
+		public List<String> getOrderedVariableNames() {
             return orderedVariableNames;
         }
-        
-        // Cut the reference to the variable in a cycle.
+
+		// Cut the reference to the variable in a cycle.
         private void cutCycleAt(String referee, List<String> cycle) {
             // cycle contains variables in referrer-to-referee order.
             // This should not be negative, for the first and last one is same.
@@ -263,8 +338,8 @@ public class EnvVars extends TreeMap<String,String> {
             LOGGER.warning(String.format("Cyclic reference detected: %s", Util.join(cycle," -> ")));
             LOGGER.warning(String.format("Cut the reference %s -> %s", referrer, referee));
         }
-        
-        // Cut the variable reference in a cycle.
+
+		// Cut the variable reference in a cycle.
         private void cutCycle(List<String> cycle) {
             // if an existing variable is contained in that cycle,
             // cut the cycle with that variable:
@@ -284,8 +359,8 @@ public class EnvVars extends TreeMap<String,String> {
             // if not, cut the reference to the first one.
             cutCycleAt(cycle.get(0), cycle);
         }
-        
-        /**
+
+		/**
          * Scan all variables and list all referring variables.
          */
         public void scan() {
@@ -332,131 +407,60 @@ public class EnvVars extends TreeMap<String,String> {
             Collections.reverse(reversedDuplicatedOrder);
             
             orderedVariableNames = new ArrayList<>(overrides.size());
-            for(String key: reversedDuplicatedOrder) {
-                if(overrides.containsKey(key) && !orderedVariableNames.contains(key)) {
-                    orderedVariableNames.add(key);
-                }
-            }
+            orderedVariableNames.addAll(reversedDuplicatedOrder.stream().filter(key -> overrides.containsKey(key) && !orderedVariableNames.contains(key)).collect(Collectors.toList()));
             Collections.reverse(orderedVariableNames);
             orderedVariableNames.addAll(extendingVariableNames);
         }
-    }
-    
 
-    /**
-     * Overrides all values in the map by the given map. Expressions in values will be expanded.
-     * See {@link #override(String, String)}.
-     * @return {@code this}
-     */
-    public EnvVars overrideExpandingAll(@Nonnull Map<String,String> all) {
-        for (String key : new OverrideOrderCalculator(this, all).getOrderedVariableNames()) {
-            override(key, expand(all.get(key)));
+		/**
+         * Extract variables referred directly from a variable.
+         */
+        private static class TraceResolver implements VariableResolver<String> {
+            private final Comparator<? super String> comparator;
+            public Set<String> referredVariables;
+            
+            public TraceResolver(Comparator<? super String> comparator) {
+                this.comparator = comparator;
+                clear();
+            }
+            
+            public void clear() {
+                referredVariables = new TreeSet<>(comparator);
+            }
+            
+            @Override
+			public String resolve(String name) {
+                referredVariables.add(name);
+                return "";
+            }
         }
-        return this;
-    }
-
-    /**
-     * Resolves environment variables against each other.
-     */
-	public static void resolve(Map<String, String> env) {
-		for (Map.Entry<String,String> entry: env.entrySet()) {
-			entry.setValue(Util.replaceMacro(entry.getValue(), env));
-		}
-	}
-
-    /**
-     * Convenience message
-     * @since 1.485
-     **/
-    public String get(String key, String defaultValue) {
-        String v = get(key);
-        if (v==null)    v=defaultValue;
-        return v;
-    }
-
-    @Override
-    public String put(String key, String value) {
-        if (value==null)    throw new IllegalArgumentException("Null value not allowed as an environment variable: "+key);
-        return super.put(key,value);
-    }
-
-    /**
-     * Add a key/value but only if the value is not-null. Otherwise no-op.
-     * @since 1.556
-     */
-    public void putIfNotNull(String key, String value) {
-        if (value!=null)
-            put(key,value);
-    }
-    
-    /**
-     * Takes a string that looks like "a=b" and adds that to this map.
-     */
-    public void addLine(String line) {
-        int sep = line.indexOf('=');
-        if(sep > 0) {
-            put(line.substring(0,sep),line.substring(sep+1));
+        
+        private static class VariableReferenceSorter extends CyclicGraphDetector<String> {
+            // map from a variable to a set of variables that variable refers.
+            private final Map<String, Set<String>> refereeSetMap;
+            
+            public VariableReferenceSorter(Map<String, Set<String>> refereeSetMap) {
+                this.refereeSetMap = refereeSetMap;
+            }
+            
+            @Override
+            protected Iterable<? extends String> getEdges(String n) {
+                // return variables referred from the variable.
+                if (!refereeSetMap.containsKey(n)) {
+                    // there is a case a non-existing variable is referred...
+                    return Collections.emptySet();
+                }
+                return refereeSetMap.get(n);
+            }
         }
     }
-
-    /**
-     * Expands the variables in the given string by using environment variables represented in 'this'.
-     */
-    public String expand(String s) {
-        return Util.replaceMacro(s, this);
-    }
-
-    /**
-     * Creates a magic cookie that can be used as the model environment variable
-     * when we later kill the processes.
-     */
-    public static EnvVars createCookie() {
-        return new EnvVars("HUDSON_COOKIE", UUID.randomUUID().toString());
-    }
-
-    /**
-     * Obtains the environment variables of a remote peer.
-     *
-     * @param channel
-     *      Can be null, in which case the map indicating "N/A" will be returned.
-     * @return
-     *      A fresh copy that can be owned and modified by the caller.
-     */
-    public static EnvVars getRemote(VirtualChannel channel) throws IOException, InterruptedException {
-        if(channel==null)
-            return new EnvVars("N/A","N/A");
-        return channel.call(new GetEnvVars());
-    }
+    
 
     private static final class GetEnvVars extends MasterToSlaveCallable<EnvVars,RuntimeException> {
-        public EnvVars call() {
+        private static final long serialVersionUID = 1L;
+		@Override
+		public EnvVars call() {
             return new EnvVars(EnvVars.masterEnvVars);
         }
-        private static final long serialVersionUID = 1L;
-    }
-
-    /**
-     * Environmental variables that we've inherited.
-     *
-     * <p>
-     * Despite what the name might imply, this is the environment variable
-     * of the current JVM process. And therefore, it is Jenkins master's environment
-     * variables only when you access this from the master.
-     *
-     * <p>
-     * If you access this field from agents, then this is the environment
-     * variable of the agent.
-     */
-    public static final Map<String,String> masterEnvVars = initMaster();
-
-    private static EnvVars initMaster() {
-        EnvVars vars = new EnvVars(System.getenv());
-        vars.platform = Platform.current();
-        if(Main.isUnitTest || Main.isDevelopmentMode)
-            // if unit test is launched with maven debug switch,
-            // we need to prevent forked Maven processes from seeing it, or else
-            // they'll hang
-            vars.remove("MAVEN_OPTS");
-        return vars;
     }
 }

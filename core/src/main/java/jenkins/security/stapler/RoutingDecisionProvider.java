@@ -28,11 +28,11 @@ import hudson.ExtensionPoint;
 import javax.annotation.Nonnull;
 
 public abstract class RoutingDecisionProvider implements ExtensionPoint {
-    enum Decision {
+    @Nonnull public abstract Decision decide(@Nonnull String signature);
+
+	enum Decision {
         ACCEPTED,
         REJECTED,
         UNKNOWN
     }
-
-    @Nonnull public abstract Decision decide(@Nonnull String signature);
 }

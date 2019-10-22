@@ -53,19 +53,21 @@ public class DependencyRunner implements Runnable {
         this.runnable = runnable;
     }
 
-    public void run() {
+    @Override
+	public void run() {
         SecurityContext oldContext = ACL.impersonate(ACL.SYSTEM);
         try {
             Set<AbstractProject> topLevelProjects = new HashSet<>();
             // Get all top-level projects
             LOGGER.fine("assembling top level projects");
-            for (AbstractProject p : Jenkins.get().allItems(AbstractProject.class))
-                if (p.getUpstreamProjects().size() == 0) {
+            for (AbstractProject p : Jenkins.get().allItems(AbstractProject.class)) {
+				if (p.getUpstreamProjects().size() == 0) {
                     LOGGER.fine("adding top level project " + p.getName());
                     topLevelProjects.add(p);
                 } else {
                     LOGGER.fine("skipping project since not a top level project: " + p.getName());
                 }
+			}
             populate(topLevelProjects);
             for (AbstractProject p : polledProjects) {
                     LOGGER.fine("running project in correct dependency order: " + p.getName());
@@ -81,7 +83,7 @@ public class DependencyRunner implements Runnable {
             if (polledProjects.contains(p)) {
                 // Project will be readded at the queue, so that we always use
                 // the longest path
-            	LOGGER.fine("removing project " + p.getName() + " for re-add");
+            	LOGGER.fine(new StringBuilder().append("removing project ").append(p.getName()).append(" for re-add").toString());
                 polledProjects.remove(p);
             }
 

@@ -39,6 +39,7 @@ import org.kohsuke.stapler.DataBoundConstructor;
 import hudson.model.Descriptor.FormException;
 import hudson.Extension;
 import org.kohsuke.stapler.interceptor.RequirePOST;
+import java.util.stream.Collectors;
 
 /**
  * {@link View} that only contains projects for which the current user has access to.
@@ -76,11 +77,7 @@ public class MyView extends View {
     @Override
     public Collection<TopLevelItem> getItems() {
         List<TopLevelItem> items = new ArrayList<>();
-        for (TopLevelItem item : getOwner().getItemGroup().getItems()) {
-            if (item.hasPermission(Item.CONFIGURE)) {
-                items.add(item);
-            }
-        }
+        items.addAll(getOwner().getItemGroup().getItems().stream().filter(item -> item.hasPermission(Item.CONFIGURE)).collect(Collectors.toList()));
         return Collections.unmodifiableList(items);
     }
 
@@ -105,7 +102,8 @@ public class MyView extends View {
             return Jenkins.get().isUseSecurity();
         }
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.MyView_DisplayName();
         }
     }

@@ -41,13 +41,17 @@ import static java.util.logging.Level.*;
  * @since 1.382
  */
 public class CloudRetentionStrategy extends RetentionStrategy<AbstractCloudComputer> {
-    private int idleMinutes;
+    private static final Logger LOGGER = Logger.getLogger(CloudRetentionStrategy.class.getName());
 
-    public CloudRetentionStrategy(int idleMinutes) {
+	public static boolean disabled = SystemProperties.getBoolean(CloudRetentionStrategy.class.getName()+".disabled");
+
+	private int idleMinutes;
+
+	public CloudRetentionStrategy(int idleMinutes) {
         this.idleMinutes = idleMinutes;
     }
 
-    @Override
+	@Override
     @GuardedBy("hudson.model.Queue.lock")
     public long check(final AbstractCloudComputer c) {
         final AbstractCloudSlave computerNode = c.getNode();
@@ -65,15 +69,11 @@ public class CloudRetentionStrategy extends RetentionStrategy<AbstractCloudCompu
         return 1;
     }
 
-    /**
+	/**
      * Try to connect to it ASAP.
      */
     @Override
     public void start(AbstractCloudComputer c) {
         c.connect(false);
     }
-
-    private static final Logger LOGGER = Logger.getLogger(CloudRetentionStrategy.class.getName());
-
-    public static boolean disabled = SystemProperties.getBoolean(CloudRetentionStrategy.class.getName()+".disabled");
 }

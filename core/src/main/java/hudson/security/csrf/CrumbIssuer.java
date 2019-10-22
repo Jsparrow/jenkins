@@ -148,7 +148,8 @@ public abstract class CrumbIssuer implements Describable<CrumbIssuer>, Extension
     /**
      * Access global configuration for the crumb issuer.
      */
-    public CrumbIssuerDescriptor<CrumbIssuer> getDescriptor() {
+    @Override
+	public CrumbIssuerDescriptor<CrumbIssuer> getDescriptor() {
         return (CrumbIssuerDescriptor<CrumbIssuer>) Jenkins.get().getDescriptorOrDie(getClass());
     }
 
@@ -181,8 +182,9 @@ public abstract class CrumbIssuer implements Describable<CrumbIssuer>, Extension
                 if (ci==null) {
                     DEFAULT.validateCrumb(request,submittedCrumb);
                 } else {
-                    if (!ci.validateCrumb(request, ci.getDescriptor().getCrumbSalt(), submittedCrumb))
-                        throw new SecurityException("Crumb didn't match");
+                    if (!ci.validateCrumb(request, ci.getDescriptor().getCrumbSalt(), submittedCrumb)) {
+						throw new SecurityException("Crumb didn't match");
+					}
                 }
             }
         });
@@ -204,10 +206,10 @@ public abstract class CrumbIssuer implements Describable<CrumbIssuer>, Extension
             } else if ("/*/crumb/text()".equals(xpath)) { // ditto
                 text = ci.getCrumb();
             } else if ("concat(//crumbRequestField,\":\",//crumb)".equals(xpath)) { // new FullDuplexHttpStream; Main
-                text = ci.getCrumbRequestField() + ':' + ci.getCrumb();
+                text = new StringBuilder().append(ci.getCrumbRequestField()).append(':').append(ci.getCrumb()).toString();
             } else if ("concat(//crumbRequestField,'=',//crumb)".equals(xpath)) { // NetBeans
                 if (ci.getCrumbRequestField().startsWith(".") || ci.getCrumbRequestField().contains("-")) {
-                    text = ci.getCrumbRequestField() + '=' + ci.getCrumb();
+                    text = new StringBuilder().append(ci.getCrumbRequestField()).append('=').append(ci.getCrumb()).toString();
                 } else {
                     text = null;
                 }

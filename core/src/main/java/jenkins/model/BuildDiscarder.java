@@ -64,17 +64,20 @@ public abstract class BuildDiscarder extends AbstractDescribableImpl<BuildDiscar
             };
         }
 
-        public void marshal(Object source, HierarchicalStreamWriter writer, MarshallingContext context) {
+        @Override
+		public void marshal(Object source, HierarchicalStreamWriter writer, MarshallingContext context) {
             // abstract class, so there shouldn't be any instance.
             throw new UnsupportedOperationException();
         }
 
-        public Object unmarshal(HierarchicalStreamReader reader, UnmarshallingContext context) {
+        @Override
+		public Object unmarshal(HierarchicalStreamReader reader, UnmarshallingContext context) {
             // force unmarshal as LogRotator
             return ref.unmarshal(reader,context);
         }
 
-        public boolean canConvert(Class type) {
+        @Override
+		public boolean canConvert(Class type) {
             return type==BuildDiscarder.class;
         }
     }

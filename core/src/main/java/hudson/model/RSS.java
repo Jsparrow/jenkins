@@ -52,7 +52,7 @@ public final class RSS {
         rsp.setContentType("application/xml; charset=UTF-8");
         try (PrintWriter pw = rsp.getWriter()) {
             pw.println("<response>");
-            pw.println("<error>" + (url != null ? 0 : 1) + "</error>");
+            pw.println(new StringBuilder().append("<error>").append(url != null ? 0 : 1).append("</error>").toString());
             if (url == null) {
                 pw.println("<message>url must be specified</message>");
             }
@@ -79,15 +79,17 @@ public final class RSS {
         req.setAttribute("entries",entries);
 
         String flavor = req.getParameter("flavor");
-        if(flavor==null)    flavor="atom";
+        if(flavor==null) {
+			flavor="atom";
+		}
         flavor = flavor.replace('/', '_'); // Don't allow path to any jelly
 
-        if (flavor.equals("atom")) {
+        if ("atom".equals(flavor)) {
             rsp.setContentType("application/atom+xml; charset=UTF-8");
         } else {
             rsp.setContentType("text/xml; charset=UTF-8");
         }
 
-        req.getView(Jenkins.get(),"/hudson/"+flavor+".jelly").forward(req,rsp);
+        req.getView(Jenkins.get(),new StringBuilder().append("/hudson/").append(flavor).append(".jelly").toString()).forward(req,rsp);
     }
 }

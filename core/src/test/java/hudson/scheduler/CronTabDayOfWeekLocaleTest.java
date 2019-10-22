@@ -26,7 +26,13 @@ import org.jvnet.hudson.test.Url;
 @For(CronTab.class)
 @RunWith(Parameterized.class)
 public class CronTabDayOfWeekLocaleTest {
-    @Parameters
+    private final Locale locale;
+
+	public CronTabDayOfWeekLocaleTest(Locale locale) {
+        this.locale = locale;
+    }
+
+	@Parameters
     public static Collection<Object[]> parameters() {
         final Locale[] locales = Locale.getAvailableLocales();
         final Collection<Object[]> parameters = new ArrayList<>();
@@ -38,14 +44,8 @@ public class CronTabDayOfWeekLocaleTest {
         }
         return parameters;
     }
-    
-    private final Locale locale;
-    
-    public CronTabDayOfWeekLocaleTest(Locale locale) {
-        this.locale = locale;
-    }
-    
-    /**
+
+	/**
      * This unit test is an slight adaptation of the unit test found in
      * HUDSON-8656.
      */
@@ -64,8 +64,8 @@ public class CronTabDayOfWeekLocaleTest {
         expectedDate.set(2011, 0, 17, 23, 0, 0);
         compare(expectedDate, next);
     }
-    
-    @Test
+
+	@Test
     public void isSundayAndNextRunIsMonday() throws Exception {
         final Calendar cal = Calendar.getInstance(locale);
         cal.set(2011, 0, 16, 0, 0, 0); // Sunday, Jan 16th 2011, 00:00
@@ -79,8 +79,8 @@ public class CronTabDayOfWeekLocaleTest {
         expected.set(2011, 0, 17, 0, 0, 0);
         compare(expected, actual);
     }
-    
-    @Test
+
+	@Test
     public void isSundayAndPreviousRunIsMonday() throws Exception {
         final Calendar cal = Calendar.getInstance(locale);
         cal.set(2011, 0, 16, 0, 0, 0); // Sunday, Jan 16th 2011, 00:00
@@ -94,8 +94,8 @@ public class CronTabDayOfWeekLocaleTest {
         expected.set(2011, 0, 10, 0, 0, 0);
         compare(expected, actual);
     }
-    
-    @Test
+
+	@Test
     public void isSundayAndNextRunIsTuesday() throws Exception {
         final Calendar cal = Calendar.getInstance(locale);
         cal.set(2011, 0, 16, 0, 0, 0); // Sunday, Jan 16th 2011, 00:00
@@ -109,8 +109,8 @@ public class CronTabDayOfWeekLocaleTest {
         expected.set(2011, 0, 18, 0, 0, 0);
         compare(expected, actual);
     }
-    
-    @Test
+
+	@Test
     public void isSundayAndPreviousRunIsTuesday() throws Exception {
         final Calendar cal = Calendar.getInstance(locale);
         cal.set(2011, 0, 16, 0, 0, 0); // Sunday, Jan 16th 2011, 00:00
@@ -124,8 +124,8 @@ public class CronTabDayOfWeekLocaleTest {
         expected.set(2011, 0, 11, 0, 0, 0);
         compare(expected, actual);
     }
-    
-    @Test
+
+	@Test
     public void isSundayAndNextRunIsWednesday() throws Exception {
         final Calendar cal = Calendar.getInstance(locale);
         cal.set(2011, 0, 16, 0, 0, 0); // Sunday, Jan 16th 2011, 00:00
@@ -139,8 +139,8 @@ public class CronTabDayOfWeekLocaleTest {
         expected.set(2011, 0, 19, 0, 0, 0);
         compare(expected, actual);
     }
-    
-    @Test
+
+	@Test
     public void isSundayAndPreviousRunIsWednesday() throws Exception {
         final Calendar cal = Calendar.getInstance(locale);
         cal.set(2011, 0, 16, 0, 0, 0); // Sunday, Jan 16th 2011, 00:00
@@ -154,8 +154,8 @@ public class CronTabDayOfWeekLocaleTest {
         expected.set(2011, 0, 12, 0, 0, 0);
         compare(expected, actual);
     }
-    
-    @Test
+
+	@Test
     public void isSundayAndNextRunIsThursday() throws Exception {
         final Calendar cal = Calendar.getInstance(locale);
         cal.set(2011, 0, 16, 0, 0, 0); // Sunday, Jan 16th 2011, 00:00
@@ -169,8 +169,8 @@ public class CronTabDayOfWeekLocaleTest {
         expected.set(2011, 0, 20, 0, 0, 0);
         compare(expected, actual);
     }
-    
-    @Test
+
+	@Test
     public void isSundayAndPreviousRunIsThursday() throws Exception {
         final Calendar cal = Calendar.getInstance(locale);
         cal.set(2011, 0, 16, 0, 0, 0); // Sunday, Jan 16th 2011, 00:00
@@ -184,8 +184,8 @@ public class CronTabDayOfWeekLocaleTest {
         expected.set(2011, 0, 13, 0, 0, 0);
         compare(expected, actual);
     }
-    
-    @Test
+
+	@Test
     public void isSundayAndNextRunIsFriday() throws Exception {
         final Calendar cal = Calendar.getInstance(locale);
         cal.set(2011, 0, 16, 0, 0, 0); // Sunday, Jan 16th 2011, 00:00
@@ -199,8 +199,8 @@ public class CronTabDayOfWeekLocaleTest {
         expected.set(2011, 0, 21, 0, 0, 0);
         compare(expected, actual);
     }
-    
-    @Test
+
+	@Test
     public void isSundayAndPreviousRunIsFriday() throws Exception {
         final Calendar cal = Calendar.getInstance(locale);
         cal.set(2011, 0, 16, 0, 0, 0); // Sunday, Jan 16th 2011, 00:00
@@ -214,8 +214,8 @@ public class CronTabDayOfWeekLocaleTest {
         expected.set(2011, 0, 14, 0, 0, 0);
         compare(expected, actual);
     }
-    
-    @Test
+
+	@Test
     public void isSundayAndNextRunIsSaturday() throws Exception {
         final Calendar cal = Calendar.getInstance(locale);
         cal.set(2011, 0, 16, 0, 0, 0); // Sunday, Jan 16th 2011, 00:00
@@ -229,8 +229,8 @@ public class CronTabDayOfWeekLocaleTest {
         expected.set(2011, 0, 22, 0, 0, 0);
         compare(expected, actual);
     }
-    
-    @Test
+
+	@Test
     public void isSundayAndPreviousRunIsSaturday() throws Exception {
         final Calendar cal = Calendar.getInstance(locale);
         cal.set(2011, 0, 16, 0, 0, 0); // Sunday, Jan 16th 2011, 00:00
@@ -244,8 +244,8 @@ public class CronTabDayOfWeekLocaleTest {
         expected.set(2011, 0, 15, 0, 0, 0);
         compare(expected, actual);
     }
-    
-    @Test
+
+	@Test
     public void isSundayAndNextRunIsNextSunday() throws Exception {
         final Calendar cal = Calendar.getInstance(locale);
         cal.set(2011, 0, 16, 1, 0, 0); // Sunday, Jan 16th 2011, 01:00
@@ -259,8 +259,8 @@ public class CronTabDayOfWeekLocaleTest {
         expected.set(2011, 0, 23, 0, 0, 0);
         compare(expected, actual);
     }
-    
-    @Test
+
+	@Test
     public void isSundayAndPreviousRunIsPreviousSunday() throws Exception {
         final Calendar cal = Calendar.getInstance(locale);
         cal.set(2011, 0, 16, 0, 0, 0); // Sunday, Jan 16th 2011, 00:00
@@ -275,7 +275,7 @@ public class CronTabDayOfWeekLocaleTest {
         compare(expected, actual);
     }
 
-    @Test
+	@Test
     @Issue("JENKINS-12357")
     public void isSundayAndNextRunIsNextSunday7() throws Exception {
         final Calendar cal = Calendar.getInstance(locale);
@@ -291,7 +291,7 @@ public class CronTabDayOfWeekLocaleTest {
         compare(expected, actual);
     }
 
-    @Test
+	@Test
     public void isSundayAndPreviousRunIsPreviousSunday7() throws Exception {
         final Calendar cal = Calendar.getInstance(locale);
         cal.set(2011, 0, 16, 0, 0, 0); // Sunday, Jan 16th 2011, 00:00
@@ -306,7 +306,7 @@ public class CronTabDayOfWeekLocaleTest {
         compare(expected, actual);
     }
 
-    @Test
+	@Test
     public void isSaturdayAndNextRunIsSundayAsterisk() throws Exception {
         final Calendar cal = Calendar.getInstance(locale);
         cal.set(2011, 0, 15, 1, 0, 0); // Saturday, Jan 15th 2011, 01:00
@@ -321,7 +321,7 @@ public class CronTabDayOfWeekLocaleTest {
         compare(expected, actual);
     }
 
-    @Test
+	@Test
     public void isSundayAndPreviousRunIsSaturdayAsterisk() throws Exception {
         final Calendar cal = Calendar.getInstance(locale);
         cal.set(2011, 0, 16, 0, 0, 0); // Sunday, Jan 16th 2011, 00:00
@@ -336,10 +336,10 @@ public class CronTabDayOfWeekLocaleTest {
         compare(expected, actual);
     }
 
-    private void compare(final Calendar expected, final Calendar actual) {
+	private void compare(final Calendar expected, final Calendar actual) {
         final DateFormat f = DateFormat.getDateTimeInstance();
-        final String msg = "Locale: " + locale + " FirstDayOfWeek: " + actual.getFirstDayOfWeek() + " Expected: "
-                + f.format(expected.getTime()) + " Actual: " + f.format(actual.getTime());
+        final String msg = new StringBuilder().append("Locale: ").append(locale).append(" FirstDayOfWeek: ").append(actual.getFirstDayOfWeek()).append(" Expected: ").append(f.format(expected.getTime()))
+				.append(" Actual: ").append(f.format(actual.getTime())).toString();
         assertEquals(msg, expected.get(Calendar.YEAR), actual.get(Calendar.YEAR));
         assertEquals(msg, expected.get(Calendar.MONTH), actual.get(Calendar.MONTH));
         assertEquals(msg, expected.get(Calendar.DAY_OF_MONTH), actual.get(Calendar.DAY_OF_MONTH));

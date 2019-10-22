@@ -43,16 +43,16 @@ import jenkins.util.AntWithFindResourceClassLoader;
  */
 public class PluginFirstClassLoader
     extends AntWithFindResourceClassLoader
-    implements Closeable
 {
-
-    public PluginFirstClassLoader() {
-        super(null, false);
-    }
 
     private List<URL> urls = new ArrayList<>();
 
-    public void addPathFiles( Collection<File> paths )
+	public PluginFirstClassLoader() {
+        super(null, false);
+    }
+
+	@Override
+	public void addPathFiles( Collection<File> paths )
         throws IOException
     {
         for ( File f : paths )
@@ -62,41 +62,42 @@ public class PluginFirstClassLoader
         }
     }
 
-    /**
+	/**
      * @return List of jar used by the plugin /WEB-INF/lib/*.jar and classes directory /WEB-INF/classes
      */
     public List<URL> getURLs() 
     {
         return urls;
     }
-    
-    public void close()
+
+	@Override
+	public void close()
         throws IOException
     {
         cleanup();
     }
 
-    @Override
+	@Override
     protected Enumeration findResources( String arg0, boolean arg1 )
         throws IOException
     {
         return super.findResources( arg0, arg1 );
     }
 
-    @Override
+	@Override
     protected Enumeration findResources( String name )
         throws IOException
     {
         return super.findResources( name );
     }
 
-    @Override
+	@Override
     public URL getResource( String arg0 )
     {
         return super.getResource( arg0 );
     }
 
-    @Override
+	@Override
     public InputStream getResourceAsStream( String name )
     {
         return super.getResourceAsStream( name );

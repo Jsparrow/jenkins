@@ -79,97 +79,27 @@ import org.kohsuke.accmod.restrictions.NoExternalUse;
 @Restricted(NoExternalUse.class)
 public class SystemProperties {
 
-    @FunctionalInterface
-    private interface Handler {
-        @CheckForNull
-        String getString(String key);
-    }
-
     private static final Handler NULL_HANDLER = key -> null;
 
-    private static @Nonnull Handler handler = NULL_HANDLER;
+	private static @Nonnull Handler handler = NULL_HANDLER;
 
-    // declared in WEB-INF/web.xml
-    public static final class Listener implements ServletContextListener, OnMaster {
+	private static final Set<String> ALLOW_ON_AGENT = Collections.synchronizedSet(new HashSet<>());
 
-        /**
-         * Called by the servlet container to initialize the {@link ServletContext}.
-         */
-        @Override
-        public void contextInitialized(ServletContextEvent event) {
-            ServletContext theContext = event.getServletContext();
-            handler = key -> {
-                if (StringUtils.isNotBlank(key)) {
-                    try {
-                        return theContext.getInitParameter(key);
-                    } catch (SecurityException ex) {
-                        // Log exception and go on
-                        LOGGER.log(Level.CONFIG, "Access to the property {0} is prohibited", key);
-                    }
-                }
-                return null;
-            };
-        }
+	/**
+     * Logger.
+     */
+    private static final Logger LOGGER = Logger.getLogger(SystemProperties.class.getName());
 
-        @Override
-        public void contextDestroyed(ServletContextEvent event) {
-            handler = NULL_HANDLER;
-        }
+	private SystemProperties() {}
 
-    }
-
-    private static final Set<String> ALLOW_ON_AGENT = Collections.synchronizedSet(new HashSet<>());
-
-    /**
+	/**
      * Mark a key whose value should be made accessible in agent JVMs.
      */
     public static void allowOnAgent(String key) {
         ALLOW_ON_AGENT.add(key);
     }
 
-    @Extension
-    public static final class AgentCopier extends ComputerListener {
-        @Override
-        public void preOnline(Computer c, Channel channel, FilePath root, TaskListener listener) throws IOException, InterruptedException {
-            channel.call(new CopySystemProperties());
-        }
-        private static final class CopySystemProperties extends MasterToSlaveCallable<Void, RuntimeException> {
-            private static final long serialVersionUID = 1;
-            private final Map<String, String> snapshot;
-            CopySystemProperties() {
-                // Take a snapshot of those system properties and context variables available on the master at the time the agent starts which have been whitelisted for that purpose.
-                snapshot = new HashMap<>();
-                for (String key : ALLOW_ON_AGENT) {
-                    snapshot.put(key, getString(key));
-                }
-                LOGGER.log(Level.FINE, "taking snapshot of {0}", snapshot);
-            }
-            @Override
-            public Void call() throws RuntimeException {
-                handler = new CopiedHandler(snapshot);
-                return null;
-            }
-        }
-        private static final class CopiedHandler implements Handler {
-            private final Map<String, String> snapshot;
-            CopiedHandler(Map<String, String> snapshot) {
-                this.snapshot = snapshot;
-            }
-            @Override
-            public String getString(String key) {
-                return snapshot.get(key);
-            }
-        }
-    }
-
-    /**
-     * Logger.
-     */
-    private static final Logger LOGGER = Logger.getLogger(SystemProperties.class.getName());
-
-    private SystemProperties() {}
-
-    /**
+	/**
      * Gets the system property indicated by the specified key.
      * This behaves just like {@link System#getProperty(java.lang.String)}, except that it
      * also consults the {@link ServletContext}'s "init" parameters.
@@ -205,7 +135,7 @@ public class SystemProperties {
         return null;
     }
 
-    /**
+	/**
      * Gets the system property indicated by the specified key, or a default value.
      * This behaves just like {@link System#getProperty(java.lang.String, java.lang.String)}, except
      * that it also consults the {@link ServletContext}'s "init" parameters.
@@ -222,7 +152,7 @@ public class SystemProperties {
         return getString(key, def, Level.CONFIG);
     }
 
-    /**
+	/**
      * Gets the system property indicated by the specified key, or a default value.
      * This behaves just like {@link System#getProperty(java.lang.String, java.lang.String)}, except
      * that it also consults the {@link ServletContext}'s "init" parameters.
@@ -260,7 +190,7 @@ public class SystemProperties {
         return value;
     }
 
-    /**
+	/**
       * Returns {@code true} if the system property
       * named by the argument exists and is equal to the string
       * {@code "true"}. If the system property does not exist, return
@@ -277,7 +207,7 @@ public class SystemProperties {
         return getBoolean(name, false);
     }
 
-    /**
+	/**
       * Returns {@code true} if the system property
       * named by the argument exists and is equal to the string
       * {@code "true"}, or a default value. If the system property does not exist, return
@@ -301,7 +231,7 @@ public class SystemProperties {
         return def;
     }
 
-    /**
+	/**
      * Returns {@link Boolean#TRUE} if the named system property exists and is equal to the string {@code "true}
      * (ignoring case), returns {@link Boolean#FALSE} if the system property exists and doesn't equal {@code "true}
      * otherwise returns {@code null} if the named system property does not exist.
@@ -315,8 +245,8 @@ public class SystemProperties {
         String v = getString(name);
         return v == null ? null : Boolean.parseBoolean(v);
     }
-    
-    /**
+
+	/**
       * Determines the integer value of the system property with the
       * specified name.
       * 
@@ -331,7 +261,7 @@ public class SystemProperties {
         return getInteger(name, null);
     }
 
-    /**
+	/**
      * Determines the integer value of the system property with the
      * specified name, or a default value.
      *
@@ -349,7 +279,7 @@ public class SystemProperties {
         return getInteger(name, def, Level.CONFIG);
     }
 
-    /**
+	/**
       * Determines the integer value of the system property with the
       * specified name, or a default value.
       * 
@@ -379,8 +309,8 @@ public class SystemProperties {
         }
         return def;
     }
-    
-    /**
+
+	/**
       * Determines the long value of the system property with the
       * specified name.
       * 
@@ -395,7 +325,7 @@ public class SystemProperties {
         return getLong(name, null);
     }
 
-    /**
+	/**
      * Determines the integer value of the system property with the
      * specified name, or a default value.
      *
@@ -413,7 +343,7 @@ public class SystemProperties {
         return getLong(name, def, Level.CONFIG);
     }
 
-    /**
+	/**
       * Determines the integer value of the system property with the
       * specified name, or a default value.
       * 
@@ -442,6 +372,74 @@ public class SystemProperties {
             }
         }
         return def;
+    }
+
+	@FunctionalInterface
+    private interface Handler {
+        @CheckForNull
+        String getString(String key);
+    }
+
+    // declared in WEB-INF/web.xml
+    public static final class Listener implements ServletContextListener, OnMaster {
+
+        /**
+         * Called by the servlet container to initialize the {@link ServletContext}.
+         */
+        @Override
+        public void contextInitialized(ServletContextEvent event) {
+            ServletContext theContext = event.getServletContext();
+            handler = key -> {
+                if (StringUtils.isNotBlank(key)) {
+                    try {
+                        return theContext.getInitParameter(key);
+                    } catch (SecurityException ex) {
+                        // Log exception and go on
+                        LOGGER.log(Level.CONFIG, "Access to the property {0} is prohibited", key);
+                    }
+                }
+                return null;
+            };
+        }
+
+        @Override
+        public void contextDestroyed(ServletContextEvent event) {
+            handler = NULL_HANDLER;
+        }
+
+    }
+
+    @Extension
+    public static final class AgentCopier extends ComputerListener {
+        @Override
+        public void preOnline(Computer c, Channel channel, FilePath root, TaskListener listener) throws IOException, InterruptedException {
+            channel.call(new CopySystemProperties());
+        }
+        private static final class CopySystemProperties extends MasterToSlaveCallable<Void, RuntimeException> {
+            private static final long serialVersionUID = 1;
+            private final Map<String, String> snapshot;
+            CopySystemProperties() {
+                // Take a snapshot of those system properties and context variables available on the master at the time the agent starts which have been whitelisted for that purpose.
+                snapshot = new HashMap<>();
+                ALLOW_ON_AGENT.forEach(key -> snapshot.put(key, getString(key)));
+                LOGGER.log(Level.FINE, "taking snapshot of {0}", snapshot);
+            }
+            @Override
+            public Void call() {
+                handler = new CopiedHandler(snapshot);
+                return null;
+            }
+        }
+        private static final class CopiedHandler implements Handler {
+            private final Map<String, String> snapshot;
+            CopiedHandler(Map<String, String> snapshot) {
+                this.snapshot = snapshot;
+            }
+            @Override
+            public String getString(String key) {
+                return snapshot.get(key);
+            }
+        }
     }
 
 }

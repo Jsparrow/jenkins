@@ -49,11 +49,13 @@ import java.util.logging.Logger;
  * @see WindowsInstallerLink
  */
 public class WindowsServiceLifecycle extends Lifecycle {
-    public WindowsServiceLifecycle() {
+    private static final Logger LOGGER = Logger.getLogger(WindowsServiceLifecycle.class.getName());
+
+	public WindowsServiceLifecycle() {
         updateJenkinsExeIfNeeded();
     }
 
-    /**
+	/**
      * If {@code jenkins.exe} is old compared to our copy,
      * schedule an overwrite (except that since it's currently running,
      * we can only do it when Jenkins restarts next time.)
@@ -68,10 +70,15 @@ public class WindowsServiceLifecycle extends Lifecycle {
             for (String name : new String[]{"hudson.exe","jenkins.exe"}) {
                 try {
                     File currentCopy = new File(baseDir,name);
-                    if(!currentCopy.exists())   continue;
+                    if(!currentCopy.exists()) {
+						continue;
+					}
                     String curCopy = new FilePath(currentCopy).digest();
 
-                    if(ourCopy.equals(curCopy))     continue; // identical
+                    if(ourCopy.equals(curCopy))
+					 {
+						continue; // identical
+					}
 
                     File stage = new File(baseDir,name+".new");
                     FileUtils.copyURLToFile(exe,stage);
@@ -87,7 +94,7 @@ public class WindowsServiceLifecycle extends Lifecycle {
         }
     }
 
-    /**
+	/**
      * On Windows, jenkins.war is locked, so we place a new version under a special name,
      * which is picked up by the service wrapper upon restart.
      */
@@ -96,13 +103,16 @@ public class WindowsServiceLifecycle extends Lifecycle {
         File dest = getHudsonWar();
         // this should be impossible given the canRewriteHudsonWar method,
         // but let's be defensive
-        if(dest==null)  throw new IOException("jenkins.war location is not known.");
+        if(dest==null) {
+			throw new IOException("jenkins.war location is not known.");
+		}
 
         // backing up the old jenkins.war before its lost due to upgrading
         // unless we are trying to rewrite jenkins.war by a backup itself
         File bak = new File(dest.getPath() + ".bak");
-        if (!by.equals(bak))
-            FileUtils.copyFile(dest, bak);
+        if (!by.equals(bak)) {
+			FileUtils.copyFile(dest, bak);
+		}
 
         String baseName = dest.getName();
         baseName = baseName.substring(0,baseName.indexOf('.'));
@@ -111,11 +121,11 @@ public class WindowsServiceLifecycle extends Lifecycle {
         File copyFiles = new File(baseDir,baseName+".copies");
 
         try (FileWriter w = new FileWriter(copyFiles, true)) {
-            w.write(by.getAbsolutePath() + '>' + getHudsonWar().getAbsolutePath() + '\n');
+            w.write(new StringBuilder().append(by.getAbsolutePath()).append('>').append(getHudsonWar().getAbsolutePath()).append('\n').toString());
         }
     }
 
-    @Override
+	@Override
     public void restart() throws IOException, InterruptedException {
         Jenkins jenkins = Jenkins.getInstanceOrNull();
         try {
@@ -134,18 +144,24 @@ public class WindowsServiceLifecycle extends Lifecycle {
         task.getLogger().println("Restarting a service");
         String exe = System.getenv("WINSW_EXECUTABLE");
         File executable;
-        if (exe!=null)   executable = new File(exe);
-        else            executable = new File(home, "hudson.exe");
-        if (!executable.exists())   executable = new File(home, "jenkins.exe");
+        if (exe!=null) {
+			executable = new File(exe);
+		} else {
+			executable = new File(home, "hudson.exe");
+		}
+        if (!executable.exists()) {
+			executable = new File(home, "jenkins.exe");
+		}
 
         // use restart! to run hudson/jenkins.exe restart in a separate process, so it doesn't kill itself
         int r = new LocalLauncher(task).launch().cmds(executable, "restart!")
                 .stdout(task).pwd(home).join();
-        if(r!=0)
-            throw new IOException(baos.toString());
+        if(r!=0) {
+			throw new IOException(baos.toString());
+		}
     }
-    
-    private static File getBaseDir() {
+
+	private static File getBaseDir() {
         File baseDir;
         
         String baseEnv = System.getenv("BASE");
@@ -157,6 +173,4 @@ public class WindowsServiceLifecycle extends Lifecycle {
         }
         return baseDir;
     }
-
-    private static final Logger LOGGER = Logger.getLogger(WindowsServiceLifecycle.class.getName());
 }

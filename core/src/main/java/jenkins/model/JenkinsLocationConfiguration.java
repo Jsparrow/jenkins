@@ -54,22 +54,28 @@ public class JenkinsLocationConfiguration extends GlobalConfiguration implements
     @Restricted(NoExternalUse.class)
     public static final int ORDINAL = 200;
 
-    /**
+	private static final Logger LOGGER = Logger.getLogger(JenkinsLocationConfiguration.class.getName());
+
+	/**
      * @deprecated replaced by {@link #jenkinsUrl}
      */
     @Deprecated
     private transient String hudsonUrl;
-    private String adminAddress;
-    private String jenkinsUrl;
 
-    // just to suppress warnings
-    private transient String charset,useSsl;
+	private String adminAddress;
 
-    public static @Nonnull JenkinsLocationConfiguration get() {
+	private String jenkinsUrl;
+
+	// just to suppress warnings
+    private transient String charset;
+
+	private transient String useSsl;
+
+	public static @Nonnull JenkinsLocationConfiguration get() {
         return GlobalConfiguration.all().getInstance(JenkinsLocationConfiguration.class);
     }
-    
-    /**
+
+	/**
      * Gets local configuration. For explanation when it could die, see {@link #get()}
      */
     @Restricted(NoExternalUse.class)
@@ -81,7 +87,7 @@ public class JenkinsLocationConfiguration extends GlobalConfiguration implements
         return config;
     }
 
-    @Override
+	@Override
     public synchronized void load() {
         // for backward compatibility, if we don't have our own data yet, then
         // load from Mailer.
@@ -93,8 +99,9 @@ public class JenkinsLocationConfiguration extends GlobalConfiguration implements
             if (file.exists()) {
                 try {
                     file.unmarshal(this);
-                    if (jenkinsUrl==null)
-                        jenkinsUrl = hudsonUrl;
+                    if (jenkinsUrl==null) {
+						jenkinsUrl = hudsonUrl;
+					}
                 } catch (IOException e) {
                     LOGGER.log(Level.WARNING, "Failed to load "+file, e);
                 }
@@ -110,17 +117,19 @@ public class JenkinsLocationConfiguration extends GlobalConfiguration implements
         updateSecureSessionFlag();
     }
 
-    /**
+	/**
      * Gets the service administrator e-mail address.
      * @return Admin address or &quot;address not configured&quot; stub
      */
     public @Nonnull String getAdminAddress() {
         String v = adminAddress;
-        if(v==null)     v = Messages.Mailer_Address_Not_Configured();
+        if(v==null) {
+			v = Messages.Mailer_Address_Not_Configured();
+		}
         return v;
     }
 
-    /**
+	/**
      * Sets the e-mail address of Jenkins administrator.
      * @param adminAddress Admin address. Use null to reset the value to default.
      */
@@ -135,14 +144,15 @@ public class JenkinsLocationConfiguration extends GlobalConfiguration implements
         save();
     }
 
-    public @CheckForNull String getUrl() {
+	public @CheckForNull String getUrl() {
         return jenkinsUrl;
     }
 
-    public void setUrl(@CheckForNull String jenkinsUrl) {
+	public void setUrl(@CheckForNull String jenkinsUrl) {
         String url = Util.nullify(jenkinsUrl);
-        if(url!=null && !url.endsWith("/"))
-            url += '/';
+        if(url!=null && !url.endsWith("/")) {
+			url += '/';
+		}
         this.jenkinsUrl = url;
 
         if (!DISABLE_URL_VALIDATION) {
@@ -153,18 +163,19 @@ public class JenkinsLocationConfiguration extends GlobalConfiguration implements
         updateSecureSessionFlag();
     }
 
-    private void preventRootUrlBeingInvalid() {
-        if (this.jenkinsUrl != null && isInvalidRootUrl(this.jenkinsUrl)) {
-            LOGGER.log(Level.INFO, "Invalid URL received: {0}, considered as null", this.jenkinsUrl);
-            this.jenkinsUrl = null;
-        }
+	private void preventRootUrlBeingInvalid() {
+        if (!(this.jenkinsUrl != null && isInvalidRootUrl(this.jenkinsUrl))) {
+			return;
+		}
+		LOGGER.log(Level.INFO, "Invalid URL received: {0}, considered as null", this.jenkinsUrl);
+		this.jenkinsUrl = null;
     }
 
-    private boolean isInvalidRootUrl(@Nullable String value) {
+	private boolean isInvalidRootUrl(@Nullable String value) {
         return !UrlHelper.isValidRootUrl(value);
     }
 
-    /**
+	/**
      * If the Jenkins URL starts from "https", force the secure session flag
      *
      * @see <a href="https://www.owasp.org/index.php/SecureFlag">discussion of this topic in OWASP</a>
@@ -197,12 +208,13 @@ public class JenkinsLocationConfiguration extends GlobalConfiguration implements
         }
     }
 
-    /**
+	/**
      * Checks the URL in {@code global.jelly}
      */
     public FormValidation doCheckUrl(@QueryParameter String value) {
-        if(value.startsWith("http://localhost"))
-            return FormValidation.warning(Messages.Mailer_Localhost_Error());
+        if(value.startsWith("http://localhost")) {
+			return FormValidation.warning(Messages.Mailer_Localhost_Error());
+		}
 
         if (!DISABLE_URL_VALIDATION && isInvalidRootUrl(value)) {
             return FormValidation.error(Messages.Mailer_NotHttp_Error());
@@ -211,7 +223,7 @@ public class JenkinsLocationConfiguration extends GlobalConfiguration implements
         return FormValidation.ok();
     }
 
-    public FormValidation doCheckAdminAddress(@QueryParameter String value) {
+	public FormValidation doCheckAdminAddress(@QueryParameter String value) {
         try {
             new InternetAddress(value);
             return FormValidation.ok();
@@ -219,6 +231,4 @@ public class JenkinsLocationConfiguration extends GlobalConfiguration implements
             return FormValidation.error(e.getMessage());
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(JenkinsLocationConfiguration.class.getName());
 }

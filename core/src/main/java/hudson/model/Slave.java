@@ -100,18 +100,28 @@ import org.kohsuke.stapler.StaplerResponse;
 public abstract class Slave extends Node implements Serializable {
     
     private static final Logger LOGGER = Logger.getLogger(Slave.class.getName());
-    
-    /**
+
+	/**
+     * Determines the workspace root file name for those who really really need the shortest possible path name.
+     */
+    private static final String WORKSPACE_ROOT = SystemProperties.getString(Slave.class.getName()+".workspaceRoot","workspace");
+
+	/**
+     * Provides a collection of file names, which are accessible via /jnlpJars link.
+     */
+    private static final Set<String> ALLOWED_JNLPJARS_FILES = ImmutableSet.of("agent.jar", "slave.jar", "remoting.jar", "jenkins-cli.jar", "hudson-cli.jar");
+
+	/**
      * Name of this agent node.
      */
     protected String name;
 
-    /**
+	/**
      * Description of this node.
      */
     private String description;
 
-    /**
+	/**
      * Path to the root of the workspace from the view point of this node, such as "/hudson", this need not
      * be absolute provided that the launcher establishes a consistent working directory, such as "./.jenkins-slave"
      * when used with an SSH launcher.
@@ -121,45 +131,56 @@ public abstract class Slave extends Node implements Serializable {
      */
     protected final String remoteFS;
 
-    /**
+	/**
      * Number of executors of this node.
      */
     private int numExecutors = 2;
 
-    /**
+	/**
      * Job allocation strategy.
      */
     private Mode mode = Mode.NORMAL;
 
-    /**
+	/**
      * Agent availability strategy.
      */
     private RetentionStrategy retentionStrategy;
 
-    /**
+	/**
      * The starter that will startup this agent.
      */
     private ComputerLauncher launcher;
 
-    /**
+	/**
      * Whitespace-separated labels.
      */
     private String label="";
 
-    private /*almost final*/ DescribableList<NodeProperty<?>,NodePropertyDescriptor> nodeProperties =
+	private /*almost final*/ DescribableList<NodeProperty<?>,NodePropertyDescriptor> nodeProperties =
             new DescribableList<>(this);
 
-    /**
+	/**
      * Lazily computed set of labels from {@link #label}.
      */
     private transient volatile Set<Label> labels;
 
-    /**
+	/**
      * Id of user which creates this agent {@link User}.
      */
     private String userId;
 
-    /**
+	//
+	// backward compatibility
+	//
+	    /**
+	     * Command line to launch the agent, like
+	     * "ssh myslave java -jar /path/to/hudson-remoting.jar"
+	     * @deprecated in 1.216
+	     */
+	    @Deprecated
+	    private transient String agentCommand;
+
+	/**
      * Use {@link #Slave(String, String, ComputerLauncher)} and set the rest through setters.
      * @deprecated since FIXME
      */
@@ -169,7 +190,7 @@ public abstract class Slave extends Node implements Serializable {
         this(name,nodeDescription,remoteFS,Util.tryParseNumber(numExecutors, 1).intValue(),mode,labelString,launcher,retentionStrategy, nodeProperties);
     }
 
-    /**
+	/**
      * @deprecated since 2009-02-20.
      */
     @Deprecated
@@ -178,13 +199,13 @@ public abstract class Slave extends Node implements Serializable {
     	this(name, nodeDescription, remoteFS, numExecutors, mode, labelString, launcher, retentionStrategy, new ArrayList());
     }
 
-    public Slave(@Nonnull String name, String remoteFS, ComputerLauncher launcher) throws FormException, IOException {
+	public Slave(@Nonnull String name, String remoteFS, ComputerLauncher launcher) throws FormException, IOException {
         this.name = name;
         this.remoteFS = remoteFS;
         this.launcher = launcher;
     }
 
-    /**
+	/**
      * @deprecated as of 2.2
      *      Use {@link #Slave(String, String, ComputerLauncher)} and set the rest through setters.
      */
@@ -211,17 +232,19 @@ public abstract class Slave extends Node implements Serializable {
             User user = User.current();
             userId = user!=null ? user.getId() : "anonymous";
         }
-        if (name.equals(""))
-            throw new FormException(Messages.Slave_InvalidConfig_NoName(), null);
+        if ("".equals(name)) {
+			throw new FormException(Messages.Slave_InvalidConfig_NoName(), null);
+		}
 
 //        if (remoteFS.equals(""))
 //            throw new FormException(Messages.Slave_InvalidConfig_NoRemoteDir(name), null);
 
-        if (this.numExecutors<=0)
-            throw new FormException(Messages.Slave_InvalidConfig_Executors(name), null);
+        if (this.numExecutors<=0) {
+			throw new FormException(Messages.Slave_InvalidConfig_Executors(name), null);
+		}
     }
 
-    /**
+	/**
      * Return id of user which created this agent
      *
      * @return id of user
@@ -230,11 +253,11 @@ public abstract class Slave extends Node implements Serializable {
         return userId;
     }
 
-    public void setUserId(String userId){
+	public void setUserId(String userId){
         this.userId = userId;
     }
 
-    public ComputerLauncher getLauncher() {
+	public ComputerLauncher getLauncher() {
         if (launcher == null && !StringUtils.isEmpty(agentCommand)) {
             try {
                 launcher = (ComputerLauncher) Jenkins.get().getPluginManager().uberClassLoader.loadClass("hudson.slaves.CommandLauncher").getConstructor(String.class, EnvVars.class).newInstance(agentCommand, null);
@@ -248,77 +271,84 @@ public abstract class Slave extends Node implements Serializable {
         return launcher == null ? new JNLPLauncher(false) : launcher;
     }
 
-    public void setLauncher(ComputerLauncher launcher) {
+	public void setLauncher(ComputerLauncher launcher) {
         this.launcher = launcher;
     }
 
-    public String getRemoteFS() {
+	public String getRemoteFS() {
         return remoteFS;
     }
 
-    public String getNodeName() {
+	@Override
+	public String getNodeName() {
         return name;
     }
 
-    @Override public String toString() {
-        return getClass().getName() + "[" + name + "]";
+	@Override public String toString() {
+        return new StringBuilder().append(getClass().getName()).append("[").append(name).append("]").toString();
     }
 
-    public void setNodeName(String name) {
+	@Override
+	public void setNodeName(String name) {
         this.name = name;
     }
 
-    @DataBoundSetter
+	@DataBoundSetter
     public void setNodeDescription(String value) {
         this.description = value;
     }
 
-    public String getNodeDescription() {
+	@Override
+	public String getNodeDescription() {
         return description;
     }
 
-    public int getNumExecutors() {
+	@Override
+	public int getNumExecutors() {
         return numExecutors;
     }
 
-    @DataBoundSetter
+	@DataBoundSetter
     public void setNumExecutors(int n) {
         this.numExecutors = n;
     }
 
-    public Mode getMode() {
+	@Override
+	public Mode getMode() {
         return mode;
     }
 
-    @DataBoundSetter
+	@DataBoundSetter
     public void setMode(Mode mode) {
         this.mode = mode;
     }
 
-    public DescribableList<NodeProperty<?>, NodePropertyDescriptor> getNodeProperties() {
+	@Override
+	public DescribableList<NodeProperty<?>, NodePropertyDescriptor> getNodeProperties() {
         assert nodeProperties != null;
     	return nodeProperties;
     }
 
-    @DataBoundSetter
+	@DataBoundSetter
     public void setNodeProperties(List<? extends NodeProperty<?>> properties) throws IOException {
         nodeProperties.replaceBy(properties);
     }
 
-    public RetentionStrategy getRetentionStrategy() {
+	public RetentionStrategy getRetentionStrategy() {
         return retentionStrategy == null ? RetentionStrategy.Always.INSTANCE : retentionStrategy;
     }
 
-    @DataBoundSetter
+	@DataBoundSetter
     public void setRetentionStrategy(RetentionStrategy availabilityStrategy) {
         this.retentionStrategy = availabilityStrategy;
     }
 
-    public String getLabelString() {
+	@Override
+	public String getLabelString() {
         return Util.fixNull(label).trim();
     }
 
-    @Override
+	@Override
     @DataBoundSetter
     public void setLabelString(String labelString) throws IOException {
         this.label = Util.fixNull(labelString).trim();
@@ -326,16 +356,18 @@ public abstract class Slave extends Node implements Serializable {
         getAssignedLabels();
     }
 
-    @Override
+	@Override
     public Callable<ClockDifference,IOException> getClockDifferenceCallable() {
         return new GetClockDifference1();
     }
 
-    public Computer createComputer() {
+	@Override
+	public Computer createComputer() {
         return new SlaveComputer(this);
     }
 
-    public FilePath getWorkspaceFor(TopLevelItem item) {
+	@Override
+	public FilePath getWorkspaceFor(TopLevelItem item) {
         for (WorkspaceLocator l : WorkspaceLocator.all()) {
             FilePath workspace = l.locate(item, this);
             if (workspace != null) {
@@ -344,11 +376,15 @@ public abstract class Slave extends Node implements Serializable {
         }
 
         FilePath r = getWorkspaceRoot();
-        if(r==null)     return null;    // offline
+        if(r==null)
+		 {
+			return null;    // offline
+		}
         return r.child(item.getFullName());
     }
 
-    @CheckForNull
+	@Override
+	@CheckForNull
     public FilePath getRootPath() {
         final SlaveComputer computer = getComputer();
         if (computer == null) {
@@ -359,127 +395,32 @@ public abstract class Slave extends Node implements Serializable {
         }
     }
 
-    /**
+	/**
      * Root directory on this agent where all the job workspaces are laid out.
      * @return
      *      null if not connected.
      */
     public @CheckForNull FilePath getWorkspaceRoot() {
         FilePath r = getRootPath();
-        if(r==null) return null;
+        if(r==null) {
+			return null;
+		}
         return r.child(WORKSPACE_ROOT);
     }
 
-    /**
-     * Web-bound object used to serve jar files for inbound connections.
-     */
-    public static final class JnlpJar implements HttpResponse {
-        private final String fileName;
-
-        public JnlpJar(String fileName) {
-            this.fileName = fileName;
-        }
-
-        public void doIndex( StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
-            URLConnection con = connect();
-            // since we end up redirecting users to jnlpJars/foo.jar/, set the content disposition
-            // so that browsers can download them in the right file name.
-            // see http://support.microsoft.com/kb/260519 and http://www.boutell.com/newfaq/creating/forcedownload.html
-            rsp.setHeader("Content-Disposition", "attachment; filename=" + fileName);
-            InputStream in = con.getInputStream();
-            rsp.serveFile(req, in, con.getLastModified(), con.getContentLength(), "*.jar" );
-            in.close();
-        }
-
-        public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object node) throws IOException, ServletException {
-            doIndex(req,rsp);
-        }
-
-        private URLConnection connect() throws IOException {
-            URL res = getURL();
-            return res.openConnection();
-        }
-
-        public URL getURL() throws IOException {
-            String name = fileName;
-            
-            // Prevent the access to war contents & prevent the folder escaping (SECURITY-195)
-            if (!ALLOWED_JNLPJARS_FILES.contains(name)) {
-                throw new MalformedURLException("The specified file path " + fileName + " is not allowed due to security reasons");
-            }
-            
-            if (name.equals("hudson-cli.jar") || name.equals("jenkins-cli.jar"))  {
-                File cliJar = Which.jarFile(CLI.class);
-                if (cliJar.isFile()) {
-                    name = "jenkins-cli.jar";
-                } else {
-                    URL res = findExecutableJar(cliJar, CLI.class);
-                    if (res != null) {
-                        return res;
-                    }
-                }
-            } else if (name.equals("agent.jar") || name.equals("slave.jar") || name.equals("remoting.jar")) {
-                File remotingJar = Which.jarFile(hudson.remoting.Launcher.class);
-                if (remotingJar.isFile()) {
-                    name = "lib/" + remotingJar.getName();
-                } else {
-                    URL res = findExecutableJar(remotingJar, hudson.remoting.Launcher.class);
-                    if (res != null) {
-                        return res;
-                    }
-                }
-            }
-            
-            URL res = Jenkins.get().servletContext.getResource("/WEB-INF/" + name);
-            if(res==null) {
-                throw new FileNotFoundException(name); // giving up
-            } else {
-                LOGGER.log(Level.FINE, "found {0}", res);
-            }
-            return res;
-        }
-
-        /** Useful for {@code JenkinsRule.createSlave}, {@code hudson-dev:run}, etc. */
-        private @CheckForNull URL findExecutableJar(File notActuallyJAR, Class<?> mainClass) throws IOException {
-            if (notActuallyJAR.getName().equals("classes")) {
-                File[] siblings = notActuallyJAR.getParentFile().listFiles();
-                if (siblings != null) {
-                    for (File actualJar : siblings) {
-                        if (actualJar.getName().endsWith(".jar")) {
-                            try (JarFile jf = new JarFile(actualJar, false)) {
-                                Manifest mf = jf.getManifest();
-                                if (mf != null && mainClass.getName().equals(mf.getMainAttributes().getValue("Main-Class"))) {
-                                    LOGGER.log(Level.FINE, "found {0}", actualJar);
-                                    return actualJar.toURI().toURL();
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            return null;
-        }
-
-        public byte[] readFully() throws IOException {
-            try (InputStream in = connect().getInputStream()) {
-                return IOUtils.toByteArray(in);
-            }
-        }
-
-    }
-
-    /**
+	/**
      * Creates a launcher for the agent.
      *
      * @return
      *      If there is no computer it will return a {@link hudson.Launcher.DummyLauncher}, otherwise it
      *      will return a {@link hudson.Launcher.RemoteLauncher} instead.
      */
-    @Nonnull
+    @Override
+	@Nonnull
     public Launcher createLauncher(TaskListener listener) {
         SlaveComputer c = getComputer();
         if (c == null) {
-            listener.error("Issue with creating launcher for agent " + name + ". Computer has been disconnected");
+            listener.error(new StringBuilder().append("Issue with creating launcher for agent ").append(name).append(". Computer has been disconnected").toString());
             return new Launcher.DummyLauncher(listener);
         } else {
             // TODO: ideally all the logic below should be inside the SlaveComputer class with proper locking to prevent race conditions, 
@@ -489,7 +430,7 @@ public abstract class Slave extends Node implements Serializable {
             // Otherwise we may end up running the command on a wrong (reconnected) Node instance.
             Slave node = c.getNode();
             if (node != this) {
-                String message = "Issue with creating launcher for agent " + name + ". Computer has been reconnected";
+                String message = new StringBuilder().append("Issue with creating launcher for agent ").append(name).append(". Computer has been reconnected").toString();
                 if (LOGGER.isLoggable(Level.WARNING)) {
                     LOGGER.log(Level.WARNING, message, new IllegalStateException("Computer has been reconnected, this Node instance cannot be used anymore"));
                 }
@@ -521,9 +462,9 @@ public abstract class Slave extends Node implements Serializable {
             return new RemoteLauncher(listener, channel, isUnix).decorateFor(this);
         }
     }
-    
-    private void reportLauncherCreateError(@Nonnull String humanReadableMsg, @CheckForNull String exceptionDetails, @Nonnull TaskListener listener) {
-        String message = "Issue with creating launcher for agent " + name + ". " + humanReadableMsg;
+
+	private void reportLauncherCreateError(@Nonnull String humanReadableMsg, @CheckForNull String exceptionDetails, @Nonnull TaskListener listener) {
+        String message = new StringBuilder().append("Issue with creating launcher for agent ").append(name).append(". ").append(humanReadableMsg).toString();
         listener.error(message);
         if (LOGGER.isLoggable(Level.WARNING)) {
             // Send stacktrace to the log as well in order to diagnose the root cause of issues like JENKINS-38527
@@ -533,7 +474,7 @@ public abstract class Slave extends Node implements Serializable {
         }
     }
 
-    /**
+	/**
      * Gets the corresponding computer object.
      *
      * @return
@@ -545,38 +486,144 @@ public abstract class Slave extends Node implements Serializable {
         return (SlaveComputer)toComputer();
     }
 
-    @Override
+	@Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+			return true;
+		}
+        if (o == null || getClass() != o.getClass()) {
+			return false;
+		}
 
         final Slave that = (Slave) o;
 
         return name.equals(that.name);
     }
 
-    @Override
+	@Override
     public int hashCode() {
         return name.hashCode();
     }
 
-    /**
+	/**
      * Invoked by XStream when this object is read into memory.
      */
     protected Object readResolve() {
-        if(nodeProperties==null)
-            nodeProperties = new DescribableList<>(this);
+        if(nodeProperties==null) {
+			nodeProperties = new DescribableList<>(this);
+		}
         return this;
     }
 
-    public SlaveDescriptor getDescriptor() {
+	@Override
+	public SlaveDescriptor getDescriptor() {
         Descriptor d = Jenkins.get().getDescriptorOrDie(getClass());
-        if (d instanceof SlaveDescriptor)
-            return (SlaveDescriptor) d;
+        if (d instanceof SlaveDescriptor) {
+			return (SlaveDescriptor) d;
+		}
         throw new IllegalStateException(d.getClass()+" needs to extend from SlaveDescriptor");
     }
+    
+    /**
+     * Web-bound object used to serve jar files for inbound connections.
+     */
+    public static final class JnlpJar implements HttpResponse {
+        private final String fileName;
 
-    public static abstract class SlaveDescriptor extends NodeDescriptor {
+        public JnlpJar(String fileName) {
+            this.fileName = fileName;
+        }
+
+        public void doIndex( StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
+            URLConnection con = connect();
+            // since we end up redirecting users to jnlpJars/foo.jar/, set the content disposition
+            // so that browsers can download them in the right file name.
+            // see http://support.microsoft.com/kb/260519 and http://www.boutell.com/newfaq/creating/forcedownload.html
+            rsp.setHeader("Content-Disposition", "attachment; filename=" + fileName);
+            InputStream in = con.getInputStream();
+            rsp.serveFile(req, in, con.getLastModified(), con.getContentLength(), "*.jar" );
+            in.close();
+        }
+
+        @Override
+		public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object node) throws IOException, ServletException {
+            doIndex(req,rsp);
+        }
+
+        private URLConnection connect() throws IOException {
+            URL res = getURL();
+            return res.openConnection();
+        }
+
+        public URL getURL() throws IOException {
+            String name = fileName;
+            
+            // Prevent the access to war contents & prevent the folder escaping (SECURITY-195)
+            if (!ALLOWED_JNLPJARS_FILES.contains(name)) {
+                throw new MalformedURLException(new StringBuilder().append("The specified file path ").append(fileName).append(" is not allowed due to security reasons").toString());
+            }
+            
+            if ("hudson-cli.jar".equals(name) || "jenkins-cli.jar".equals(name))  {
+                File cliJar = Which.jarFile(CLI.class);
+                if (cliJar.isFile()) {
+                    name = "jenkins-cli.jar";
+                } else {
+                    URL res = findExecutableJar(cliJar, CLI.class);
+                    if (res != null) {
+                        return res;
+                    }
+                }
+            } else if ("agent.jar".equals(name) || "slave.jar".equals(name) || "remoting.jar".equals(name)) {
+                File remotingJar = Which.jarFile(hudson.remoting.Launcher.class);
+                if (remotingJar.isFile()) {
+                    name = "lib/" + remotingJar.getName();
+                } else {
+                    URL res = findExecutableJar(remotingJar, hudson.remoting.Launcher.class);
+                    if (res != null) {
+                        return res;
+                    }
+                }
+            }
+            
+            URL res = Jenkins.get().servletContext.getResource("/WEB-INF/" + name);
+            if(res==null) {
+                throw new FileNotFoundException(name); // giving up
+            } else {
+                LOGGER.log(Level.FINE, "found {0}", res);
+            }
+            return res;
+        }
+
+        /** Useful for {@code JenkinsRule.createSlave}, {@code hudson-dev:run}, etc. */
+        private @CheckForNull URL findExecutableJar(File notActuallyJAR, Class<?> mainClass) throws IOException {
+            if ("classes".equals(notActuallyJAR.getName())) {
+                File[] siblings = notActuallyJAR.getParentFile().listFiles();
+                if (siblings != null) {
+                    for (File actualJar : siblings) {
+                        if (actualJar.getName().endsWith(".jar")) {
+                            try (JarFile jf = new JarFile(actualJar, false)) {
+                                Manifest mf = jf.getManifest();
+                                if (mf != null && mainClass.getName().equals(mf.getMainAttributes().getValue("Main-Class"))) {
+                                    LOGGER.log(Level.FINE, "found {0}", actualJar);
+                                    return actualJar.toURI().toURL();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        public byte[] readFully() throws IOException {
+            try (InputStream in = connect().getInputStream()) {
+                return IOUtils.toByteArray(in);
+            }
+        }
+
+    }
+
+    public abstract static class SlaveDescriptor extends NodeDescriptor {
         public FormValidation doCheckNumExecutors(@QueryParameter String value) {
             return FormValidation.validatePositiveInteger(value);
         }
@@ -585,11 +632,13 @@ public abstract class Slave extends Node implements Serializable {
          * Performs syntactical check on the remote FS for agents.
          */
         public FormValidation doCheckRemoteFS(@QueryParameter String value) throws IOException, ServletException {
-            if(Util.fixEmptyAndTrim(value)==null)
-                return FormValidation.error(Messages.Slave_Remote_Director_Mandatory());
+            if(Util.fixEmptyAndTrim(value)==null) {
+				return FormValidation.error(Messages.Slave_Remote_Director_Mandatory());
+			}
 
-            if(value.startsWith("\\\\") || value.startsWith("/net/"))
-                return FormValidation.warning(Messages.Slave_Network_Mounted_File_System_Warning());
+            if(value.startsWith("\\\\") || value.startsWith("/net/")) {
+				return FormValidation.warning(Messages.Slave_Network_Mounted_File_System_Warning());
+			}
 
             if (Util.isRelativePath(value)) {
                 return FormValidation.warning(Messages.Slave_Remote_Relative_Path_Warning());
@@ -657,18 +706,7 @@ public abstract class Slave extends Node implements Serializable {
     }
 
 
-//
-// backward compatibility
-//
-    /**
-     * Command line to launch the agent, like
-     * "ssh myslave java -jar /path/to/hudson-remoting.jar"
-     * @deprecated in 1.216
-     */
-    @Deprecated
-    private transient String agentCommand;
-
-    /**
+/**
      * Obtains the clock difference between this side and that side of the channel.
      *
      * <p>
@@ -682,30 +720,31 @@ public abstract class Slave extends Node implements Serializable {
      * </ol>
      */
     private static final class GetClockDifference1 extends MasterToSlaveCallable<ClockDifference,IOException> {
-        public ClockDifference call() {
+        private static final long serialVersionUID = 1L;
+
+		@Override
+		public ClockDifference call() {
             // this method must be being invoked locally, which means the clock is in sync
             return new ClockDifference(0);
         }
 
-        private Object writeReplace() {
+		private Object writeReplace() {
             return new GetClockDifference2();
         }
-
-        private static final long serialVersionUID = 1L;
     }
 
     private static final class GetClockDifference2 extends MasterToSlaveCallable<GetClockDifference3,IOException> {
-        /**
+        private static final long serialVersionUID = 1L;
+		/**
          * Capture the time on the master when this object is sent to remote, which is when
          * {@link GetClockDifference1#writeReplace()} is run.
          */
         private final long startTime = System.currentTimeMillis();
 
-        public GetClockDifference3 call() {
+		@Override
+		public GetClockDifference3 call() {
             return new GetClockDifference3(startTime);
         }
-
-        private static final long serialVersionUID = 1L;
     }
 
     private static final class GetClockDifference3 implements Serializable {
@@ -721,14 +760,4 @@ public abstract class Slave extends Node implements Serializable {
             return new ClockDifference((startTime + endTime)/2-remoteTime);
         }
     }
-
-    /**
-     * Determines the workspace root file name for those who really really need the shortest possible path name.
-     */
-    private static final String WORKSPACE_ROOT = SystemProperties.getString(Slave.class.getName()+".workspaceRoot","workspace");
-
-    /**
-     * Provides a collection of file names, which are accessible via /jnlpJars link.
-     */
-    private static final Set<String> ALLOWED_JNLPJARS_FILES = ImmutableSet.of("agent.jar", "slave.jar", "remoting.jar", "jenkins-cli.jar", "hudson-cli.jar");
 }

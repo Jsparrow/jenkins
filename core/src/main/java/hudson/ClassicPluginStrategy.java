@@ -77,6 +77,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static org.apache.commons.io.FilenameUtils.getBaseName;
+import java.util.stream.Collectors;
 
 public class ClassicPluginStrategy implements PluginStrategy {
 
@@ -85,29 +86,29 @@ public class ClassicPluginStrategy implements PluginStrategy {
     /**
      * Filter for jar files.
      */
-    private static final FilenameFilter JAR_FILTER = new FilenameFilter() {
-        public boolean accept(File dir,String name) {
-            return name.endsWith(".jar");
-        }
-    };
+    private static final FilenameFilter JAR_FILTER = (File dir, String name) -> name.endsWith(".jar");
 
-    private PluginManager pluginManager;
+	public static boolean useAntClassLoader = SystemProperties.getBoolean(ClassicPluginStrategy.class.getName()+".useAntClassLoader");
 
-    /**
+	public static boolean DISABLE_TRANSFORMER = SystemProperties.getBoolean(ClassicPluginStrategy.class.getName()+".noBytecodeTransformer");
+
+	private PluginManager pluginManager;
+
+	/**
      * All the plugins eventually delegate this classloader to load core, servlet APIs, and SE runtime.
      */
     private final MaskingClassLoader coreClassLoader = new MaskingClassLoader(getClass().getClassLoader());
 
-    public ClassicPluginStrategy(PluginManager pluginManager) {
+	public ClassicPluginStrategy(PluginManager pluginManager) {
         this.pluginManager = pluginManager;
     }
 
-    @Override public String getShortName(File archive) throws IOException {
+	@Override public String getShortName(File archive) throws IOException {
         Manifest manifest;
         if (!archive.exists()) {
-            throw new FileNotFoundException("Failed to load " + archive + ". The file does not exist");
+            throw new FileNotFoundException(new StringBuilder().append("Failed to load ").append(archive).append(". The file does not exist").toString());
         } else if (!archive.isFile()) {
-            throw new FileNotFoundException("Failed to load " + archive + ". It is not a file");
+            throw new FileNotFoundException(new StringBuilder().append("Failed to load ").append(archive).append(". It is not a file").toString());
         }
 
         if (isLinked(archive)) {
@@ -123,11 +124,11 @@ public class ClassicPluginStrategy implements PluginStrategy {
         return PluginWrapper.computeShortName(manifest, archive.getName());
     }
 
-    private static boolean isLinked(File archive) {
+	private static boolean isLinked(File archive) {
         return archive.getName().endsWith(".hpl") || archive.getName().endsWith(".jpl");
     }
 
-    private static Manifest loadLinkedManifest(File archive) throws IOException {
+	private static Manifest loadLinkedManifest(File archive) throws IOException {
             // resolve the .hpl file to the location of the manifest file        
             try {
                 // Locate the manifest
@@ -156,7 +157,7 @@ public class ClassicPluginStrategy implements PluginStrategy {
             }
     }
 
-    @Override public PluginWrapper createPluginWrapper(File archive) throws IOException {
+	@Override public PluginWrapper createPluginWrapper(File archive) throws IOException {
         final Manifest manifest;
 
         URL baseResourceURL;
@@ -188,7 +189,7 @@ public class ClassicPluginStrategy implements PluginStrategy {
             }
             String canonicalName = manifest.getMainAttributes().getValue("Short-Name") + ".jpi";
             if (!archive.getName().equals(canonicalName)) {
-                LOGGER.warning(() -> "encountered " + archive + " under a nonstandard name; expected " + canonicalName);
+                LOGGER.warning(() -> new StringBuilder().append("encountered ").append(archive).append(" under a nonstandard name; expected ").append(canonicalName).toString());
             }
         }
 
@@ -211,15 +212,16 @@ public class ClassicPluginStrategy implements PluginStrategy {
             }
             File lib = new File(expandDir, "WEB-INF/lib");
             File[] libs = lib.listFiles(JAR_FILTER);
-            if (libs != null)
-                paths.addAll(Arrays.asList(libs));
+            if (libs != null) {
+				paths.addAll(Arrays.asList(libs));
+			}
 
             baseResourceURL = expandDir.toPath().toUri().toURL();
 
         }
         File disableFile = new File(archive.getPath() + ".disabled");
         if (disableFile.exists()) {
-            LOGGER.info("Plugin " + archive.getName() + " is disabled");
+            LOGGER.info(new StringBuilder().append("Plugin ").append(archive.getName()).append(" is disabled").toString());
         }
 
         // compute dependencies
@@ -244,8 +246,9 @@ public class ClassicPluginStrategy implements PluginStrategy {
         // also need to be masked by all the other plugins that depend on the database plugin.
         String masked = atts.getValue("Global-Mask-Classes");
         if(masked!=null) {
-            for (String pkg : masked.trim().split("[ \t\r\n]+"))
-                coreClassLoader.add(pkg);
+            for (String pkg : masked.trim().split("[ \t\r\n]+")) {
+				coreClassLoader.add(pkg);
+			}
         }
 
         ClassLoader dependencyLoader = new DependencyClassLoader(coreClassLoader, archive, Util.join(dependencies,optionalDependencies));
@@ -255,21 +258,22 @@ public class ClassicPluginStrategy implements PluginStrategy {
                 createClassLoader(paths, dependencyLoader, atts), disableFile, dependencies, optionalDependencies);
     }
 
-    private void fix(Attributes atts, List<PluginWrapper.Dependency> optionalDependencies) {
+	private void fix(Attributes atts, List<PluginWrapper.Dependency> optionalDependencies) {
         String pluginName = atts.getValue("Short-Name");
         
         String jenkinsVersion = atts.getValue("Jenkins-Version");
-        if (jenkinsVersion==null)
-            jenkinsVersion = atts.getValue("Hudson-Version");
+        if (jenkinsVersion==null) {
+			jenkinsVersion = atts.getValue("Hudson-Version");
+		}
 
-        for (Dependency d : DetachedPluginsUtil.getImpliedDependencies(pluginName, jenkinsVersion)) {
-            LOGGER.fine(() -> "implied dep " + pluginName + " → " + d.shortName);
+        DetachedPluginsUtil.getImpliedDependencies(pluginName, jenkinsVersion).forEach(d -> {
+            LOGGER.fine(() -> new StringBuilder().append("implied dep ").append(pluginName).append(" → ").append(d.shortName).toString());
             pluginManager.considerDetachedPlugin(d.shortName);
             optionalDependencies.add(d);
-        }
+        });
     }
 
-    /**
+	/**
      * @see DetachedPluginsUtil#getImpliedDependencies(String, String)
      */
     @Deprecated // since TODO
@@ -278,12 +282,12 @@ public class ClassicPluginStrategy implements PluginStrategy {
         return DetachedPluginsUtil.getImpliedDependencies(pluginName, jenkinsVersion);
     }
 
-    @Deprecated
+	@Deprecated
     protected ClassLoader createClassLoader(List<File> paths, ClassLoader parent) throws IOException {
         return createClassLoader( paths, parent, null );
     }
 
-    /**
+	/**
      * Creates the classloader that can load all the specified jar files and delegate to the given parent.
      */
     protected ClassLoader createClassLoader(List<File> paths, ClassLoader parent, Attributes atts) throws IOException {
@@ -303,7 +307,7 @@ public class ClassicPluginStrategy implements PluginStrategy {
         return classLoader;
     }
 
-    /**
+	/**
      * Computes the classloader that takes the class masking into account.
      *
      * <p>
@@ -311,15 +315,18 @@ public class ClassicPluginStrategy implements PluginStrategy {
      */
     private ClassLoader getBaseClassLoader(Attributes atts, ClassLoader base) {
         String masked = atts.getValue("Mask-Classes");
-        if(masked!=null)
-            base = new MaskingClassLoader(base, masked.trim().split("[ \t\r\n]+"));
+        if(masked!=null) {
+			base = new MaskingClassLoader(base, masked.trim().split("[ \t\r\n]+"));
+		}
         return base;
     }
 
-    public void initializeComponents(PluginWrapper plugin) {
+	@Override
+	public void initializeComponents(PluginWrapper plugin) {
     }
 
-    public <T> List<ExtensionComponent<T>> findComponents(Class<T> type, Hudson hudson) {
+	@Override
+	public <T> List<ExtensionComponent<T>> findComponents(Class<T> type, Hudson hudson) {
 
         List<ExtensionFinder> finders;
         if (type==ExtensionFinder.class) {
@@ -332,33 +339,29 @@ public class ClassicPluginStrategy implements PluginStrategy {
         /**
          * See {@link ExtensionFinder#scout(Class, Hudson)} for the dead lock issue and what this does.
          */
-        if (LOGGER.isLoggable(Level.FINER))
-            LOGGER.log(Level.FINER, "Scout-loading ExtensionList: "+type, new Throwable());
-        for (ExtensionFinder finder : finders) {
-            finder.scout(type, hudson);
-        }
+        if (LOGGER.isLoggable(Level.FINER)) {
+			LOGGER.log(Level.FINER, "Scout-loading ExtensionList: "+type, new Throwable());
+		}
+        finders.forEach(finder -> finder.scout(type, hudson));
 
         List<ExtensionComponent<T>> r = Lists.newArrayList();
-        for (ExtensionFinder finder : finders) {
+        finders.forEach(finder -> {
             try {
                 r.addAll(finder.find(type, hudson));
             } catch (AbstractMethodError e) {
                 // backward compatibility
-                for (T t : finder.findExtensions(type, hudson))
-                    r.add(new ExtensionComponent<>(t));
+				finder.findExtensions(type, hudson).forEach(t -> r.add(new ExtensionComponent<>(t)));
             }
-        }
+        });
 
         List<ExtensionComponent<T>> filtered = Lists.newArrayList();
-        for (ExtensionComponent<T> e : r) {
-            if (ExtensionFilter.isAllowed(type,e))
-                filtered.add(e);
-        }
+        filtered.addAll(r.stream().filter(e -> ExtensionFilter.isAllowed(type,e)).collect(Collectors.toList()));
 
         return filtered;
     }
 
-    public void load(PluginWrapper wrapper) throws IOException {
+	@Override
+	public void load(PluginWrapper wrapper) throws IOException {
         // override the context classloader. This no longer makes sense,
         // but it is left for the backward compatibility
         ClassLoader old = Thread.currentThread().getContextClassLoader();
@@ -377,9 +380,9 @@ public class ClassicPluginStrategy implements PluginStrategy {
                     }
                     wrapper.setPlugin((Plugin) o);
                 } catch (LinkageError | ClassNotFoundException e) {
-                    throw new IOException("Unable to load " + className + " from " + wrapper.getShortName(),e);
+                    throw new IOException(new StringBuilder().append("Unable to load ").append(className).append(" from ").append(wrapper.getShortName()).toString(),e);
                 } catch (IllegalAccessException | InstantiationException e) {
-                    throw new IOException("Unable to create instance of " + className + " from " + wrapper.getShortName(),e);
+                    throw new IOException(new StringBuilder().append("Unable to create instance of ").append(className).append(" from ").append(wrapper.getShortName()).toString(),e);
                 }
             }
 
@@ -397,20 +400,21 @@ public class ClassicPluginStrategy implements PluginStrategy {
         }
     }
 
-    public void startPlugin(PluginWrapper plugin) throws Exception {
+	public void startPlugin(PluginWrapper plugin) throws Exception {
         plugin.getPlugin().start();
     }
 
-    @Override
+	@Override
     public void updateDependency(PluginWrapper depender, PluginWrapper dependee) {
         DependencyClassLoader classLoader = findAncestorDependencyClassLoader(depender.classLoader);
-        if (classLoader != null) {
-            classLoader.updateTransientDependencies();
-            LOGGER.log(Level.INFO, "Updated dependency of {0}", depender.getShortName());
-        }
+        if (classLoader == null) {
+			return;
+		}
+		classLoader.updateTransientDependencies();
+		LOGGER.log(Level.INFO, "Updated dependency of {0}", depender.getShortName());
     }
 
-    private DependencyClassLoader findAncestorDependencyClassLoader(ClassLoader classLoader)
+	private DependencyClassLoader findAncestorDependencyClassLoader(ClassLoader classLoader)
     {
         for (; classLoader != null; classLoader = classLoader.getParent()) {
             if (classLoader instanceof DependencyClassLoader) {
@@ -431,17 +435,21 @@ public class ClassicPluginStrategy implements PluginStrategy {
         return null;
     }
 
-    private static File resolve(File base, String relative) {
+	private static File resolve(File base, String relative) {
         File rel = new File(relative);
-        if(rel.isAbsolute())
-            return rel;
-        else
-            return new File(base.getParentFile(),relative);
+        if(rel.isAbsolute()) {
+			return rel;
+		} else {
+			return new File(base.getParentFile(),relative);
+		}
     }
 
-    private static void parseClassPath(Manifest manifest, File archive, List<File> paths, String attributeName, String separator) throws IOException {
+	private static void parseClassPath(Manifest manifest, File archive, List<File> paths, String attributeName, String separator) throws IOException {
         String classPath = manifest.getMainAttributes().getValue(attributeName);
-        if(classPath==null) return; // attribute not found
+        if(classPath==null)
+		 {
+			return; // attribute not found
+		}
         for (String s : classPath.split(separator)) {
             File file = resolve(archive, s);
             if(file.getName().contains("*")) {
@@ -454,14 +462,15 @@ public class ClassicPluginStrategy implements PluginStrategy {
                     paths.add(new File(dir,included));
                 }
             } else {
-                if(!file.exists())
-                    throw new IOException("No such file: "+file);
+                if(!file.exists()) {
+					throw new IOException("No such file: "+file);
+				}
                 paths.add(file);
             }
         }
     }
 
-    /**
+	/**
      * Explodes the plugin into a directory, if necessary.
      */
     private static void explode(File archive, File destDir) throws IOException {
@@ -470,7 +479,9 @@ public class ClassicPluginStrategy implements PluginStrategy {
         // timestamp check
         File explodeTime = new File(destDir,".timestamp2");
         if(explodeTime.exists() && explodeTime.lastModified()==archive.lastModified())
-            return; // no need to expand
+		 {
+			return; // no need to expand
+		}
 
         // delete the contents so that old files won't interfere with new files
         Util.deleteRecursive(destDir);
@@ -490,7 +501,7 @@ public class ClassicPluginStrategy implements PluginStrategy {
         }
     }
 
-    /**
+	/**
      * Repackage classes directory into a jar file to make it remoting friendly.
      * The remoting layer can cache jar files but not class files.
      */
@@ -524,7 +535,8 @@ public class ClassicPluginStrategy implements PluginStrategy {
                  * Forces the fixed timestamp for directories to make sure
                  * classes.jar always get a consistent checksum.
                  */
-                protected void zipDir(Resource dir, ZipOutputStream zOut, String vPath,
+                @Override
+				protected void zipDir(Resource dir, ZipOutputStream zOut, String vPath,
                                       int mode, ZipExtraField[] extra)
                     throws IOException {
                     // use wrappedZOut instead of zOut
@@ -543,7 +555,7 @@ public class ClassicPluginStrategy implements PluginStrategy {
         }
     }
 
-    private static void unzipExceptClasses(File archive, File destDir, Project prj) {
+	private static void unzipExceptClasses(File archive, File destDir, Project prj) {
         Expand e = new Expand();
         e.setProject(prj);
         e.setTaskType("unzip");
@@ -588,11 +600,11 @@ public class ClassicPluginStrategy implements PluginStrategy {
                     @Override
                     protected List<PluginWrapper> getEdges(PluginWrapper pw) {
                         List<PluginWrapper> dep = new ArrayList<>();
-                        for (Dependency d : pw.getDependencies()) {
-                            PluginWrapper p = pluginManager.getPlugin(d.shortName);
-                            if (p!=null && p.isActive())
-                                dep.add(p);
-                        }
+                        pw.getDependencies().stream().map(d -> pluginManager.getPlugin(d.shortName)).forEach(p -> {
+							if (p!=null && p.isActive()) {
+								dep.add(p);
+							}
+						});
                         return dep;
                     }
                 };
@@ -600,8 +612,9 @@ public class ClassicPluginStrategy implements PluginStrategy {
                 try {
                     for (Dependency d : dependencies) {
                         PluginWrapper p = pluginManager.getPlugin(d.shortName);
-                        if (p!=null && p.isActive())
-                            cgd.run(Collections.singleton(p));
+                        if (p!=null && p.isActive()) {
+							cgd.run(Collections.singleton(p));
+						}
                     }
                 } catch (CycleDetectedException e) {
                     throw new AssertionError(e);    // such error should have been reported earlier
@@ -627,7 +640,9 @@ public class ClassicPluginStrategy implements PluginStrategy {
                 for (PluginWrapper pw : getTransitiveDependencies()) {
                     try {
                         Class<?> c = ClassLoaderReflectionToolkit._findLoadedClass(pw.classLoader, name);
-                        if (c!=null)    return c;
+                        if (c!=null) {
+							return c;
+						}
                         return ClassLoaderReflectionToolkit._findClass(pw.classLoader, name);
                     } catch (ClassNotFoundException ignored) {
                         //not found. try next
@@ -658,16 +673,18 @@ public class ClassicPluginStrategy implements PluginStrategy {
             if (PluginManager.FAST_LOOKUP) {
                     for (PluginWrapper pw : getTransitiveDependencies()) {
                         Enumeration<URL> urls = ClassLoaderReflectionToolkit._findResources(pw.classLoader, name);
-                        while (urls != null && urls.hasMoreElements())
-                            result.add(urls.nextElement());
+                        while (urls != null && urls.hasMoreElements()) {
+							result.add(urls.nextElement());
+						}
                     }
             } else {
                 for (Dependency dep : dependencies) {
                     PluginWrapper p = pluginManager.getPlugin(dep.shortName);
                     if (p!=null) {
                         Enumeration<URL> urls = p.classLoader.getResources(name);
-                        while (urls != null && urls.hasMoreElements())
-                            result.add(urls.nextElement());
+                        while (urls != null && urls.hasMoreElements()) {
+							result.add(urls.nextElement());
+						}
                     }
                 }
             }
@@ -680,15 +697,18 @@ public class ClassicPluginStrategy implements PluginStrategy {
             if (PluginManager.FAST_LOOKUP) {
                     for (PluginWrapper pw : getTransitiveDependencies()) {
                         URL url = ClassLoaderReflectionToolkit._findResource(pw.classLoader, name);
-                        if (url!=null)    return url;
+                        if (url!=null) {
+							return url;
+						}
                     }
             } else {
                 for (Dependency dep : dependencies) {
                     PluginWrapper p = pluginManager.getPlugin(dep.shortName);
                     if(p!=null) {
                         URL url = p.classLoader.getResource(name);
-                        if (url!=null)
-                            return url;
+                        if (url!=null) {
+							return url;
+						}
                     }
                 }
             }
@@ -707,12 +727,10 @@ public class ClassicPluginStrategy implements PluginStrategy {
         
         @Override
         protected Class defineClassFromData(File container, byte[] classData, String classname) throws IOException {
-            if (!DISABLE_TRANSFORMER)
-                classData = pluginManager.getCompatibilityTransformer().transform(classname, classData, this);
+            if (!DISABLE_TRANSFORMER) {
+				classData = pluginManager.getCompatibilityTransformer().transform(classname, classData, this);
+			}
             return super.defineClassFromData(container, classData, classname);
         }
     }
-
-    public static boolean useAntClassLoader = SystemProperties.getBoolean(ClassicPluginStrategy.class.getName()+".useAntClassLoader");
-    public static boolean DISABLE_TRANSFORMER = SystemProperties.getBoolean(ClassicPluginStrategy.class.getName()+".noBytecodeTransformer");
 }

@@ -39,19 +39,21 @@ import java.nio.charset.Charset;
  * @author Kohsuke Kawaguchi
  */
 public class StreamBuildListener extends StreamTaskListener implements BuildListener {
-    public StreamBuildListener(OutputStream out, Charset charset) {
+    private static final long serialVersionUID = 1L;
+
+	public StreamBuildListener(OutputStream out, Charset charset) {
         super(out, charset);
     }
 
-    public StreamBuildListener(File out, Charset charset) throws IOException {
+	public StreamBuildListener(File out, Charset charset) throws IOException {
         super(out, charset);
     }
 
-    public StreamBuildListener(OutputStream w) {
+	public StreamBuildListener(OutputStream w) {
         super(w);
     }
 
-    /**
+	/**
      * @deprecated as of 1.349
      *      The caller should use {@link #StreamBuildListener(OutputStream, Charset)} to pass in
      *      the charset and output stream separately, so that this class can handle encoding correctly.
@@ -61,9 +63,7 @@ public class StreamBuildListener extends StreamTaskListener implements BuildList
         super(w);
     }
 
-    public StreamBuildListener(PrintStream w, Charset charset) {
+	public StreamBuildListener(PrintStream w, Charset charset) {
         super(w,charset);
     }
-
-    private static final long serialVersionUID = 1L;
 }

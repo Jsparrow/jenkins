@@ -62,13 +62,16 @@ public class Failure extends RuntimeException implements HttpResponse {
         generateResponse(req, rsp, node);
     }
 
-    public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object node) throws IOException, ServletException {
+    @Override
+	public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object node) throws IOException, ServletException {
         req.setAttribute("message",getMessage());
-        if(pre)
-            req.setAttribute("pre",true);
-        if (node instanceof AbstractItem) // Maintain ancestors
-            rsp.forward(Jenkins.get(), ((AbstractItem)node).getUrl() + "error", req);
-        else
-            rsp.forward(node instanceof AbstractModelObject ? node : Jenkins.get() ,"error", req);
+        if(pre) {
+			req.setAttribute("pre",true);
+		}
+        if (node instanceof AbstractItem) {
+			rsp.forward(Jenkins.get(), ((AbstractItem)node).getUrl() + "error", req);
+		} else {
+			rsp.forward(node instanceof AbstractModelObject ? node : Jenkins.get() ,"error", req);
+		}
     }
 }

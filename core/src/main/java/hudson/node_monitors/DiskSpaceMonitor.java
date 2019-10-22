@@ -43,41 +43,46 @@ import java.text.ParseException;
  * @since 1.123
  */
 public class DiskSpaceMonitor extends AbstractDiskSpaceMonitor {
-    @DataBoundConstructor
-	public DiskSpaceMonitor(String freeSpaceThreshold) throws ParseException {
-        super(freeSpaceThreshold);
-	}
-
-    public DiskSpaceMonitor() {}
-    
-    public DiskSpace getFreeSpace(Computer c) {
-        return DESCRIPTOR.get(c);
-    }
-
-    @Override
-    public String getColumnCaption() {
-        // Hide this column from non-admins
-        return Jenkins.get().hasPermission(Jenkins.ADMINISTER) ? super.getColumnCaption() : null;
-    }
-
     public static final DiskSpaceMonitorDescriptor DESCRIPTOR = new DiskSpaceMonitorDescriptor() {
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.DiskSpaceMonitor_DisplayName();
         }
 
         @Override
         protected Callable<DiskSpace, IOException> createCallable(Computer c) {
             Node node = c.getNode();
-            if (node == null) return null;
+            if (node == null) {
+				return null;
+			}
             
             FilePath p = node.getRootPath();
-            if(p==null) return null;
+            if(p==null) {
+				return null;
+			}
 
             return p.asCallableWith(new GetUsableSpace());
         }
     };
 
-    @Extension
+	@DataBoundConstructor
+	public DiskSpaceMonitor(String freeSpaceThreshold) throws ParseException {
+        super(freeSpaceThreshold);
+	}
+
+	public DiskSpaceMonitor() {}
+
+	public DiskSpace getFreeSpace(Computer c) {
+        return DESCRIPTOR.get(c);
+    }
+
+	@Override
+    public String getColumnCaption() {
+        // Hide this column from non-admins
+        return Jenkins.get().hasPermission(Jenkins.ADMINISTER) ? super.getColumnCaption() : null;
+    }
+
+	@Extension
     public static DiskSpaceMonitorDescriptor install() {
         return DESCRIPTOR;
     }

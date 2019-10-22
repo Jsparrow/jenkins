@@ -49,20 +49,20 @@ import org.kohsuke.stapler.framework.io.WriterOutputStream;
  * @since 1.349
  */
 public class ConsoleAnnotationOutputStream<T> extends LineTransformationOutputStream {
-    private final Writer out; // not an OutputStream so cannot use LineTransformationOutputStream.Delegating
-    private final T context;
-    private ConsoleAnnotator<T> ann;
-
-    /**
+    private static final Logger LOGGER = Logger.getLogger(ConsoleAnnotationOutputStream.class.getName());
+	private final Writer out; // not an OutputStream so cannot use LineTransformationOutputStream.Delegating
+	private final T context;
+	private ConsoleAnnotator<T> ann;
+	/**
      * Reused buffer that stores char representation of a single line.
      */
     private final LineBuffer line = new LineBuffer(256);
-    /**
+	/**
      * {@link OutputStream} that writes to {@link #line}.
      */
     private final WriterOutputStream lineOut;
 
-    /**
+	/**
      *
      */
     public ConsoleAnnotationOutputStream(Writer out, ConsoleAnnotator<? super T> ann, T context, Charset charset) {
@@ -72,11 +72,11 @@ public class ConsoleAnnotationOutputStream<T> extends LineTransformationOutputSt
         this.lineOut = new WriterOutputStream(line,charset);
     }
 
-    public ConsoleAnnotator<T> getConsoleAnnotator() {
+	public ConsoleAnnotator<T> getConsoleAnnotator() {
         return ann;
     }
 
-    /**
+	/**
      * Called after we read the whole line of plain text, which is stored in {@link #buf}.
      * This method performs annotations and send the result to {@link #out}.
      */
@@ -110,8 +110,9 @@ public class ConsoleAnnotationOutputStream<T> extends LineTransformationOutputSt
                 try {
                     final ConsoleNote a = ConsoleNote.readFrom(new DataInputStream(b));
                     if (a!=null) {
-                        if (annotators==null)
-                            annotators = new ArrayList<>();
+                        if (annotators==null) {
+							annotators = new ArrayList<>();
+						}
                         annotators.add(new ConsoleAnnotator<T>() {
                             @Override
                             public ConsoleAnnotator<T> annotate(T context, MarkupText text) {
@@ -121,7 +122,7 @@ public class ConsoleAnnotationOutputStream<T> extends LineTransformationOutputSt
                     }
                 } catch (IOException | ClassNotFoundException e) {
                     // if we failed to resurrect an annotation, ignore it.
-                    LOGGER.log(Level.FINE, "Failed to resurrect annotation from \"" + StringEscapeUtils.escapeJava(new String(in, next, rest)) + "\"", e);
+                    LOGGER.log(Level.FINE, new StringBuilder().append("Failed to resurrect annotation from \"").append(StringEscapeUtils.escapeJava(new String(in, next, rest))).append("\"").toString(), e);
                 }
 
                 int bytesUsed = rest - b.available(); // bytes consumed by annotations
@@ -135,30 +136,33 @@ public class ConsoleAnnotationOutputStream<T> extends LineTransformationOutputSt
 
             if (annotators!=null) {
                 // aggregate newly retrieved ConsoleAnnotators into the current one.
-                if (ann!=null)      annotators.add(ann);
+                if (ann!=null) {
+					annotators.add(ann);
+				}
                 ann = ConsoleAnnotator.combine(annotators);
             }
         }
 
         lineOut.flush();
         MarkupText mt = new MarkupText(strBuf.toString());
-        if (ann!=null)
-            ann = ann.annotate(context,mt);
+        if (ann!=null) {
+			ann = ann.annotate(context,mt);
+		}
         out.write(mt.toString(true)); // this perform escapes
     }
 
-    @Override
+	@Override
     public void flush() throws IOException {
         out.flush();
     }
 
-    @Override
+	@Override
     public void close() throws IOException {
         super.close();
         out.close();
     }
 
-    /**
+	/**
      * {@link StringWriter} enhancement that's capable of shrinking the buffer size.
      *
      * <p>
@@ -172,10 +176,11 @@ public class ConsoleAnnotationOutputStream<T> extends LineTransformationOutputSt
 
         private void reset() {
             StringBuffer buf = getStringBuffer();
-            if (buf.length()>4096)
-                out = new StringWriter(256);
-            else
-                buf.setLength(0);
+            if (buf.length()>4096) {
+				out = new StringWriter(256);
+			} else {
+				buf.setLength(0);
+			}
         }
 
         private StringBuffer getStringBuffer() {
@@ -183,6 +188,4 @@ public class ConsoleAnnotationOutputStream<T> extends LineTransformationOutputSt
             return w.getBuffer();
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(ConsoleAnnotationOutputStream.class.getName());
 }

@@ -98,16 +98,19 @@ public interface RunWithSCM<JobT extends Job<JobT, RunT>,
         return new AbstractSet<User>() {
             private Set<String> culpritIds = ImmutableSet.copyOf(getCulpritIds());
 
-            public Iterator<User> iterator() {
+            @Override
+			public Iterator<User> iterator() {
                 return new AdaptedIterator<String,User>(culpritIds.iterator()) {
-                    protected User adapt(String id) {
+                    @Override
+					protected User adapt(String id) {
                         // TODO: Probably it should not auto-create users
                         return User.getById(id, true);
                     }
                 };
             }
 
-            public int size() {
+            @Override
+			public int size() {
                 return culpritIds.size();
             }
         };
@@ -154,7 +157,8 @@ public interface RunWithSCM<JobT extends Job<JobT, RunT>,
                     }
                 } catch (RuntimeException re) {
                     Logger LOGGER = Logger.getLogger(RunWithSCM.class.getName());
-                    LOGGER.log(Level.INFO, "Failed to determine author of changelog " + e.getCommitId() + "for " + ((RunT) this).getParent().getDisplayName() + ", " + ((RunT) this).getDisplayName(), re);
+                    LOGGER.log(Level.INFO, new StringBuilder().append("Failed to determine author of changelog ").append(e.getCommitId()).append("for ").append(((RunT) this).getParent().getDisplayName()).append(", ")
+							.append(((RunT) this).getDisplayName()).toString(), re);
                 }
             }
         }

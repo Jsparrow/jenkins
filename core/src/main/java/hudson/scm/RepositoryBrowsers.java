@@ -54,9 +54,11 @@ public class RepositoryBrowsers {
      */
     public static List<Descriptor<RepositoryBrowser<?>>> filter(Class<? extends RepositoryBrowser> t) {
         List<Descriptor<RepositoryBrowser<?>>> r = new ArrayList<>();
-        for (Descriptor<RepositoryBrowser<?>> d : RepositoryBrowser.all())
-            if(d.isSubTypeOf(t))
-                r.add(d);
+        for (Descriptor<RepositoryBrowser<?>> d : RepositoryBrowser.all()) {
+			if(d.isSubTypeOf(t)) {
+				r.add(d);
+			}
+		}
         return r;
     }
 
@@ -71,8 +73,9 @@ public class RepositoryBrowsers {
     T createInstance(Class<T> type, StaplerRequest req, String fieldName) throws FormException {
         List<Descriptor<RepositoryBrowser<?>>> list = filter(type);
         String value = req.getParameter(fieldName);
-        if(value==null || value.equals("auto"))
-            return null;
+        if(value==null || "auto".equals(value)) {
+			return null;
+		}
 
         // TODO: There was a TODO in the original code, which presumes passing something meaningful to the newInstance() JSON param
         // Now we just pass empty JSON in order to make the code compliant with the defined interface
@@ -88,7 +91,9 @@ public class RepositoryBrowsers {
     public static <T extends RepositoryBrowser>
     T createInstance(Class<T> type, StaplerRequest req, JSONObject parent, String fieldName) throws FormException {
         JSONObject o = (JSONObject)parent.get(fieldName);
-        if(o==null) return null;
+        if(o==null) {
+			return null;
+		}
 
         return req.bindJSON(type,o);
     }

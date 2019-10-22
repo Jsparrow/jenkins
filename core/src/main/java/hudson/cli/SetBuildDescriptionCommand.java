@@ -16,24 +16,26 @@ import org.kohsuke.args4j.Argument;
 @Extension
 public class SetBuildDescriptionCommand extends CLICommand implements Serializable {
 
-    @Override
+    @Argument(metaVar="JOB",usage="Name of the job to build",required=true,index=0)
+    public transient Job<?,?> job;
+
+	@Argument(metaVar="BUILD#",usage="Number of the build",required=true,index=1)
+    public int number;
+
+	@Argument(metaVar="DESCRIPTION",required=true,usage="Description to be set. '=' to read from stdin.", index=2)
+    public String description;
+
+	@Override
     public String getShortDescription() {
         return Messages.SetBuildDescriptionCommand_ShortDescription();
      }
 
-    @Argument(metaVar="JOB",usage="Name of the job to build",required=true,index=0)
-    public transient Job<?,?> job;
-
-    @Argument(metaVar="BUILD#",usage="Number of the build",required=true,index=1)
-    public int number;
-    
-    @Argument(metaVar="DESCRIPTION",required=true,usage="Description to be set. '=' to read from stdin.", index=2)
-    public String description;
-
-    protected int run() throws Exception {
+	@Override
+	protected int run() throws Exception {
     	Run run = job.getBuildByNumber(number);
-        if (run == null)
-            throw new IllegalArgumentException("No such build #"+number);
+        if (run == null) {
+			throw new IllegalArgumentException("No such build #"+number);
+		}
 
         run.checkPermission(Run.UPDATE);
 

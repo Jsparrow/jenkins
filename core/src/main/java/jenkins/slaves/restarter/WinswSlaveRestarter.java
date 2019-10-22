@@ -14,14 +14,20 @@ import static org.apache.commons.io.IOUtils.*;
  */
 @Extension
 public class WinswSlaveRestarter extends SlaveRestarter {
-    private transient String exe;
+    private static final Logger LOGGER = Logger.getLogger(WinswSlaveRestarter.class.getName());
 
-    @Override
+	private static final long serialVersionUID = 1L;
+
+	private transient String exe;
+
+	@Override
     public boolean canWork() {
         try {
             exe = System.getenv("WINSW_EXECUTABLE");
             if (exe==null)
-                return false;   // not under winsw
+			 {
+				return false;   // not under winsw
+			}
 
             return exec("status") ==0;
         } catch (InterruptedException | IOException e) {
@@ -30,7 +36,7 @@ public class WinswSlaveRestarter extends SlaveRestarter {
         }
     }
 
-    private int exec(String cmd) throws InterruptedException, IOException {
+	private int exec(String cmd) throws InterruptedException, IOException {
         ProcessBuilder pb = new ProcessBuilder(exe, cmd);
         pb.redirectErrorStream(true);
         Process p = pb.start();
@@ -38,22 +44,19 @@ public class WinswSlaveRestarter extends SlaveRestarter {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         copy(p.getInputStream(), baos);
         int r = p.waitFor();
-        if (r!=0)
-            LOGGER.info(exe+" cmd: output:\n"+baos);
+        if (r!=0) {
+			LOGGER.info(new StringBuilder().append(exe).append(" cmd: output:\n").append(baos).toString());
+		}
         return r;
     }
 
-    public void restart() throws Exception {
+	@Override
+	public void restart() throws Exception {
         // winsw 1.16 supports this operation. this file gets updated via windows-slaves-plugin,
         // so it's possible that we end up in the situation where jenkins-slave.exe doesn't support
         // this command. If that is the case, there's nothing we can do about it.
         int r = exec("restart!");
-        throw new IOException("Restart failure. '"+exe+" restart' completed with "+r+" but I'm still alive!  "
-                               + "See https://jenkins.io/redirect/troubleshooting/windows-agent-restart"
-                               + " for a possible explanation and solution");
+        throw new IOException(new StringBuilder().append("Restart failure. '").append(exe).append(" restart' completed with ").append(r).append(" but I'm still alive!  ").append("See https://jenkins.io/redirect/troubleshooting/windows-agent-restart").append(" for a possible explanation and solution")
+				.toString());
     }
-
-    private static final Logger LOGGER = Logger.getLogger(WinswSlaveRestarter.class.getName());
-
-    private static final long serialVersionUID = 1L;
 }

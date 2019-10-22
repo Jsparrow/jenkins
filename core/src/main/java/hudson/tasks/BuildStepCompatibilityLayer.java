@@ -57,11 +57,13 @@ public abstract class BuildStepCompatibilityLayer implements BuildStep {
 //
 // new definitions >= 1.150
 //
-    public boolean prebuild(AbstractBuild<?,?> build, BuildListener listener) {
-        if (build instanceof Build)
-            return prebuild((Build)build,listener);
-        else
-            return true;
+    @Override
+	public boolean prebuild(AbstractBuild<?,?> build, BuildListener listener) {
+        if (build instanceof Build) {
+			return prebuild((Build)build,listener);
+		} else {
+			return true;
+		}
     }
 
     /**
@@ -86,18 +88,23 @@ public abstract class BuildStepCompatibilityLayer implements BuildStep {
         }
     }
 
-    public Action getProjectAction(AbstractProject<?, ?> project) {
-        if (project instanceof Project)
-            return getProjectAction((Project) project);
-        else
-            return null;
+    @Override
+	public Action getProjectAction(AbstractProject<?, ?> project) {
+        if (project instanceof Project) {
+			return getProjectAction((Project) project);
+		} else {
+			return null;
+		}
     }
 
-    @Nonnull
+    @Override
+	@Nonnull
     public Collection<? extends Action> getProjectActions(AbstractProject<?, ?> project) {
         // delegate to getJobAction (singular) for backward compatible behavior
         Action a = getProjectAction(project);
-        if (a==null)    return Collections.emptyList();
+        if (a==null) {
+			return Collections.emptyList();
+		}
         return Collections.singletonList(a);
     }
 

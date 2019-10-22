@@ -59,12 +59,14 @@ public class BuildWrappers {
         Descriptor pd = Jenkins.get().getDescriptor((Class)project.getClass());
 
         for (Descriptor<BuildWrapper> w : BuildWrapper.all()) {
-            if (pd instanceof AbstractProjectDescriptor && !((AbstractProjectDescriptor)pd).isApplicable(w))
-                continue;
+            if (pd instanceof AbstractProjectDescriptor && !((AbstractProjectDescriptor)pd).isApplicable(w)) {
+				continue;
+			}
             if (w instanceof BuildWrapperDescriptor) {
                 BuildWrapperDescriptor bwd = (BuildWrapperDescriptor) w;
-                if(bwd.isApplicable(project))
-                    result.add(bwd);
+                if(bwd.isApplicable(project)) {
+					result.add(bwd);
+				}
             } else {
                 // old BuildWrapper that doesn't implement BuildWrapperDescriptor
                 result.add(w);

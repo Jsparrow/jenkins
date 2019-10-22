@@ -50,7 +50,6 @@ import org.kohsuke.accmod.restrictions.NoExternalUse;
 public class DeprecatedAgentProtocolMonitor extends AdministrativeMonitor {
     
     public DeprecatedAgentProtocolMonitor() {
-        super();
     }
 
     @Override
@@ -80,12 +79,12 @@ public class DeprecatedAgentProtocolMonitor extends AdministrativeMonitor {
     public static String getDeprecatedProtocolsString() {
         final List<String> deprecatedProtocols = new ArrayList<>();
         final Set<String> agentProtocols = Jenkins.get().getAgentProtocols();
-        for (String name : agentProtocols) {
+        agentProtocols.forEach(name -> {
             AgentProtocol pr = AgentProtocol.of(name);
             if (pr != null && pr.isDeprecated()) {
                 deprecatedProtocols.add(name);
             }
-        }
+        });
         if (deprecatedProtocols.isEmpty()) {
             return null;
         }

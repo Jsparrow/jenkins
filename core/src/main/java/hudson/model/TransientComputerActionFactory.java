@@ -65,9 +65,7 @@ public abstract class TransientComputerActionFactory implements ExtensionPoint {
      */
 	public static List<Action> createAllFor(Computer target) {
 		List<Action> result = new ArrayList<>();
-		for (TransientComputerActionFactory f: all()) {
-			result.addAll(f.createFor(target));
-		}
+		all().forEach(f -> result.addAll(f.createFor(target)));
 		return result;
 	}
 

@@ -33,32 +33,32 @@ import java.util.regex.Pattern;
  * @since 1.213
  */
 public final class Area {
-    public final int width;
-    public final int height;
+    private static final Pattern PATTERN = Pattern.compile("(\\d+)x(\\d+)");
+	public final int width;
+	public final int height;
 
-    public Area(int width, int height) {
+	public Area(int width, int height) {
         this.width = width;
         this.height = height;
     }
 
-    /**
+	/**
      * Opposite of {@link #toString()}.
      */
     public static Area parse(String s) {
         Matcher m = PATTERN.matcher(s);
-        if(m.matches())
-            return new Area(Integer.parseInt(m.group(1)),Integer.parseInt(m.group(2)));
+        if(m.matches()) {
+			return new Area(Integer.parseInt(m.group(1)),Integer.parseInt(m.group(2)));
+		}
         return null;
     }
 
-    public int area() {
+	public int area() {
         return width*height;
     }
 
-    @Override
+	@Override
     public String toString() {
-        return width+"x"+height;
+        return new StringBuilder().append(width).append("x").append(height).toString();
     }
-
-    private static final Pattern PATTERN = Pattern.compile("(\\d+)x(\\d+)");
 }

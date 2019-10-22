@@ -47,11 +47,18 @@ import java.io.IOException;
  */
 public class SwapSpaceMonitor extends NodeMonitor {
     /**
+     * @deprecated as of 2.0
+     *      use injection
+     */
+    public static /*almost final*/ AbstractNodeMonitorDescriptor<MemoryUsage> DESCRIPTOR;
+
+	/**
      * Returns the HTML representation of the space.
      */
     public String toHtml(MemoryUsage usage) {
-        if(usage.availableSwapSpace==-1)
-            return "N/A";
+        if(usage.availableSwapSpace==-1) {
+			return "N/A";
+		}
 
        String humanReadableSpace = Functions.humanReadableByteSize(usage.availableSwapSpace);
        
@@ -59,15 +66,18 @@ public class SwapSpaceMonitor extends NodeMonitor {
         free/=1024L;   // convert to KB
         free/=1024L;   // convert to MB
         if(free>256 || usage.totalSwapSpace<usage.availableSwapSpace*5)
-            return humanReadableSpace; // if we have more than 256MB free or less than 80% filled up, it's OK
+		 {
+			return humanReadableSpace; // if we have more than 256MB free or less than 80% filled up, it's OK
+		}
 
         // Otherwise considered dangerously low.
         return Util.wrapToErrorSpan(humanReadableSpace);
     }
 
-    public long toMB(MemoryUsage usage) {
-        if(usage.availableSwapSpace==-1)
-            return -1;
+	public long toMB(MemoryUsage usage) {
+        if(usage.availableSwapSpace==-1) {
+			return -1;
+		}
 
         long free = usage.availableSwapSpace;
         free/=1024L;   // convert to KB
@@ -75,19 +85,13 @@ public class SwapSpaceMonitor extends NodeMonitor {
         return free;
     }
 
-    @Override
+	@Override
     public String getColumnCaption() {
         // Hide this column from non-admins
         return Jenkins.get().hasPermission(Jenkins.ADMINISTER) ? super.getColumnCaption() : null;
     }
 
-    /**
-     * @deprecated as of 2.0
-     *      use injection
-     */
-    public static /*almost final*/ AbstractNodeMonitorDescriptor<MemoryUsage> DESCRIPTOR;
-
-    @Extension @Symbol("swapSpace")
+	@Extension @Symbol("swapSpace")
     public static class DescriptorImpl extends AbstractAsyncNodeMonitorDescriptor<MemoryUsage> {
         public DescriptorImpl() {
             DESCRIPTOR = this;
@@ -98,7 +102,8 @@ public class SwapSpaceMonitor extends NodeMonitor {
             return new MonitorTask();
         }
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.SwapSpaceMonitor_DisplayName();
         }
 
@@ -112,7 +117,12 @@ public class SwapSpaceMonitor extends NodeMonitor {
      * Obtains the string that represents the architecture.
      */
     private static class MonitorTask extends MasterToSlaveCallable<MemoryUsage,IOException> {
-        public MemoryUsage call() throws IOException {
+        private static final long serialVersionUID = 1L;
+
+		private static boolean warned = false;
+
+		@Override
+		public MemoryUsage call() throws IOException {
             MemoryMonitor mm;
             try {
                 mm = MemoryMonitor.get();
@@ -124,7 +134,7 @@ public class SwapSpaceMonitor extends NodeMonitor {
             return new MemoryUsage2(mm.monitor());
         }
 
-        private <T extends Throwable> MemoryUsage report(T e) throws T {
+		private <T extends Throwable> MemoryUsage report(T e) throws T {
             if (!warned) {
                 warned = true;
                 throw e;
@@ -132,10 +142,6 @@ public class SwapSpaceMonitor extends NodeMonitor {
                 return null;
             }
         }
-
-        private static final long serialVersionUID = 1L;
-
-        private static boolean warned = false;
     }
 
     /**

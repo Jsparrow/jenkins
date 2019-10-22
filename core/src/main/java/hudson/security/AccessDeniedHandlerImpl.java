@@ -42,7 +42,8 @@ import java.io.IOException;
  * @author Kohsuke Kawaguchi
  */
 public class AccessDeniedHandlerImpl implements AccessDeniedHandler {
-    public void handle(ServletRequest request, ServletResponse response, AccessDeniedException cause) throws IOException, ServletException {
+    @Override
+	public void handle(ServletRequest request, ServletResponse response, AccessDeniedException cause) throws IOException, ServletException {
         HttpServletRequest req = (HttpServletRequest) request;
         HttpServletResponse rsp = (HttpServletResponse) response;
 

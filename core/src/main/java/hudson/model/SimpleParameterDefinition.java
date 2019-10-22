@@ -30,7 +30,7 @@ public abstract class SimpleParameterDefinition extends ParameterDefinition {
         if (value == null) {
             return getDefaultParameterValue();
         } else if (value.length != 1) {
-            throw new IllegalArgumentException("Illegal number of parameter values for " + getName() + ": " + value.length);
+            throw new IllegalArgumentException(new StringBuilder().append("Illegal number of parameter values for ").append(getName()).append(": ").append(value.length).toString());
         } else {
             return createValue(value[0]);
         }

@@ -59,28 +59,28 @@ import java.util.logging.Logger;
  *
  */
 public class ChunkedInputStream extends InputStream {
-    /** The inputstream that we're wrapping */
-    private InputStream in;
-
-    /** The chunk size */
-    private int chunkSize;
-
-    /** The current position within the current chunk */
-    private int pos;
-
-    /** True if we're at the beginning of stream */
-    private boolean bof = true;
-
-    /** True if we've reached the end of stream */
-    private boolean eof = false;
-
-    /** True if this stream is closed */
-    private boolean closed = false;
-
     /** Log object for this class. */
     private static final Logger LOGGER = Logger.getLogger(ChunkedInputStream.class.getName());
 
-    /**
+	/** The inputstream that we're wrapping */
+    private InputStream in;
+
+	/** The chunk size */
+    private int chunkSize;
+
+	/** The current position within the current chunk */
+    private int pos;
+
+	/** True if we're at the beginning of stream */
+    private boolean bof = true;
+
+	/** True if we've reached the end of stream */
+    private boolean eof = false;
+
+	/** True if this stream is closed */
+    private boolean closed = false;
+
+	/**
      * ChunkedInputStream constructor
      *
      * @param in the raw input stream
@@ -97,7 +97,7 @@ public class ChunkedInputStream extends InputStream {
         this.pos = 0;
     }
 
-    /**
+	/**
      * <p> Returns all the data in a chunked stream in coalesced form. A chunk
      * is followed by a CRLF. The method returns -1 as soon as a chunksize of 0
      * is detected.</p>
@@ -109,14 +109,17 @@ public class ChunkedInputStream extends InputStream {
      * byte
      * @throws IOException If an IO problem occurs
      */
-    public int read() throws IOException {
+    @Override
+	public int read() throws IOException {
 
-        if (advanceChunk()) return -1;
+        if (advanceChunk()) {
+			return -1;
+		}
         pos++;
         return in.read();
     }
 
-    /**
+	/**
      * Read some bytes from the stream.
      * @param b The byte array that will hold the contents from the stream.
      * @param off The offset into the byte array at which bytes will start to be
@@ -130,14 +133,16 @@ public class ChunkedInputStream extends InputStream {
     @Override
     public int read (byte[] b, int off, int len) throws IOException {
 
-        if (advanceChunk()) return -1;
+        if (advanceChunk()) {
+			return -1;
+		}
         len = Math.min(len, chunkSize - pos);
         int count = in.read(b, off, len);
         pos += count;
         return count;
     }
 
-    private boolean advanceChunk() throws IOException {
+	private boolean advanceChunk() throws IOException {
         if (closed) {
             throw new IOException("Attempted read from closed stream.");
         }
@@ -154,7 +159,7 @@ public class ChunkedInputStream extends InputStream {
         return false;
     }
 
-    /**
+	/**
      * Read some bytes from the stream.
      * @param b The byte array that will hold the contents from the stream.
      * @return The number of bytes returned or -1 if the end of stream has been
@@ -167,7 +172,7 @@ public class ChunkedInputStream extends InputStream {
         return read(b, 0, b.length);
     }
 
-    /**
+	/**
      * Read the CRLF terminator.
      * @throws IOException If an IO error occurs.
      */
@@ -176,12 +181,11 @@ public class ChunkedInputStream extends InputStream {
         int lf = in.read();
         if ((cr != '\r') || (lf != '\n')) {
             throw new IOException(
-                "CRLF expected at end of chunk: " + cr + "/" + lf);
+                new StringBuilder().append("CRLF expected at end of chunk: ").append(cr).append("/").append(lf).toString());
         }
     }
 
-
-    /**
+	/**
      * Read the next chunk.
      * @throws IOException If an IO error occurs.
      */
@@ -192,13 +196,14 @@ public class ChunkedInputStream extends InputStream {
         chunkSize = getChunkSizeFromInputStream(in);
         bof = false;
         pos = 0;
-        if (chunkSize == 0) {
-            eof = true;
-            parseTrailerHeaders();
-        }
+        if (chunkSize != 0) {
+			return;
+		}
+		eof = true;
+		parseTrailerHeaders();
     }
 
-    /**
+	/**
      * Expects the stream to start with a chunksize in hex with optional
      * comments after a semicolon. The line must end with a CRLF: "a3; some
      * comment\r\n" Positions the stream at the start of the next line.
@@ -276,7 +281,7 @@ public class ChunkedInputStream extends InputStream {
         return result;
     }
 
-    /**
+	/**
      * Reads and stores the Trailer headers.
      * @throws IOException If an IO problem occurs
      */
@@ -304,7 +309,7 @@ public class ChunkedInputStream extends InputStream {
 //        }
     }
 
-    /**
+	/**
      * Upon close, this reads the remainder of the chunked message,
      * leaving the underlying socket at a position to start reading the
      * next response without scanning.
@@ -324,7 +329,7 @@ public class ChunkedInputStream extends InputStream {
         }
     }
 
-    /**
+	/**
      * Exhaust an input stream, reading until EOF has been encountered.
      *
      * <p>Note that this function is intended as a non-public utility.
@@ -339,7 +344,7 @@ public class ChunkedInputStream extends InputStream {
         // read and discard the remainder of the message
         byte[] buffer = new byte[1024];
         //noinspection StatementWithEmptyBody
-        while (inStream.read(buffer) >= 0)
-            ;
+        while (inStream.read(buffer) >= 0) {
+		}
     }
 }

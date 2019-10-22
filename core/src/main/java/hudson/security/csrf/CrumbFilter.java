@@ -35,30 +35,28 @@ import javax.servlet.http.HttpServletResponse;
  * @author dty
  */
 public class CrumbFilter implements Filter {
-    /**
+    private static final Logger LOGGER = Logger.getLogger(CrumbFilter.class.getName());
+
+	/**
      * Because servlet containers generally don't specify the ordering of the initialization
      * (and different implementations indeed do this differently --- See HUDSON-3878),
      * we cannot use Hudson to the CrumbIssuer into CrumbFilter eagerly.
      */
     public CrumbIssuer getCrumbIssuer() {
         Jenkins h = Jenkins.getInstanceOrNull();
-        if(h==null)     return null;    // before Jenkins is initialized?
+        if(h==null)
+		 {
+			return null;    // before Jenkins is initialized?
+		}
         return h.getCrumbIssuer();
     }
 
-    @Restricted(NoExternalUse.class)
-    @MetaInfServices
-    public static class ErrorCustomizer implements RequirePOST.ErrorCustomizer {
-        @Override
-        public ForwardToView getForwardView() {
-            return new ForwardToView(CrumbFilter.class, "retry");
-        }
+	@Override
+	public void init(FilterConfig filterConfig) throws ServletException {
     }
 
-    public void init(FilterConfig filterConfig) throws ServletException {
-    }
-
-    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+	@Override
+	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
         CrumbIssuer crumbIssuer = getCrumbIssuer();
         if (crumbIssuer == null || !(request instanceof HttpServletRequest)) {
             chain.doFilter(request, response);
@@ -70,8 +68,9 @@ public class CrumbFilter implements Filter {
 
         if ("POST".equals(httpRequest.getMethod())) {
             for (CrumbExclusion e : CrumbExclusion.all()) {
-                if (e.process(httpRequest,httpResponse,chain))
-                    return;
+                if (e.process(httpRequest,httpResponse,chain)) {
+					return;
+				}
             }
 
             String crumbFieldName = crumbIssuer.getDescriptor().getCrumbRequestField();
@@ -106,7 +105,7 @@ public class CrumbFilter implements Filter {
         }
     }
 
-    private String extractCrumbFromRequest(HttpServletRequest httpRequest, String crumbFieldName) {
+	private String extractCrumbFromRequest(HttpServletRequest httpRequest, String crumbFieldName) {
         String crumb = httpRequest.getHeader(crumbFieldName);
         if (crumb == null) {
             Enumeration<?> paramNames = httpRequest.getParameterNames();
@@ -121,7 +120,7 @@ public class CrumbFilter implements Filter {
         return crumb;
     }
 
-    protected static boolean isMultipart(HttpServletRequest request) {
+	protected static boolean isMultipart(HttpServletRequest request) {
         if (request == null) {
             return false;
         }
@@ -129,12 +128,19 @@ public class CrumbFilter implements Filter {
         return MultipartFormDataParser.isMultiPartForm(request.getContentType());
     }
 
-    /**
+	/**
      * {@inheritDoc}
      */
     @Override
     public void destroy() {
     }
 
-    private static final Logger LOGGER = Logger.getLogger(CrumbFilter.class.getName());
+	@Restricted(NoExternalUse.class)
+    @MetaInfServices
+    public static class ErrorCustomizer implements RequirePOST.ErrorCustomizer {
+        @Override
+        public ForwardToView getForwardView() {
+            return new ForwardToView(CrumbFilter.class, "retry");
+        }
+    }
 }

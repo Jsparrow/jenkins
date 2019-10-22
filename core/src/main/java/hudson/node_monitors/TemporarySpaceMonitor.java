@@ -45,67 +45,75 @@ import java.text.ParseException;
  * @author Kohsuke Kawaguchi
  */
 public class TemporarySpaceMonitor extends AbstractDiskSpaceMonitor {
-    @DataBoundConstructor
-	public TemporarySpaceMonitor(String freeSpaceThreshold) throws ParseException {
-        super(freeSpaceThreshold);
-	}
-
-    public TemporarySpaceMonitor() {}
-
-    public DiskSpace getFreeSpace(Computer c) {
-        return DESCRIPTOR.get(c);
-    }
-
-    @Override
-    public String getColumnCaption() {
-        // Hide this column from non-admins
-        return Jenkins.get().hasPermission(Jenkins.ADMINISTER) ? super.getColumnCaption() : null;
-    }
-
     /**
      * @deprecated as of 2.0
      *      Use injection
      */
     public static /*almost final*/ DiskSpaceMonitorDescriptor DESCRIPTOR;
 
-    @Extension @Symbol("tmpSpace")
+	@DataBoundConstructor
+	public TemporarySpaceMonitor(String freeSpaceThreshold) throws ParseException {
+        super(freeSpaceThreshold);
+	}
+
+	public TemporarySpaceMonitor() {}
+
+	public DiskSpace getFreeSpace(Computer c) {
+        return DESCRIPTOR.get(c);
+    }
+
+	@Override
+    public String getColumnCaption() {
+        // Hide this column from non-admins
+        return Jenkins.get().hasPermission(Jenkins.ADMINISTER) ? super.getColumnCaption() : null;
+    }
+
+	/**
+     * @deprecated as of 2.0
+     */
+    public static DiskSpaceMonitorDescriptor install() {
+        return DESCRIPTOR;
+    }
+
+	@Extension @Symbol("tmpSpace")
     public static class DescriptorImpl extends DiskSpaceMonitorDescriptor {
         public DescriptorImpl() {
             DESCRIPTOR = this;
         }
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.TemporarySpaceMonitor_DisplayName();
         }
 
         @Override
         protected Callable<DiskSpace,IOException> createCallable(Computer c) {
             Node node = c.getNode();
-            if (node == null) return null;
+            if (node == null) {
+				return null;
+			}
             
             FilePath p = node.getRootPath();
-            if(p==null) return null;
+            if(p==null) {
+				return null;
+			}
 
             return p.asCallableWith(new GetTempSpace());
         }
     }
 
-    /**
-     * @deprecated as of 2.0
-     */
-    public static DiskSpaceMonitorDescriptor install() {
-        return DESCRIPTOR;
-    }
-    
     protected static final class GetTempSpace extends MasterToSlaveFileCallable<DiskSpace> {
-        public DiskSpace invoke(File f, VirtualChannel channel) throws IOException {
+        private static final long serialVersionUID = 1L;
+		@Override
+		public DiskSpace invoke(File f, VirtualChannel channel) throws IOException {
                 // if the disk is really filled up we can't even create a single file,
                 // so calling File.createTempFile and figuring out the directory won't reliably work.
                 f = new File(System.getProperty("java.io.tmpdir"));
                 long s = f.getUsableSpace();
-                if(s<=0)    return null;
+                if(s<=0) {
+					return null;
+				}
                 return new DiskSpace(f.getCanonicalPath(), s);
         }
-        private static final long serialVersionUID = 1L;
     }
 }

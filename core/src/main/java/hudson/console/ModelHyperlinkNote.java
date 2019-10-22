@@ -16,36 +16,40 @@ import javax.annotation.Nonnull;
  * @since 1.464
  */
 public class ModelHyperlinkNote extends HyperlinkNote {
-    public ModelHyperlinkNote(String url, int length) {
+    private static final long serialVersionUID = 1L;
+
+	private static final Logger LOGGER = Logger.getLogger(ModelHyperlinkNote.class.getName());
+
+	public ModelHyperlinkNote(String url, int length) {
         super(url, length);
     }
 
-    @Override
+	@Override
     protected String extraAttributes() {
         return " class='model-link'";
     }
 
-    public static String encodeTo(@Nonnull User u) {
+	public static String encodeTo(@Nonnull User u) {
         return encodeTo(u,u.getDisplayName());
     }
 
-    public static String encodeTo(User u, String text) {
+	public static String encodeTo(User u, String text) {
         return encodeTo('/'+u.getUrl(),text);
     }
 
-    public static String encodeTo(Item item) {
+	public static String encodeTo(Item item) {
         return encodeTo(item,item.getFullDisplayName());
     }
 
-    public static String encodeTo(Item item, String text) {
+	public static String encodeTo(Item item, String text) {
         return encodeTo('/'+item.getUrl(),text);
     }
 
-    public static String encodeTo(Run r) {
+	public static String encodeTo(Run r) {
         return encodeTo('/'+r.getUrl(),r.getDisplayName());
     }
 
-    public static String encodeTo(Node node) {
+	public static String encodeTo(Node node) {
         Computer c = node.toComputer();
         if (c != null) {
             return encodeTo("/" + c.getUrl(), node.getDisplayName());
@@ -54,18 +58,15 @@ public class ModelHyperlinkNote extends HyperlinkNote {
         return encodeTo("/computer/" + nodePath, node.getDisplayName());
     }
 
-    public static String encodeTo(String url, String text) {
+	public static String encodeTo(String url, String text) {
         return HyperlinkNote.encodeTo(url, text, ModelHyperlinkNote::new);
     }
 
-    @Extension @Symbol("hyperlinkToModels")
+	@Extension @Symbol("hyperlinkToModels")
     public static class DescriptorImpl extends HyperlinkNote.DescriptorImpl {
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return "Hyperlinks to models";
         }
     }
-    
-    private static final long serialVersionUID = 1L;
-
-    private static final Logger LOGGER = Logger.getLogger(ModelHyperlinkNote.class.getName());
 }

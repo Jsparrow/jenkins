@@ -90,34 +90,51 @@ import java.util.regex.Pattern;
  * @author Kohsuke Kawaguchi
  */
 public class Maven extends Builder {
-    /**
+    private static final String MAVEN_1_INSTALLATION_COMMON_FILE = "bin/maven";
+
+	private static final String MAVEN_2_INSTALLATION_COMMON_FILE = "bin/mvn";
+
+	private static final Pattern S_PATTERN = Pattern.compile("(^| )-s ");
+
+	private static final Pattern GS_PATTERN = Pattern.compile("(^| )-gs ");
+
+	/**
+     * @deprecated as of 1.286
+     *      Use {@link jenkins.model.Jenkins#getDescriptorByType(Class)} to obtain the current instance.
+     *      For compatibility, this field retains the last created {@link DescriptorImpl}.
+     *      TODO: fix sonar plugin that depends on this. That's the only plugin that depends on this field.
+     */
+    @Deprecated
+    public static DescriptorImpl DESCRIPTOR;
+
+	/**
      * The targets and other maven options.
      * Can be separated by SP or NL.
      */
     public final String targets;
 
-    /**
+	/**
      * Identifies {@link MavenInstallation} to be used.
      */
     public final String mavenName;
 
-    /**
+	/**
      * MAVEN_OPTS if not null.
      */
     public final String jvmOptions;
 
-    /**
+	/**
      * Optional POM file path relative to the workspace.
      * Used for the Maven '-f' option.
      */
     public final String pom;
 
-    /**
+	/**
      * Optional properties to be passed to Maven. Follows {@link Properties} syntax.
      */
     public final String properties;
 
-    /**
+	/**
      * If true, the build will use its own local Maven repository
      * via "-Dmaven.repo.local=...".
      * <p>
@@ -130,20 +147,20 @@ public class Maven extends Builder {
      * @since 1.322
      */
     public boolean usePrivateRepository;
-    
-    /**
+
+	/**
      * Provides access to the settings.xml to be used for a build.
      * @since 1.491
      */
     private SettingsProvider settings;
-    
-    /**
+
+	/**
      * Provides access to the global settings.xml to be used for a build.
      * @since 1.491
      */
     private GlobalSettingsProvider globalSettings;
 
-    /**
+	/**
      * Skip injecting build variables as properties into maven process.
      *
      * Defaults to false unless user requests otherwise. Old configurations are set to true to mimic the legacy behaviour.
@@ -152,29 +169,23 @@ public class Maven extends Builder {
      */
     private @Nonnull Boolean injectBuildVariables;
 
-    private final static String MAVEN_1_INSTALLATION_COMMON_FILE = "bin/maven";
-    private final static String MAVEN_2_INSTALLATION_COMMON_FILE = "bin/mvn";
-    
-    private static final Pattern S_PATTERN = Pattern.compile("(^| )-s ");
-    private static final Pattern GS_PATTERN = Pattern.compile("(^| )-gs ");
-
-    public Maven(String targets,String name) {
+	public Maven(String targets,String name) {
         this(targets,name,null,null,null,false, null, null);
     }
 
-    public Maven(String targets, String name, String pom, String properties, String jvmOptions) {
+	public Maven(String targets, String name, String pom, String properties, String jvmOptions) {
         this(targets, name, pom, properties, jvmOptions, false, null, null);
     }
-    
-    public Maven(String targets,String name, String pom, String properties, String jvmOptions, boolean usePrivateRepository) {
+
+	public Maven(String targets,String name, String pom, String properties, String jvmOptions, boolean usePrivateRepository) {
         this(targets, name, pom, properties, jvmOptions, usePrivateRepository, null, null);
     }
-    
-    public Maven(String targets,String name, String pom, String properties, String jvmOptions, boolean usePrivateRepository, SettingsProvider settings, GlobalSettingsProvider globalSettings) {
+
+	public Maven(String targets,String name, String pom, String properties, String jvmOptions, boolean usePrivateRepository, SettingsProvider settings, GlobalSettingsProvider globalSettings) {
         this(targets, name, pom, properties, jvmOptions, usePrivateRepository, settings, globalSettings, false);
     }
 
-    @DataBoundConstructor
+	@DataBoundConstructor
     public Maven(String targets,String name, String pom, String properties, String jvmOptions, boolean usePrivateRepository, SettingsProvider settings, GlobalSettingsProvider globalSettings, boolean injectBuildVariables) {
         this.targets = targets;
         this.mavenName = name;
@@ -187,106 +198,66 @@ public class Maven extends Builder {
         this.injectBuildVariables = injectBuildVariables;
     }
 
-    public String getTargets() {
+	public String getTargets() {
         return targets;
     }
 
-    /**
+	/**
      * @since 1.491
      */
     public SettingsProvider getSettings() {
         return settings != null ? settings : GlobalMavenConfig.get().getSettingsProvider();
     }
-    
-    protected void setSettings(SettingsProvider settings) {
+
+	protected void setSettings(SettingsProvider settings) {
         this.settings = settings;
     }
-    
-    /**
+
+	/**
      * @since 1.491
      */
     public GlobalSettingsProvider getGlobalSettings() {
         return globalSettings != null ? globalSettings : GlobalMavenConfig.get().getGlobalSettingsProvider();
     }
-    
-    protected void setGlobalSettings(GlobalSettingsProvider globalSettings) {
+
+	protected void setGlobalSettings(GlobalSettingsProvider globalSettings) {
         this.globalSettings = globalSettings;
     }
 
-    public void setUsePrivateRepository(boolean usePrivateRepository) {
+	public void setUsePrivateRepository(boolean usePrivateRepository) {
         this.usePrivateRepository = usePrivateRepository;
     }
 
-    public boolean usesPrivateRepository() {
+	public boolean usesPrivateRepository() {
         return usePrivateRepository;
     }
 
-    @Restricted(NoExternalUse.class) // Exposed for view
+	@Restricted(NoExternalUse.class) // Exposed for view
     public boolean isInjectBuildVariables() {
         return injectBuildVariables;
     }
 
-    /**
+	/**
      * Gets the Maven to invoke,
      * or null to invoke the default one.
      */
     public MavenInstallation getMaven() {
         for( MavenInstallation i : getDescriptor().getInstallations() ) {
-            if(mavenName !=null && mavenName.equals(i.getName()))
-                return i;
+            if(mavenName !=null && mavenName.equals(i.getName())) {
+				return i;
+			}
         }
         return null;
     }
 
-    private Object readResolve() throws ObjectStreamException {
+	private Object readResolve() throws ObjectStreamException {
         if (injectBuildVariables == null) {
             injectBuildVariables = true;
         }
         return this;
     }
 
-    /**
-     * Looks for {@code pom.xlm} or {@code project.xml} to determine the maven executable
-     * name.
-     */
-    private static final class DecideDefaultMavenCommand extends MasterToSlaveFileCallable<String> {
-        private static final long serialVersionUID = -2327576423452215146L;
-        // command line arguments.
-        private final String arguments;
-
-        public DecideDefaultMavenCommand(String arguments) {
-            this.arguments = arguments;
-        }
-
-        public String invoke(File ws, VirtualChannel channel) throws IOException {
-            String seed=null;
-
-            // check for the -f option
-            StringTokenizer tokens = new StringTokenizer(arguments);
-            while(tokens.hasMoreTokens()) {
-                String t = tokens.nextToken();
-                if(t.equals("-f") && tokens.hasMoreTokens()) {
-                    File file = new File(ws,tokens.nextToken());
-                    if(!file.exists())
-                        continue;   // looks like an error, but let the execution fail later
-                    seed = file.isDirectory() ?
-                        /* in M1, you specify a directory in -f */ "maven"
-                        /* in M2, you specify a POM file name.  */ : "mvn";
-                    break;
-                }
-            }
-
-            if(seed==null) {
-                // as of 1.212 (2008 April), I think Maven2 mostly replaced Maven1, so
-                // switching to err on M2 side.
-                seed = new File(ws,"project.xml").exists() ? "maven" : "mvn";
-            }
-
-            return seed;
-        }
-    }
-
-    @Override
+	@Override
     public boolean perform(AbstractBuild<?,?> build, Launcher launcher, BuildListener listener) throws IOException, InterruptedException {
         VariableResolver<String> vr = build.getBuildVariableResolver();
 
@@ -324,8 +295,9 @@ public class Maven extends Builder {
                 }
                 args.add(exec);
             }
-            if(pom!=null)
-                args.add("-f",pom);
+            if(pom!=null) {
+				args.add("-f",pom);
+			}
             
             
             if(!S_PATTERN.matcher(targets).find()){ // check the given target/goals do not contain settings parameter already
@@ -352,8 +324,9 @@ public class Maven extends Builder {
             final VariableResolver<String> resolver = new Union<>(new ByMap<>(env), vr);
             args.addKeyValuePairsFromPropertyString("-D", this.properties, resolver, sensitiveVars);
 
-            if (usesPrivateRepository())
-                args.add("-Dmaven.repo.local=" + build.getWorkspace().child(".repository"));
+            if (usesPrivateRepository()) {
+				args.add("-Dmaven.repo.local=" + build.getWorkspace().child(".repository"));
+			}
             args.addTokenized(normalizedTarget);
             wrapUpArguments(args,normalizedTarget,build,launcher,listener);
 
@@ -379,7 +352,7 @@ public class Maven extends Builder {
         return true;
     }
 
-    /**
+	/**
      * Allows the derived type to make additional modifications to the arguments list.
      *
      * @since 1.344
@@ -387,7 +360,7 @@ public class Maven extends Builder {
     protected void wrapUpArguments(ArgumentListBuilder args, String normalizedTarget, AbstractBuild<?,?> build, Launcher launcher, BuildListener listener) throws IOException, InterruptedException {
     }
 
-    /**
+	/**
      * Build up the environment variables toward the Maven launch.
      */
     protected void buildEnvVars(EnvVars env, MavenInstallation mi) throws IOException, InterruptedException {
@@ -406,23 +379,59 @@ public class Maven extends Builder {
         env.put("MAVEN_TERMINATE_CMD","on");
 
         String jvmOptions = env.expand(this.jvmOptions);
-        if(jvmOptions!=null)
-            env.put("MAVEN_OPTS",jvmOptions.replaceAll("[\t\r\n]+"," "));
+        if(jvmOptions!=null) {
+			env.put("MAVEN_OPTS",jvmOptions.replaceAll("[\t\r\n]+"," "));
+		}
     }
 
-    @Override
+	@Override
     public DescriptorImpl getDescriptor() {
         return (DescriptorImpl)super.getDescriptor();
     }
 
-    /**
-     * @deprecated as of 1.286
-     *      Use {@link jenkins.model.Jenkins#getDescriptorByType(Class)} to obtain the current instance.
-     *      For compatibility, this field retains the last created {@link DescriptorImpl}.
-     *      TODO: fix sonar plugin that depends on this. That's the only plugin that depends on this field.
+	/**
+     * Looks for {@code pom.xlm} or {@code project.xml} to determine the maven executable
+     * name.
      */
-    @Deprecated
-    public static DescriptorImpl DESCRIPTOR;
+    private static final class DecideDefaultMavenCommand extends MasterToSlaveFileCallable<String> {
+        private static final long serialVersionUID = -2327576423452215146L;
+        // command line arguments.
+        private final String arguments;
+
+        public DecideDefaultMavenCommand(String arguments) {
+            this.arguments = arguments;
+        }
+
+        @Override
+		public String invoke(File ws, VirtualChannel channel) throws IOException {
+            String seed=null;
+
+            // check for the -f option
+            StringTokenizer tokens = new StringTokenizer(arguments);
+            while(tokens.hasMoreTokens()) {
+                String t = tokens.nextToken();
+                if("-f".equals(t) && tokens.hasMoreTokens()) {
+                    File file = new File(ws,tokens.nextToken());
+                    if(!file.exists())
+					 {
+						continue;   // looks like an error, but let the execution fail later
+					}
+                    seed = file.isDirectory() ?
+                        /* in M1, you specify a directory in -f */ "maven"
+                        /* in M2, you specify a POM file name.  */ : "mvn";
+                    break;
+                }
+            }
+
+            if(seed==null) {
+                // as of 1.212 (2008 April), I think Maven2 mostly replaced Maven1, so
+                // switching to err on M2 side.
+                seed = new File(ws,"project.xml").exists() ? "maven" : "mvn";
+            }
+
+            return seed;
+        }
+    }
 
     @Extension @Symbol("maven")
     public static final class DescriptorImpl extends BuildStepDescriptor<Builder> implements PersistentDescriptor {
@@ -433,17 +442,22 @@ public class Maven extends Builder {
             DESCRIPTOR = this;
         }
 
-        public boolean isApplicable(Class<? extends AbstractProject> jobType) {
+        @Override
+		public boolean isApplicable(Class<? extends AbstractProject> jobType) {
             return true;
         }
 
         @Override
         public String getHelpFile(String fieldName) {
-            if (fieldName != null && fieldName.equals("globalSettings")) fieldName = "settings"; // same help file
+            if (fieldName != null && "globalSettings".equals(fieldName))
+			 {
+				fieldName = "settings"; // same help file
+			}
             return super.getHelpFile(fieldName);
         }
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.Maven_DisplayName();
         }
         
@@ -495,15 +509,14 @@ public class Maven extends Builder {
         public static final int MAVEN_20 = 0;
         public static final int MAVEN_21 = 1;
         public static final int MAVEN_30 = 2;
-        
-    
-        /**
+		private static final long serialVersionUID = 1L;
+		/**
          * @deprecated since 2009-02-25.
          */
         @Deprecated // kept for backward compatibility - use getHome()
         private transient String mavenHome;
 
-        /**
+		/**
          * @deprecated as of 1.308.
          *      Use {@link #MavenInstallation(String, String, List)}
          */
@@ -512,12 +525,12 @@ public class Maven extends Builder {
             super(name, home);
         }
 
-        @DataBoundConstructor
+		@DataBoundConstructor
         public MavenInstallation(String name, String home, List<? extends ToolProperty<?>> properties) {
             super(Util.fixEmptyAndTrim(name), Util.fixEmptyAndTrim(home), properties);
         }
 
-        /**
+		/**
          * install directory.
          *
          * @deprecated as of 1.308. Use {@link #getHome()}.
@@ -527,11 +540,11 @@ public class Maven extends Builder {
             return getHome();
         }
 
-        public File getHomeDir() {
+		public File getHomeDir() {
             return new File(getHome());
         }
 
-        @Override
+		@Override
         public void buildEnvVars(EnvVars env) {
             String home = getHome();
             if (home == null) {
@@ -542,7 +555,7 @@ public class Maven extends Builder {
             env.put("PATH+MAVEN", home + "/bin");
         }
 
-        /**
+		/**
          * Compares the version of this Maven installation to the minimum required version specified.
          *
          * @param launcher
@@ -555,23 +568,108 @@ public class Maven extends Builder {
             // olamy : but will add a dependency on maven in core -> so not so good 
             String mavenVersion = launcher.getChannel().call(new GetMavenVersion());
 
-            if (!mavenVersion.equals("")) {
+            if (!"".equals(mavenVersion)) {
                 if (mavenReqVersion == MAVEN_20) {
-                    if(mavenVersion.startsWith("2."))
-                        return true;
+                    if(mavenVersion.startsWith("2.")) {
+						return true;
+					}
                 }
                 else if (mavenReqVersion == MAVEN_21) {
-                    if(mavenVersion.startsWith("2.") && !mavenVersion.startsWith("2.0"))
-                        return true;
+                    if(mavenVersion.startsWith("2.") && !mavenVersion.startsWith("2.0")) {
+						return true;
+					}
                 }
                 else if (mavenReqVersion == MAVEN_30) {
-                    if(mavenVersion.startsWith("3."))
-                        return true;
+                    if(mavenVersion.startsWith("3.")) {
+						return true;
+					}
                 }                
             }
             return false;
             
         }
+
+		/**
+         * Is this Maven 2.1.x or 2.2.x - but not Maven 3.x?
+         *
+         * @param launcher
+         *      Represents the node on which we evaluate the path.
+         */
+        public boolean isMaven2_1(Launcher launcher) throws IOException, InterruptedException {
+            return meetsMavenReqVersion(launcher, MAVEN_21);
+        }
+
+		/**
+         * Gets the executable path of this maven on the given target system.
+         */
+        public String getExecutable(Launcher launcher) throws IOException, InterruptedException {
+            return launcher.getChannel().call(new GetExecutable());
+        }
+
+		private File getExeFile(String execName) {
+            String m2Home = Util.replaceMacro(getHome(),EnvVars.masterEnvVars);
+
+            if (!Functions.isWindows()) {
+				return new File(m2Home, "bin/" + execName);
+			}
+			File exeFile = new File(m2Home, new StringBuilder().append("bin/").append(execName).append(".bat").toString());
+			// since Maven 3.3 .bat files are replaced with .cmd
+			if (!exeFile.exists()) {
+			    return new File(m2Home, new StringBuilder().append("bin/").append(execName).append(".cmd").toString());
+			}
+			return exeFile;
+        }
+
+		/**
+         * Returns true if the executable exists.
+         */
+        public boolean getExists() {
+            try {
+                return getExecutable(new LocalLauncher(new StreamTaskListener(new NullStream())))!=null;
+            } catch (IOException | InterruptedException e) {
+                return false;
+            }
+        }
+
+		@Override
+		public MavenInstallation forEnvironment(EnvVars environment) {
+            return new MavenInstallation(getName(), environment.expand(getHome()), getProperties().toList());
+        }
+
+		@Override
+		public MavenInstallation forNode(Node node, TaskListener log) throws IOException, InterruptedException {
+            return new MavenInstallation(getName(), translateFor(node, log), getProperties().toList());
+        }
+
+		@Override
+        public boolean equals(final Object o) {
+            if (this == o) {
+				return true;
+			}
+            if (o == null || getClass() != o.getClass()) {
+				return false;
+			}
+
+            final MavenInstallation that = (MavenInstallation) o;
+
+            if (getHome() != null ? !getHome().equals(that.getHome()) : that.getHome() != null) {
+				return false;
+			}
+            if (getName() != null ? !getName().equals(that.getName()) : that.getName() != null) {
+				return false;
+			}
+            return true;
+        }
+
+		@Override
+        public int hashCode() {
+            int result = getHome() != null ? getHome().hashCode() : 0;
+            result = 31 * result + (getName() != null ? getName().hashCode() : 0);
+            //result = 31 * result + (getProperties() != null ? getProperties().hashCode() : 0);
+            return result;
+        }
+        
+    
         private class GetMavenVersion extends MasterToSlaveCallable<String, IOException> {
             private static final long serialVersionUID = -4143159957567745621L;
             @Override
@@ -594,72 +692,20 @@ public class Maven extends Builder {
             }
         }
         
-        /**
-         * Is this Maven 2.1.x or 2.2.x - but not Maven 3.x?
-         *
-         * @param launcher
-         *      Represents the node on which we evaluate the path.
-         */
-        public boolean isMaven2_1(Launcher launcher) throws IOException, InterruptedException {
-            return meetsMavenReqVersion(launcher, MAVEN_21);
-        }
-
-        /**
-         * Gets the executable path of this maven on the given target system.
-         */
-        public String getExecutable(Launcher launcher) throws IOException, InterruptedException {
-            return launcher.getChannel().call(new GetExecutable());
-        }
         private class GetExecutable extends MasterToSlaveCallable<String, IOException> {
                 private static final long serialVersionUID = 2373163112639943768L;
                 @Override
                 public String call() throws IOException {
                     File exe = getExeFile("mvn");
-                    if(exe.exists())
-                        return exe.getPath();
+                    if(exe.exists()) {
+						return exe.getPath();
+					}
                     exe = getExeFile("maven");
-                    if(exe.exists())
-                        return exe.getPath();
+                    if(exe.exists()) {
+						return exe.getPath();
+					}
                     return null;
                 }
-        }
-
-        private File getExeFile(String execName) {
-            String m2Home = Util.replaceMacro(getHome(),EnvVars.masterEnvVars);
-
-            if(Functions.isWindows()) {
-                File exeFile = new File(m2Home, "bin/" + execName + ".bat");
-
-                // since Maven 3.3 .bat files are replaced with .cmd
-                if (!exeFile.exists()) {
-                    return new File(m2Home, "bin/" + execName + ".cmd");
-                }
-
-                return exeFile;
-            } else {
-                return new File(m2Home, "bin/" + execName);
-            }
-        }
-
-        /**
-         * Returns true if the executable exists.
-         */
-        public boolean getExists() {
-            try {
-                return getExecutable(new LocalLauncher(new StreamTaskListener(new NullStream())))!=null;
-            } catch (IOException | InterruptedException e) {
-                return false;
-            }
-        }
-
-        private static final long serialVersionUID = 1L;
-
-        public MavenInstallation forEnvironment(EnvVars environment) {
-            return new MavenInstallation(getName(), environment.expand(getHome()), getProperties().toList());
-        }
-
-        public MavenInstallation forNode(Node node, TaskListener log) throws IOException, InterruptedException {
-            return new MavenInstallation(getName(), translateFor(node, log), getProperties().toList());
         }
 
         @Extension @Symbol("maven")
@@ -695,8 +741,9 @@ public class Maven extends Builder {
                 File maven1File = new File(value,MAVEN_1_INSTALLATION_COMMON_FILE);
                 File maven2File = new File(value,MAVEN_2_INSTALLATION_COMMON_FILE);
 
-                if(!maven1File.exists() && !maven2File.exists())
-                    return FormValidation.error(Messages.Maven_NotMavenDirectory(value));
+                if(!maven1File.exists() && !maven2File.exists()) {
+					return FormValidation.error(Messages.Maven_NotMavenDirectory(value));
+				}
 
                 return FormValidation.ok();
             }
@@ -708,26 +755,6 @@ public class Maven extends Builder {
             @Override protected String oldHomeField(ToolInstallation obj) {
                 return ((MavenInstallation)obj).mavenHome;
             }
-        }
-
-        @Override
-        public boolean equals(final Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-
-            final MavenInstallation that = (MavenInstallation) o;
-
-            if (getHome() != null ? !getHome().equals(that.getHome()) : that.getHome() != null) return false;
-            if (getName() != null ? !getName().equals(that.getName()) : that.getName() != null) return false;
-            return true;
-        }
-
-        @Override
-        public int hashCode() {
-            int result = getHome() != null ? getHome().hashCode() : 0;
-            result = 31 * result + (getName() != null ? getName().hashCode() : 0);
-            //result = 31 * result + (getProperties() != null ? getProperties().hashCode() : 0);
-            return result;
         }
 
     }
@@ -743,7 +770,8 @@ public class Maven extends Builder {
 
         @Extension @Symbol("maven")
         public static final class DescriptorImpl extends DownloadFromUrlInstaller.DescriptorImpl<MavenInstaller> {
-            public String getDisplayName() {
+            @Override
+			public String getDisplayName() {
                 return Messages.InstallFromApache();
             }
 

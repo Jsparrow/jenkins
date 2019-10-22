@@ -40,7 +40,8 @@ public class GetJobCommand extends CLICommand {
         return Messages.GetJobCommand_ShortDescription();
     }
 
-    protected int run() throws Exception {
+    @Override
+	protected int run() throws Exception {
         job.writeConfigDotXml(stdout);
         return 0;
     }

@@ -52,7 +52,8 @@ import java.util.logging.Logger;
     @Override
     public void onChannelBuilding(ChannelBuilder builder, Object context) {
         new ReflectiveFilePathFilter() {
-            protected boolean op(String op, File f) throws SecurityException {
+            @Override
+			protected boolean op(String op, File f) {
                 if (BYPASS) {
                     LOGGER.log(Level.FINE, "agent allowed to {0} {1}", new Object[] {op, f});
                     return true;

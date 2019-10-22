@@ -60,12 +60,17 @@ import hudson.triggers.Trigger;
  */
 public abstract class PeriodicWork extends SafeTimerTask implements ExtensionPoint {
 
-    /** @deprecated Use your own logger, or send messages to the logger in {@link AsyncPeriodicWork#execute}. */
+    // time constants
+    protected static final long MIN = 1000*60;
+	protected static final long HOUR =60*MIN;
+	protected static final long DAY = 24*HOUR;
+	private static final Random RANDOM = new Random();
+	/** @deprecated Use your own logger, or send messages to the logger in {@link AsyncPeriodicWork#execute}. */
     @SuppressWarnings("NonConstantLogger")
     @Deprecated
     protected final Logger logger = Logger.getLogger(getClass().getName());
 
-    /**
+	/**
      * Gets the number of milliseconds between successive executions.
      *
      * <p>
@@ -78,7 +83,7 @@ public abstract class PeriodicWork extends SafeTimerTask implements ExtensionPoi
      */
     public abstract long getRecurrencePeriod();
 
-    /**
+	/**
      * Gets the number of milliseconds til the first execution.
      *
      * <p>
@@ -87,40 +92,32 @@ public abstract class PeriodicWork extends SafeTimerTask implements ExtensionPoi
     public long getInitialDelay() {
         long l = RANDOM.nextLong();
         // Math.abs(Long.MIN_VALUE)==Long.MIN_VALUE!
-        if (l==Long.MIN_VALUE)
-            l++;
+        if (l==Long.MIN_VALUE) {
+			l++;
+		}
         return Math.abs(l)%getRecurrencePeriod();
     }
 
-    /**
+	/**
      * Returns all the registered {@link PeriodicWork}s.
      */
     public static ExtensionList<PeriodicWork> all() {
         return ExtensionList.lookup(PeriodicWork.class);
     }
 
-    @Initializer(after= JOB_LOADED)
+	@Initializer(after= JOB_LOADED)
     public static void init() {
         // start all PeriodicWorks
         ExtensionList<PeriodicWork> extensionList = all();
         extensionList.addListener(new PeriodicWorkExtensionListListener(extensionList));
-        for (PeriodicWork p : extensionList) {
-            schedulePeriodicWork(p);
-        }
+        extensionList.forEach(PeriodicWork::schedulePeriodicWork);
     }
 
-    private static void schedulePeriodicWork(PeriodicWork p) {
+	private static void schedulePeriodicWork(PeriodicWork p) {
         Timer.get().scheduleAtFixedRate(p, p.getInitialDelay(), p.getRecurrencePeriod(), TimeUnit.MILLISECONDS);
     }
 
-    // time constants
-    protected static final long MIN = 1000*60;
-    protected static final long HOUR =60*MIN;
-    protected static final long DAY = 24*HOUR;
-
-    private static final Random RANDOM = new Random();
-
-    /**
+	/**
      * ExtensionListener that will kick off any new AperiodWork extensions from plugins that are dynamically
      * loaded.
      */
@@ -135,13 +132,11 @@ public abstract class PeriodicWork extends SafeTimerTask implements ExtensionPoi
         @Override
         public void onChange() {
             synchronized (registered) {
-                for (PeriodicWork p : PeriodicWork.all()) {
-                    // it is possibly to programatically remove Extensions but that is rarely used.
-                    if (!registered.contains(p)) {
-                        schedulePeriodicWork(p);
-                        registered.add(p);
-                    }
-                }
+                // it is possibly to programatically remove Extensions but that is rarely used.
+				PeriodicWork.all().stream().filter(p -> !registered.contains(p)).forEach(p -> {
+				    schedulePeriodicWork(p);
+				    registered.add(p);
+				});
             }
         }
     }

@@ -40,24 +40,26 @@ import static java.util.logging.Level.*;
  */
 @Extension
 public class AdminWhitelistRule implements StaplerProxy {
-    /**
+    private static final Logger LOGGER = Logger.getLogger(AdminWhitelistRule.class.getName());
+
+	/**
      * Ones that we rejected but want to run by admins.
      */
     public final CallableRejectionConfig rejected;
 
-    /**
+	/**
      * Callables that admins have whitelisted explicitly.
      */
     public final CallableWhitelistConfig whitelisted;
 
-    /**
+	/**
      * FilePath access pattern rules specified by the admin
      */
     public final FilePathRuleConfig filePathRules;
 
-    private boolean masterKillSwitch;
+	private boolean masterKillSwitch;
 
-    public AdminWhitelistRule() throws IOException, InterruptedException {
+	public AdminWhitelistRule() throws IOException, InterruptedException {
         final Jenkins jenkins = Jenkins.get();
 
         // while this file is not a secret, write access to this file is dangerous,
@@ -85,7 +87,7 @@ public class AdminWhitelistRule implements StaplerProxy {
         this.masterKillSwitch = loadMasterKillSwitchFile(f);
     }
 
-    /**
+	/**
      * Reads the master kill switch from a file.
      *
      * Instead of {@link FileBoolean}, we use a text file so that the admin can prevent Jenkins from
@@ -96,7 +98,9 @@ public class AdminWhitelistRule implements StaplerProxy {
     @CheckReturnValue
     private boolean loadMasterKillSwitchFile(@Nonnull File f) {
         try {
-            if (!f.exists())    return true;
+            if (!f.exists()) {
+				return true;
+			}
             return Boolean.parseBoolean(FileUtils.readFileToString(f, Charset.defaultCharset()).trim());
         } catch (IOException e) {
             LOGGER.log(WARNING, "Failed to read "+f, e);
@@ -104,12 +108,12 @@ public class AdminWhitelistRule implements StaplerProxy {
         }
     }
 
-    @Nonnull
+	@Nonnull
     private File getMasterKillSwitchFile(@Nonnull Jenkins jenkins) {
         return new File(jenkins.getRootDir(),"secrets/slave-to-master-security-kill-switch");
     }
 
-    /**
+	/**
      * Transform path for Windows.
      */
     private InputStream transformForWindows(InputStream src) throws IOException {
@@ -118,52 +122,61 @@ public class AdminWhitelistRule implements StaplerProxy {
         try (PrintStream p = new PrintStream(out)) {
             String line;
             while ((line = r.readLine()) != null) {
-                if (!line.startsWith("#") && Functions.isWindows())
-                    line = line.replace("/", "\\\\");
+                if (!line.startsWith("#") && Functions.isWindows()) {
+					line = line.replace("/", "\\\\");
+				}
                 p.println(line);
             }
         }
         return new ByteArrayInputStream(out.toByteArray());
     }
 
-    private void placeDefaultRule(File f, InputStream src) throws IOException, InterruptedException {
+	private void placeDefaultRule(File f, InputStream src) throws IOException, InterruptedException {
         try {
             new FilePath(f).copyFrom(src);
         } catch (IOException e) {
             // we allow admins to create a read-only file here to block overwrite,
             // so this can fail legitimately
-            if (!f.canWrite())  return;
+            if (!f.canWrite()) {
+				return;
+			}
             LOGGER.log(WARNING, "Failed to generate "+f,e);
         }
     }
 
-    public boolean isWhitelisted(RoleSensitive subject, Collection<Role> expected, Object context) {
+	public boolean isWhitelisted(RoleSensitive subject, Collection<Role> expected, Object context) {
         if (masterKillSwitch)
-            return true;    // master kill switch is on. subsystem deactivated
+		 {
+			return true;    // master kill switch is on. subsystem deactivated
+		}
 
         String name = subject.getClass().getName();
 
         if (whitelisted.contains(name))
-            return true;    // whitelisted by admin
+		 {
+			return true;    // whitelisted by admin
+		}
 
         // otherwise record the problem and refuse to execute that
         rejected.report(subject.getClass());
         return false;
     }
 
-    public boolean checkFileAccess(String op, File f) {
+	public boolean checkFileAccess(String op, File f) {
         // if the master kill switch is off, we allow everything
-        if (masterKillSwitch)
-            return true;
+        if (masterKillSwitch) {
+			return true;
+		}
 
         return filePathRules.checkFileAccess(op, f);
     }
 
-    @RequirePOST
+	@RequirePOST
     public HttpResponse doSubmit(StaplerRequest req) throws IOException {
         StringBuilder whitelist = new StringBuilder(Util.fixNull(req.getParameter("whitelist")));
-        if (whitelist.charAt(whitelist.length() - 1) != '\n')
-            whitelist.append("\n");
+        if (whitelist.charAt(whitelist.length() - 1) != '\n') {
+			whitelist.append("\n");
+		}
 
         Enumeration e = req.getParameterNames();
         while (e.hasMoreElements()) {
@@ -182,7 +195,7 @@ public class AdminWhitelistRule implements StaplerProxy {
         return HttpResponses.redirectToDot();
     }
 
-    /**
+	/**
      * Approves all the currently rejected subjects
      */
     @RequirePOST
@@ -196,7 +209,7 @@ public class AdminWhitelistRule implements StaplerProxy {
         return HttpResponses.ok();
     }
 
-    /**
+	/**
      * Approves specific callables by their names.
      */
     @RequirePOST
@@ -205,11 +218,11 @@ public class AdminWhitelistRule implements StaplerProxy {
         return HttpResponses.ok();
     }
 
-    public boolean getMasterKillSwitch() {
+	public boolean getMasterKillSwitch() {
         return masterKillSwitch;
     }
 
-    public void setMasterKillSwitch(boolean state) {
+	public void setMasterKillSwitch(boolean state) {
         final Jenkins jenkins = Jenkins.get();
         try {
             jenkins.checkPermission(Jenkins.RUN_SCRIPTS);
@@ -222,7 +235,7 @@ public class AdminWhitelistRule implements StaplerProxy {
         }
     }
 
-    /**
+	/**
      * Restricts the access to administrator.
      */
     @Override
@@ -230,6 +243,4 @@ public class AdminWhitelistRule implements StaplerProxy {
         Jenkins.get().checkPermission(Jenkins.RUN_SCRIPTS);
         return this;
     }
-
-    private static final Logger LOGGER = Logger.getLogger(AdminWhitelistRule.class.getName());
 }

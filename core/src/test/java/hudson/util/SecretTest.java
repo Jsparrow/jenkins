@@ -39,15 +39,15 @@ import org.junit.Test;
 
 public class SecretTest {
 
-    @Rule
-    public ConfidentialStoreRule confidentialStore = new ConfidentialStoreRule();
-
-    @Rule
-    public MockSecretRule mockSecretRule = new MockSecretRule();
-
     private static final Pattern ENCRYPTED_VALUE_PATTERN = Pattern.compile("\\{?[A-Za-z0-9+/]+={0,2}}?");
 
-    @Test
+	@Rule
+    public ConfidentialStoreRule confidentialStore = new ConfidentialStoreRule();
+
+	@Rule
+    public MockSecretRule mockSecretRule = new MockSecretRule();
+
+	@Test
     public void encrypt() {
         Secret secret = Secret.fromString("abc");
         assertEquals("abc", secret.getPlainText());
@@ -64,7 +64,7 @@ public class SecretTest {
         assertNotEquals(secret.getEncryptedValue(), Secret.fromString(secret.getPlainText()).getEncryptedValue());
     }
 
-    @Test
+	@Test
     public void encryptedValuePattern() {
         for (int i = 1; i < 100; i++) {
             String plaintext = RandomStringUtils.random(new Random().nextInt(i));
@@ -82,12 +82,12 @@ public class SecretTest {
         assert ENCRYPTED_VALUE_PATTERN.matcher("abcdefghijklmnopqr012345678==").matches();
     }
 
-    @Test
+	@Test
     public void decrypt() {
         assertEquals("abc", Secret.toString(Secret.fromString("abc")));
     }
 
-    @Test
+	@Test
     public void serialization() {
         Secret s = Secret.fromString("Mr.Jenkins");
         String xml = Jenkins.XSTREAM.toXML(s);
@@ -99,23 +99,19 @@ public class SecretTest {
         assertEquals(xml, s, o);
     }
 
-    public static class Foo {
-        Secret password;
-    }
-
-    /**
+	/**
      * Makes sure the serialization form is backward compatible with String.
      */
     @Test
     public void testCompatibilityFromString() {
         String tagName = Foo.class.getName().replace("$", "_-");
-        String xml = "<" + tagName + "><password>secret</password></" + tagName + ">";
+        String xml = new StringBuilder().append("<").append(tagName).append("><password>secret</password></").append(tagName).append(">").toString();
         Foo foo = new Foo();
         Jenkins.XSTREAM.fromXML(xml, foo);
         assertEquals("secret", Secret.toString(foo.password));
     }
 
-    /**
+	/**
      * Secret persisted with Jenkins.getSecretKey() should still decrypt OK.
      */
     @Test
@@ -129,6 +125,10 @@ public class SecretTest {
             assertEquals("secret by the old key should decrypt", str, s.getPlainText());
             assertNotEquals("but when encrypting, ConfidentialKey should be in use", old, s.getEncryptedValue());
         }
+    }
+
+	public static class Foo {
+        Secret password;
     }
 
 }

@@ -74,29 +74,34 @@ public class ResourceDomainRootAction implements UnprotectedRootAction {
 
     public static final String URL = "static-files";
 
-    @CheckForNull
+	private static HMACConfidentialKey KEY = new HMACConfidentialKey(ResourceDomainRootAction.class, "key");
+
+	// Not @Restricted because the entire class is
+    public static /* not final for Groovy */ int VALID_FOR_MINUTES = SystemProperties.getInteger(ResourceDomainRootAction.class.getName() + ".validForMinutes", 30);
+
+	@CheckForNull
     @Override
     public String getIconFileName() {
         return null;
     }
 
-    @CheckForNull
+	@CheckForNull
     @Override
     public String getDisplayName() {
         return null;
     }
 
-    @CheckForNull
+	@CheckForNull
     @Override
     public String getUrlName() {
         return URL;
     }
 
-    public static ResourceDomainRootAction get() {
+	public static ResourceDomainRootAction get() {
         return ExtensionList.lookupSingleton(ResourceDomainRootAction.class);
     }
 
-    public void doIndex(StaplerRequest req, StaplerResponse rsp) throws IOException {
+	public void doIndex(StaplerRequest req, StaplerResponse rsp) throws IOException {
         if (ResourceDomainConfiguration.isResourceRequest(req)) {
             rsp.sendError(404, ResourceDomainFilter.ERROR_RESPONSE);
         } else {
@@ -104,7 +109,7 @@ public class ResourceDomainRootAction implements UnprotectedRootAction {
         }
     }
 
-    public Object getDynamic(String id, StaplerRequest req, StaplerResponse rsp) throws Exception {
+	public Object getDynamic(String id, StaplerRequest req, StaplerResponse rsp) throws Exception {
         if (!ResourceDomainConfiguration.isResourceRequest(req)) {
             rsp.sendError(404, "Cannot handle requests to this URL unless on Jenkins resource URL.");
             return null;
@@ -128,35 +133,20 @@ public class ResourceDomainRootAction implements UnprotectedRootAction {
         return new Redirection(browserUrl);
     }
 
-    private static class Redirection {
-        private final String url;
-
-        private Redirection(String url) {
-            this.url = url;
-        }
-
-        public void doDynamic(StaplerRequest req, StaplerResponse rsp) throws IOException {
-            String restOfPath = req.getRestOfPath();
-
-            String url = Jenkins.get().getRootUrl() + this.url + restOfPath;
-            rsp.sendRedirect(302, url);
-        }
-    }
-
-    public String getRedirectUrl(@Nonnull Token token, @Nonnull String restOfPath) {
+	public String getRedirectUrl(@Nonnull Token token, @Nonnull String restOfPath) {
         String resourceRootUrl = getResourceRootUrl();
         if (!restOfPath.startsWith("/")) {
             // Unsure whether this can happen -- just be safe here
             restOfPath = "/" + restOfPath;
         }
-        return resourceRootUrl + getUrlName() + "/" + token.encode() + Arrays.stream(restOfPath.split("[/]")).map(Util::rawEncode).collect(Collectors.joining("/"));
+        return new StringBuilder().append(resourceRootUrl).append(getUrlName()).append("/").append(token.encode()).append(Arrays.stream(restOfPath.split("[/]")).map(Util::rawEncode).collect(Collectors.joining("/"))).toString();
     }
 
-    private static String getResourceRootUrl() {
+	private static String getResourceRootUrl() {
         return ResourceDomainConfiguration.get().getUrl();
     }
 
-    /**
+	/**
      * Called from {@link DirectoryBrowserSupport#generateResponse(StaplerRequest, StaplerResponse, Object)} to obtain
      * a token to use when rendering a response.
      *
@@ -175,7 +165,7 @@ public class ResourceDomainRootAction implements UnprotectedRootAction {
 
         // And finally, remove the 'restOfPath' suffix from the complete URL, as that's the path from Jenkins to the DBS.
         String dbsUrl = completeUrl.substring(0, completeUrl.length() - dbsFile.length());
-        LOGGER.fine(() -> "Determined DBS URL: " + dbsUrl + " from restOfUrl: " + completeUrl + " and restOfPath: " + dbsFile);
+        LOGGER.fine(() -> new StringBuilder().append("Determined DBS URL: ").append(dbsUrl).append(" from restOfUrl: ").append(completeUrl).append(" and restOfPath: ").append(dbsFile).toString());
 
         Authentication authentication = Jenkins.getAuthentication();
         String authenticationName = authentication == Jenkins.ANONYMOUS ? "" : authentication.getName();
@@ -183,9 +173,24 @@ public class ResourceDomainRootAction implements UnprotectedRootAction {
         try {
             return new Token(dbsUrl, authenticationName, Instant.now());
         } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Failed to encode token for URL: " + dbsUrl + " user: " + authenticationName, ex);
+            LOGGER.log(Level.WARNING, new StringBuilder().append("Failed to encode token for URL: ").append(dbsUrl).append(" user: ").append(authenticationName).toString(), ex);
         }
         return null;
+    }
+
+    private static class Redirection {
+        private final String url;
+
+        private Redirection(String url) {
+            this.url = url;
+        }
+
+        public void doDynamic(StaplerRequest req, StaplerResponse rsp) throws IOException {
+            String restOfPath = req.getRestOfPath();
+
+            String url = new StringBuilder().append(Jenkins.get().getRootUrl()).append(this.url).append(restOfPath).toString();
+            rsp.sendRedirect(302, url);
+        }
     }
 
     /**
@@ -205,7 +210,8 @@ public class ResourceDomainRootAction implements UnprotectedRootAction {
 
             String requestUrlSuffix = this.browserUrl;
 
-            LOGGER.fine(() -> "Performing a request as authentication: " + authenticationName + " and restOfUrl: " + requestUrlSuffix + " and restOfPath: " + restOfPath);
+            LOGGER.fine(() -> new StringBuilder().append("Performing a request as authentication: ").append(authenticationName).append(" and restOfUrl: ").append(requestUrlSuffix).append(" and restOfPath: ").append(restOfPath)
+					.toString());
 
             Authentication auth = Jenkins.ANONYMOUS;
             if (authenticationName != null) {
@@ -258,7 +264,8 @@ public class ResourceDomainRootAction implements UnprotectedRootAction {
 
         @Override
         public String toString() {
-            return "[" + super.toString() + ", authentication=" + authenticationName + "; key=" + browserUrl + "]";
+            return new StringBuilder().append("[").append(super.toString()).append(", authentication=").append(authenticationName).append("; key=").append(browserUrl)
+					.append("]").toString();
         }
     }
 
@@ -275,7 +282,7 @@ public class ResourceDomainRootAction implements UnprotectedRootAction {
         }
 
         private String encode() {
-            String value = username + ":" + timestamp.toEpochMilli() + ":" + path;
+            String value = new StringBuilder().append(username).append(":").append(timestamp.toEpochMilli()).append(":").append(path).toString();
             byte[] valueBytes = value.getBytes(StandardCharsets.UTF_8);
             byte[] byteValue = ArrayUtils.addAll(KEY.mac(valueBytes), valueBytes);
             return Base64.getUrlEncoder().encodeToString(byteValue);
@@ -304,9 +311,4 @@ public class ResourceDomainRootAction implements UnprotectedRootAction {
         }
 
     }
-
-    private static HMACConfidentialKey KEY = new HMACConfidentialKey(ResourceDomainRootAction.class, "key");
-
-    // Not @Restricted because the entire class is
-    public static /* not final for Groovy */ int VALID_FOR_MINUTES = SystemProperties.getInteger(ResourceDomainRootAction.class.getName() + ".validForMinutes", 30);
 }

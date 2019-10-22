@@ -81,16 +81,14 @@ public class UserLanguages extends Telemetry {
 
     @Override
     public JSONObject createContent() {
-        if (requestsByLanguage.size() == 0) {
+        if (requestsByLanguage.isEmpty()) {
             return null;
         }
         Map<String, AtomicLong> currentRequests = new TreeMap<>(requestsByLanguage);
         requestsByLanguage.clear();
 
         JSONObject payload = new JSONObject();
-        for (Map.Entry<String, AtomicLong> entry : currentRequests.entrySet()) {
-            payload.put(entry.getKey(), entry.getValue().longValue());
-        }
+        currentRequests.entrySet().forEach(entry -> payload.put(entry.getKey(), entry.getValue().longValue()));
         return payload;
     }
 
@@ -119,9 +117,7 @@ public class UserLanguages extends Telemetry {
                 HttpServletRequest httpServletRequest = (HttpServletRequest) request;
                 String language = httpServletRequest.getHeader("Accept-Language");
                 if (language != null) {
-                    if (!requestsByLanguage.containsKey(language)) {
-                        requestsByLanguage.put(language, new AtomicLong(0));
-                    }
+                    requestsByLanguage.putIfAbsent(language, new AtomicLong(0));
                     requestsByLanguage.get(language).incrementAndGet();
                 }
             }

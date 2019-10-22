@@ -43,10 +43,11 @@ public class NoClientBindProtocolSocketFactory implements ProtocolSocketFactory 
     public NoClientBindProtocolSocketFactory() {
     }
  
-    public Socket createSocket(String host, 
+    @Override
+	public Socket createSocket(String host, 
                                int port,
                                InetAddress localAddress,
-                               int localPort) throws IOException, UnknownHostException {
+                               int localPort) throws IOException {
         // ignore the local address/port for binding
         return createSocket(host, port);
     }
@@ -78,9 +79,9 @@ public class NoClientBindProtocolSocketFactory implements ProtocolSocketFactory 
      * 
      * @since 3.0
      */
-    public Socket createSocket(String host, int port, InetAddress localAddress,
-            int localPort, HttpConnectionParams params) throws IOException,
-            UnknownHostException, ConnectTimeoutException {
+    @Override
+	public Socket createSocket(String host, int port, InetAddress localAddress,
+            int localPort, HttpConnectionParams params) throws IOException {
         if (params == null) {
             throw new IllegalArgumentException("Parameters may not be null");
         }
@@ -98,8 +99,8 @@ public class NoClientBindProtocolSocketFactory implements ProtocolSocketFactory 
     /**
      * @see ProtocolSocketFactory#createSocket(java.lang.String,int)
      */
-    public Socket createSocket(String host, int port) throws IOException,
-            UnknownHostException,IOException {
+    @Override
+	public Socket createSocket(String host, int port) throws IOException {
         Socket socket;
         try {
             socket = new Socket(host, port);
@@ -113,14 +114,16 @@ public class NoClientBindProtocolSocketFactory implements ProtocolSocketFactory 
     /**
      * All instances are the same.
      */
-    public boolean equals(Object obj) {
+    @Override
+	public boolean equals(Object obj) {
         return ((obj != null) && obj.getClass().equals(NoClientBindProtocolSocketFactory.class));
     }
 
     /**
      * All instances have the same hash code.
      */
-    public int hashCode() {
+    @Override
+	public int hashCode() {
         return NoClientBindProtocolSocketFactory.class.hashCode();
     }
 }

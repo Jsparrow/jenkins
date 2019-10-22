@@ -70,15 +70,18 @@ class MethodBinder {
 
             // TODO: collection and map support
             Setter setter = new Setter() {
-                public void addValue(Object value) throws CmdLineException {
+                @Override
+				public void addValue(Object value) throws CmdLineException {
                     arguments[index] = value;
                 }
 
-                public Class getType() {
+                @Override
+				public Class getType() {
                     return p.type();
                 }
 
-                public boolean isMultiValued() {
+                @Override
+				public boolean isMultiValued() {
                     return false;
                 }
 
@@ -98,14 +101,18 @@ class MethodBinder {
             }
             Argument arg = p.annotation(Argument.class);
             if (arg!=null) {
-                if (bias>0) arg = new ArgumentImpl(arg,bias);
+                if (bias>0) {
+					arg = new ArgumentImpl(arg,bias);
+				}
                 parser.addArgument(setter,arg);
             }
-            if (p.type()==CLICommand.class)
-                arguments[index] = command;
+            if (p.type()==CLICommand.class) {
+				arguments[index] = command;
+			}
 
-            if (p.type().isPrimitive())
-                arguments[index] = ReflectionUtils.getVmDefaultValueForPrimitiveType(p.type());
+            if (p.type().isPrimitive()) {
+				arguments[index] = ReflectionUtils.getVmDefaultValueForPrimitiveType(p.type());
+			}
         }
     }
 
@@ -114,8 +121,9 @@ class MethodBinder {
             return method.invoke(instance,arguments);
         } catch (InvocationTargetException e) {
             Throwable t = e.getTargetException();
-            if (t instanceof Exception)
-                throw (Exception) t;
+            if (t instanceof Exception) {
+				throw (Exception) t;
+			}
             throw e;
         }
     }
@@ -133,31 +141,38 @@ class MethodBinder {
             this.bias = bias;
         }
 
-        public String usage() {
+        @Override
+		public String usage() {
             return base.usage();
         }
 
-        public String metaVar() {
+        @Override
+		public String metaVar() {
             return base.metaVar();
         }
 
-        public boolean required() {
+        @Override
+		public boolean required() {
             return base.required();
         }
 
-        public Class<? extends OptionHandler> handler() {
+        @Override
+		public Class<? extends OptionHandler> handler() {
             return base.handler();
         }
 
-        public int index() {
+        @Override
+		public int index() {
             return base.index()+bias;
         }
 
-        public boolean multiValued() {
+        @Override
+		public boolean multiValued() {
             return base.multiValued();
         }
 
-        public Class<? extends Annotation> annotationType() {
+        @Override
+		public Class<? extends Annotation> annotationType() {
             return base.annotationType();
         }
 

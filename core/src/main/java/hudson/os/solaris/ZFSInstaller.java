@@ -74,43 +74,56 @@ import java.util.logging.Logger;
 public class ZFSInstaller extends AdministrativeMonitor implements Serializable {
     private static final long serialVersionUID = 1018007614648118323L;
 
-    /**
+	private static final Logger LOGGER = Logger.getLogger(ZFSInstaller.class.getName());
+
+	/**
+     * Escape hatch in case JNI calls fatally crash, like in HUDSON-3733.
+     */
+    public static boolean disabled = SystemProperties.getBoolean(ZFSInstaller.class.getName()+".disabled");
+
+	/**
      * True if $JENKINS_HOME is a ZFS file system by itself.
      */
     private final boolean active = shouldBeActive();
 
-    /**
+	/**
      * This will be the file system name that we'll create.
      */
     private String prospectiveZfsFileSystemName;
 
-    public boolean isActivated() {
+	@Override
+	public boolean isActivated() {
         return active;
     }
 
-    public boolean isRoot() {
+	public boolean isRoot() {
         return LIBC.geteuid()==0;
     }
 
-    public String getProspectiveZfsFileSystemName() {
+	public String getProspectiveZfsFileSystemName() {
         return prospectiveZfsFileSystemName;
     }
 
-    private boolean shouldBeActive() {
-        if(!System.getProperty("os.name").equals("SunOS") || disabled)
-            // on systems that don't have ZFS, we don't need this monitor
+	private boolean shouldBeActive() {
+        if(!"SunOS".equals(System.getProperty("os.name")) || disabled) {
+			// on systems that don't have ZFS, we don't need this monitor
             return false;
+		}
 
         try {
             LibZFS zfs = new LibZFS();
             List<ZFSFileSystem> roots = zfs.roots();
             if(roots.isEmpty())
-                return false;       // no active ZFS pool
+			 {
+				return false;       // no active ZFS pool
+			}
 
             // if we don't run on a ZFS file system, activate
             ZFSFileSystem hudsonZfs = zfs.getFileSystemByMountPoint(Jenkins.get().getRootDir());
             if(hudsonZfs!=null)
-                return false;       // already on ZFS
+			 {
+				return false;       // already on ZFS
+			}
 
             // decide what file system we'll create
             ZFSFileSystem pool = roots.get(0);
@@ -127,23 +140,22 @@ public class ZFSInstaller extends AdministrativeMonitor implements Serializable 
         }
     }
 
-    /**
+	/**
      * Called from the management screen.
      */
     @RequirePOST
     public HttpResponse doAct(StaplerRequest req) throws ServletException, IOException {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
 
-        if(req.hasParameter("n")) {
-            // we'll shut up
-            disable(true);
-            return HttpResponses.redirectViaContextPath("/manage");
-        }
-
-        return new HttpRedirect("confirm");
+        if (!req.hasParameter("n")) {
+			return new HttpRedirect("confirm");
+		}
+		// we'll shut up
+		disable(true);
+		return HttpResponses.redirectViaContextPath("/manage");
     }
 
-    /**
+	/**
      * Creates a ZFS file system to migrate the data to.
      *
      * <p>
@@ -155,14 +167,15 @@ public class ZFSInstaller extends AdministrativeMonitor implements Serializable 
      * @return
      *      The ZFS dataset name to migrate the data to.
      */
-    private String createZfsFileSystem(final TaskListener listener, String rootUsername, String rootPassword) throws IOException, InterruptedException, ZFSException {
+    private String createZfsFileSystem(final TaskListener listener, String rootUsername, String rootPassword) throws IOException, InterruptedException {
         // capture the UID that Hudson runs under
         // so that we can allow this user to do everything on this new partition
         final int uid = LIBC.geteuid();
         final int gid = LIBC.getegid();
         passwd pwd = LIBC.getpwuid(uid);
-        if(pwd==null)
-            throw new IOException("Failed to obtain the current user information for "+uid);
+        if(pwd==null) {
+			throw new IOException("Failed to obtain the current user information for "+uid);
+		}
         final String userName = pwd.pw_name;
 
         final File home = Jenkins.get().getRootDir();
@@ -171,64 +184,8 @@ public class ZFSInstaller extends AdministrativeMonitor implements Serializable 
         // return true indicating a success
         return SU.execute(listener, rootUsername, rootPassword, new Create(listener, home, uid, gid, userName));
     }
-    private static class Create extends MasterToSlaveCallable<String, IOException> {
-        private final TaskListener listener;
-        private final File home;
-        private final int uid;
-        private final int gid;
-        private final String userName;
-        Create(TaskListener listener, File home, int uid, int gid, String userName) {
-            this.listener = listener;
-            this.home = home;
-            this.uid = uid;
-            this.gid = gid;
-            this.userName = userName;
-        }
-            private static final long serialVersionUID = 7731167233498214301L;
-            @Override
-            public String call() throws IOException {
-                PrintStream out = listener.getLogger();
 
-                LibZFS zfs = new LibZFS();
-                ZFSFileSystem existing = zfs.getFileSystemByMountPoint(home);
-                if(existing!=null) {
-                    // no need for migration
-                    out.println(home+" is already on ZFS. Doing nothing");
-                    return existing.getName();
-                }
-
-                String name = computeHudsonFileSystemName(zfs, zfs.roots().get(0));
-                out.println("Creating "+name);
-                ZFSFileSystem hudson = zfs.create(name, ZFSFileSystem.class);
-
-                // mount temporarily to set the owner right
-                File dir = Util.createTempDir();
-                hudson.setMountPoint(dir);
-                hudson.mount();
-                if(LIBC.chown(dir.getPath(),uid,gid)!=0)
-                    throw new IOException("Failed to chown "+dir);
-                hudson.unmount();
-
-                try {
-                    hudson.setProperty("hudson:managed-by","hudson"); // mark this file system as "managed by Hudson"
-
-                    ACLBuilder acl = new ACLBuilder();
-                    acl.user(userName).withEverything();
-                    hudson.allow(acl);
-                } catch (ZFSException e) {
-                    // revert the file system creation
-                    try {
-                        hudson.destory();
-                    } catch (Exception ignored) {
-                        // but ignore the error and let the original error thrown
-                    }
-                    throw e;
-                }
-                return hudson.getName();
-            }
-    }
-
-    /**
+	/**
      * Called from the confirmation screen to actually initiate the migration.
      */
     @RequirePOST
@@ -277,7 +234,9 @@ public class ZFSInstaller extends AdministrativeMonitor implements Serializable 
                     int sz = LIBC.getdtablesize();
                     for(int i=3; i<sz; i++) {
                         int flags = LIBC.fcntl(i, F_GETFD);
-                        if(flags<0) continue;
+                        if(flags<0) {
+							continue;
+						}
                         LIBC.fcntl(i, F_SETFD,flags| FD_CLOEXEC);
                     }
 
@@ -293,7 +252,7 @@ public class ZFSInstaller extends AdministrativeMonitor implements Serializable 
         }.start();
     }
 
-    @Extension
+	@Extension
     public static AdministrativeMonitor init() {
         String migrationTarget = SystemProperties.getString(ZFSInstaller.class.getName() + ".migrate");
         if(migrationTarget!=null) {
@@ -314,13 +273,14 @@ public class ZFSInstaller extends AdministrativeMonitor implements Serializable 
 
         // install the monitor if applicable
         ZFSInstaller zi = new ZFSInstaller();
-        if(zi.isActivated())
-            return zi;
+        if(zi.isActivated()) {
+			return zi;
+		}
 
         return null;
     }
 
-    /**
+	/**
      * Migrates $JENKINS_HOME to a new ZFS file system.
      *
      * TODO: do this in a separate JVM to elevate the privilege.
@@ -356,7 +316,7 @@ public class ZFSInstaller extends AdministrativeMonitor implements Serializable 
         // copy all the files
         out.println("Copying all existing data files");
         if(system(home,listener, "/usr/bin/cp","-pR",".", tmpDir.getAbsolutePath())!=0) {
-            out.println("Failed to copy "+home+" to "+tmpDir);
+            out.println(new StringBuilder().append("Failed to copy ").append(home).append(" to ").append(tmpDir).toString());
             return false;
         }
 
@@ -366,17 +326,19 @@ public class ZFSInstaller extends AdministrativeMonitor implements Serializable 
 
         // move the original directory to the side
         File backup = new File(home.getPath()+".backup");
-        out.println("Moving "+home+" to "+backup);
-        if(backup.exists())
-            Util.deleteRecursive(backup);
+        out.println(new StringBuilder().append("Moving ").append(home).append(" to ").append(backup).toString());
+        if(backup.exists()) {
+			Util.deleteRecursive(backup);
+		}
         if(!home.renameTo(backup)) {
-            out.println("Failed to move your current data "+home+" out of the way");
+            out.println(new StringBuilder().append("Failed to move your current data ").append(home).append(" out of the way").toString());
         }
 
         // update the mount point
         out.println("Creating a new mount point at "+home);
-        if(!home.mkdir())
-            throw new IOException("Failed to create mount point "+home);
+        if(!home.mkdir()) {
+			throw new IOException("Failed to create mount point "+home);
+		}
 
         out.println("Mounting "+target);
         hudson.setMountPoint(home);
@@ -402,25 +364,86 @@ public class ZFSInstaller extends AdministrativeMonitor implements Serializable 
         return true;
     }
 
-    private static int system(File pwd, TaskListener listener, String... args) throws IOException, InterruptedException {
+	private static int system(File pwd, TaskListener listener, String... args) throws IOException, InterruptedException {
         return new LocalLauncher(listener).launch().cmds(args).stdout(System.out).pwd(pwd).join();
     }
 
-    private static String computeHudsonFileSystemName(LibZFS zfs, ZFSFileSystem top) {
-        if(!zfs.exists(top.getName()+"/hudson"))
-            return top.getName()+"/hudson";
+	private static String computeHudsonFileSystemName(LibZFS zfs, ZFSFileSystem top) {
+        if(!zfs.exists(top.getName()+"/hudson")) {
+			return top.getName()+"/hudson";
+		}
         for( int i=2; ; i++ ) {
-            String name = top.getName() + "/hudson" + i;
-            if(!zfs.exists(name))
-                return name;
+            String name = new StringBuilder().append(top.getName()).append("/hudson").append(i).toString();
+            if(!zfs.exists(name)) {
+				return name;
+			}
         }
+    }
+
+    private static class Create extends MasterToSlaveCallable<String, IOException> {
+        private static final long serialVersionUID = 7731167233498214301L;
+		private final TaskListener listener;
+		private final File home;
+		private final int uid;
+		private final int gid;
+		private final String userName;
+		Create(TaskListener listener, File home, int uid, int gid, String userName) {
+            this.listener = listener;
+            this.home = home;
+            this.uid = uid;
+            this.gid = gid;
+            this.userName = userName;
+        }
+		@Override
+		public String call() throws IOException {
+		    PrintStream out = listener.getLogger();
+
+		    LibZFS zfs = new LibZFS();
+		    ZFSFileSystem existing = zfs.getFileSystemByMountPoint(home);
+		    if(existing!=null) {
+		        // no need for migration
+		        out.println(home+" is already on ZFS. Doing nothing");
+		        return existing.getName();
+		    }
+
+		    String name = computeHudsonFileSystemName(zfs, zfs.roots().get(0));
+		    out.println("Creating "+name);
+		    ZFSFileSystem hudson = zfs.create(name, ZFSFileSystem.class);
+
+		    // mount temporarily to set the owner right
+		    File dir = Util.createTempDir();
+		    hudson.setMountPoint(dir);
+		    hudson.mount();
+		    if(LIBC.chown(dir.getPath(),uid,gid)!=0) {
+				throw new IOException("Failed to chown "+dir);
+			}
+		    hudson.unmount();
+
+		    try {
+		        hudson.setProperty("hudson:managed-by","hudson"); // mark this file system as "managed by Hudson"
+
+		        ACLBuilder acl = new ACLBuilder();
+		        acl.user(userName).withEverything();
+		        hudson.allow(acl);
+		    } catch (ZFSException e) {
+		        // revert the file system creation
+		        try {
+		            hudson.destory();
+		        } catch (Exception ignored) {
+		            // but ignore the error and let the original error thrown
+		        }
+		        throw e;
+		    }
+		    return hudson.getName();
+		}
     }
 
     /**
      * Used to indicate that the migration was completed successfully.
      */
     public static final class MigrationCompleteNotice extends AdministrativeMonitor {
-        public boolean isActivated() {
+        @Override
+		public boolean isActivated() {
             return true;
         }
     }
@@ -435,7 +458,8 @@ public class ZFSInstaller extends AdministrativeMonitor implements Serializable 
             this.record = record;
         }
 
-        public boolean isActivated() {
+        @Override
+		public boolean isActivated() {
             return true;
         }
         
@@ -443,11 +467,4 @@ public class ZFSInstaller extends AdministrativeMonitor implements Serializable 
             return record.toString();
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(ZFSInstaller.class.getName());
-
-    /**
-     * Escape hatch in case JNI calls fatally crash, like in HUDSON-3733.
-     */
-    public static boolean disabled = SystemProperties.getBoolean(ZFSInstaller.class.getName()+".disabled");
 }

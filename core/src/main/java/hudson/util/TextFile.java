@@ -71,9 +71,7 @@ public class TextFile {
         StringWriter out = new StringWriter();
         PrintWriter w = new PrintWriter(out);
         try (BufferedReader in = Files.newBufferedReader(Util.fileToPath(file), StandardCharsets.UTF_8)) {
-            String line;
-            while ((line = in.readLine()) != null)
-                w.println(line);
+            in.lines().forEach(w::println);
         } catch (Exception e) {
             throw new IOException("Failed to fully read " + file, e);
         }
@@ -131,8 +129,9 @@ public class TextFile {
         try (Reader r = new FileReader(file)) {
             while (read<numChars) {
                 int d = r.read(buf,read,buf.length-read);
-                if (d<0)
-                    break;
+                if (d<0) {
+					break;
+				}
                 read += d;
             }
 

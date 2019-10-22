@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
+import java.util.stream.Collectors;
 
 /**
  * Extension point for various decisions about SCM operations for {@link Item} instances.
@@ -60,12 +61,7 @@ public abstract class SCMDecisionHandler implements ExtensionPoint {
      */
     @CheckForNull
     public static SCMDecisionHandler firstShouldPollVeto(@Nonnull Item item) {
-        for (SCMDecisionHandler handler : all()) {
-            if (!handler.shouldPoll(item)) {
-                return handler;
-            }
-        }
-        return null;
+        return all().stream().filter(handler -> !handler.shouldPoll(item)).findFirst().orElse(null);
     }
 
     /**
@@ -76,11 +72,7 @@ public abstract class SCMDecisionHandler implements ExtensionPoint {
     @Nonnull
     public static List<SCMDecisionHandler> listShouldPollVetos(@Nonnull Item item) {
         List<SCMDecisionHandler> result = new ArrayList<>();
-        for (SCMDecisionHandler handler : all()) {
-            if (!handler.shouldPoll(item)) {
-                result.add(handler);
-            }
-        }
+        result.addAll(all().stream().filter(handler -> !handler.shouldPoll(item)).collect(Collectors.toList()));
         return result;
     }
 

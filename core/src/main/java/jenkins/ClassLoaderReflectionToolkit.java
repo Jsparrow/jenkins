@@ -14,7 +14,11 @@ import javax.annotation.Nonnull;
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class ClassLoaderReflectionToolkit {
 
-    private static final Method FIND_CLASS, FIND_LOADED_CLASS, FIND_RESOURCE, FIND_RESOURCES, GET_CLASS_LOADING_LOCK;
+    private static final Method FIND_CLASS;
+	private static final Method FIND_LOADED_CLASS;
+	private static final Method FIND_RESOURCE;
+	private static final Method FIND_RESOURCES;
+	private static final Method GET_CLASS_LOADING_LOCK;
 
     static {
         try {
@@ -39,7 +43,10 @@ public class ClassLoaderReflectionToolkit {
         GET_CLASS_LOADING_LOCK = gCLL;
     }
 
-    private static <T extends Exception> Object invoke(Method method, Class<T> exception, Object obj, Object... args) throws T {
+    /** @deprecated unsafe */
+    @Deprecated public ClassLoaderReflectionToolkit() {}
+
+	private static <T extends Exception> Object invoke(Method method, Class<T> exception, Object obj, Object... args) throws T {
         try {
             return method.invoke(obj, args);
         } catch (IllegalAccessException x) {
@@ -58,11 +65,11 @@ public class ClassLoaderReflectionToolkit {
         }
     }
 
-    private static Object getClassLoadingLock(ClassLoader cl, String name) {
+	private static Object getClassLoadingLock(ClassLoader cl, String name) {
         return invoke(GET_CLASS_LOADING_LOCK, RuntimeException.class, cl, name);
     }
 
-    /**
+	/**
      * Calls {@link ClassLoader#findLoadedClass} while holding {@link ClassLoader#getClassLoadingLock}.
      * @since 1.553
      */
@@ -72,7 +79,7 @@ public class ClassLoaderReflectionToolkit {
         }
     }
 
-    /**
+	/**
      * Calls {@link ClassLoader#findClass} while holding {@link ClassLoader#getClassLoadingLock}.
      * @since 1.553
      */
@@ -82,7 +89,7 @@ public class ClassLoaderReflectionToolkit {
         }
     }
 
-    /**
+	/**
      * Calls {@link ClassLoader#findResource}.
      * @since 1.553
      */
@@ -90,7 +97,7 @@ public class ClassLoaderReflectionToolkit {
         return (URL) invoke(FIND_RESOURCE, RuntimeException.class, cl, name);
     }
 
-    /**
+	/**
      * Calls {@link ClassLoader#findResources}.
      * @since 1.553
      */
@@ -98,10 +105,7 @@ public class ClassLoaderReflectionToolkit {
         return (Enumeration<URL>) invoke(FIND_RESOURCES, IOException.class, cl, name);
     }
 
-    /** @deprecated unsafe */
-    @Deprecated public ClassLoaderReflectionToolkit() {}
-
-    /** @deprecated unsafe */
+	/** @deprecated unsafe */
     @Deprecated
     public Class findLoadedClass(ClassLoader cl, String name) throws InvocationTargetException {
         try {
@@ -111,7 +115,7 @@ public class ClassLoaderReflectionToolkit {
         }
     }
 
-    /** @deprecated unsafe */
+	/** @deprecated unsafe */
     @Deprecated
     public Class findClass(ClassLoader cl, String name) throws InvocationTargetException {
         try {
@@ -121,7 +125,7 @@ public class ClassLoaderReflectionToolkit {
         }
     }
 
-    /** @deprecated unsafe */
+	/** @deprecated unsafe */
     @Deprecated
     public URL findResource(ClassLoader cl, String name) throws InvocationTargetException {
         try {
@@ -131,7 +135,7 @@ public class ClassLoaderReflectionToolkit {
         }
     }
 
-    /** @deprecated unsafe */
+	/** @deprecated unsafe */
     @Deprecated
     public Enumeration<URL> findResources(ClassLoader cl, String name) throws InvocationTargetException {
         try {

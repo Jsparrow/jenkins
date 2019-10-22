@@ -51,7 +51,8 @@ public abstract class Builder extends BuildStepCompatibilityLayer implements Des
     /**
      * Default implementation that does nothing.
      */
-    public boolean prebuild(Build build, BuildListener listener) {
+    @Override
+	public boolean prebuild(Build build, BuildListener listener) {
         return true;
     }
 
@@ -59,11 +60,13 @@ public abstract class Builder extends BuildStepCompatibilityLayer implements Des
      * Returns {@link BuildStepMonitor#NONE} by default, as {@link Builder}s normally don't depend
      * on its previous result.
      */
-    public BuildStepMonitor getRequiredMonitorService() {
+    @Override
+	public BuildStepMonitor getRequiredMonitorService() {
         return BuildStepMonitor.NONE;
     }
 
-    public Descriptor<Builder> getDescriptor() {
+    @Override
+	public Descriptor<Builder> getDescriptor() {
         return Jenkins.get().getDescriptorOrDie(getClass());
     }
 

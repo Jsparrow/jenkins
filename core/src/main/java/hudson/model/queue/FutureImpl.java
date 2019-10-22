@@ -60,11 +60,13 @@ public final class FutureImpl extends AsyncFutureImpl<Executable> implements Que
         this.task = task;
     }
 
-    public Future<Executable> getStartCondition() {
+    @Override
+	public Future<Executable> getStartCondition() {
         return start;
     }
 
-    public final Executable waitForStart() throws InterruptedException, ExecutionException {
+    @Override
+	public final Executable waitForStart() throws InterruptedException, ExecutionException {
         return getStartCondition().get();
     }
 
@@ -74,9 +76,9 @@ public final class FutureImpl extends AsyncFutureImpl<Executable> implements Que
         synchronized (q) {
             synchronized (this) {
                 if(!executors.isEmpty()) {
-                    if(mayInterruptIfRunning)
-                        for (Executor e : executors)
-                            e.interrupt();
+                    if(mayInterruptIfRunning) {
+						executors.forEach(Executor::interrupt);
+					}
                     return mayInterruptIfRunning;
                 }
                 return q.cancel(task);

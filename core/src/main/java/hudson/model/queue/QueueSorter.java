@@ -27,14 +27,10 @@ public abstract class QueueSorter implements ExtensionPoint {
      *
      * @since 1.618
      */
-    public static final Comparator<Queue.BlockedItem> DEFAULT_BLOCKED_ITEM_COMPARATOR = new Comparator<Queue.BlockedItem>() {
-        @Override
-        public int compare(Queue.BlockedItem o1, Queue.BlockedItem o2) {
-            return Long.compare(o1.getInQueueSince(), o2.getInQueueSince());
-        }
-    };
+    public static final Comparator<Queue.BlockedItem> DEFAULT_BLOCKED_ITEM_COMPARATOR = (Queue.BlockedItem o1, Queue.BlockedItem o2) -> Long.compare(o1.getInQueueSince(), o2.getInQueueSince());
+	private static final Logger LOGGER = Logger.getLogger(QueueSorter.class.getName());
 
-    /**
+	/**
      * Sorts the buildable items list. The items at the beginning will be executed
      * before the items at the end of the list.
      *
@@ -43,7 +39,7 @@ public abstract class QueueSorter implements ExtensionPoint {
      */
     public abstract void sortBuildableItems(List<BuildableItem> buildables);
 
-    /**
+	/**
      * Sorts the blocked items list. The items at the beginning will be considered for removal from the blocked state
      * before the items at the end of the list.
      *
@@ -55,7 +51,7 @@ public abstract class QueueSorter implements ExtensionPoint {
         blockedItems.sort(DEFAULT_BLOCKED_ITEM_COMPARATOR);
     }
 
-    /**
+	/**
      * All registered {@link QueueSorter}s. Only the first one will be picked up,
      * unless explicitly overridden by {@link Queue#setSorter(QueueSorter)}.
      */
@@ -63,7 +59,7 @@ public abstract class QueueSorter implements ExtensionPoint {
         return ExtensionList.lookup(QueueSorter.class);
     }
 
-    /**
+	/**
      * Installs the default queue sorter.
      *
      * {@link Queue#Queue(LoadBalancer)} is too early to do this
@@ -71,15 +67,19 @@ public abstract class QueueSorter implements ExtensionPoint {
     @Initializer(after=JOB_LOADED)
     public static void installDefaultQueueSorter() {
         ExtensionList<QueueSorter> all = all();
-        if (all.isEmpty())  return;
+        if (all.isEmpty()) {
+			return;
+		}
 
         Queue q = Jenkins.get().getQueue();
-        if (q.getSorter()!=null)        return; // someone has already installed something. leave that alone.
+        if (q.getSorter()!=null)
+		 {
+			return; // someone has already installed something. leave that alone.
+		}
 
         q.setSorter(all.get(0));
-        if (all.size()>1)
-            LOGGER.warning("Multiple QueueSorters are registered. Only the first one is used and the rest are ignored: "+all);
+        if (all.size()>1) {
+			LOGGER.warning("Multiple QueueSorters are registered. Only the first one is used and the rest are ignored: "+all);
+		}
     }
-
-    private static final Logger LOGGER = Logger.getLogger(QueueSorter.class.getName());
 }

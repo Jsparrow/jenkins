@@ -66,13 +66,13 @@ public class MissingClassTelemetry extends Telemetry {
     private static MissingClassEvents events = new MissingClassEvents();
 
     // When we begin to gather these data
-    private final static LocalDate START = LocalDate.of(2019, 4, 1);
+    private static final LocalDate START = LocalDate.of(2019, 4, 1);
     // Gather for 2 years (who knows how long people will need to migrate to Java 11)
-    private final static LocalDate END = START.plusMonths(24);
+    private static final LocalDate END = START.plusMonths(24);
 
     // The types of exceptions which can be reported
     private static final Set reportableExceptions =
-            new HashSet<Class>(Arrays.asList(ClassNotFoundException.class, NoClassDefFoundError.class));
+            Collections.unmodifiableSet(new HashSet<Class>(Arrays.asList(ClassNotFoundException.class, NoClassDefFoundError.class)));
 
     @VisibleForTesting
     /* package */ static final String CIRCULAR_REFERENCE = "Circular reference found on the exception we are analysing to report via telemetry";
@@ -81,7 +81,7 @@ public class MissingClassTelemetry extends Telemetry {
      * Packages removed from java8 up to java11
      * https://blog.codefx.org/java/java-11-migration-guide/
      */
-    private final static String[] MOVED_PACKAGES = new String[] {"javax.activation", "javax.annotation", "javax.jws",
+    private static final String[] MOVED_PACKAGES = new String[] {"javax.activation", "javax.annotation", "javax.jws",
             "javax.rmi", "javax.transaction", "javax.xml.bind", "javax.xml.soap", "javax.xml.ws", "org.omg",
             "javax.activity", "com.sun", "sun"};
 
@@ -227,18 +227,19 @@ public class MissingClassTelemetry extends Telemetry {
      * @param e the throwable to report if needed
      */
     public static void reportException(@Nonnull String name, @Nonnull Throwable e) {
-        if (enabled()) {
-            //ClassDefFoundError uses / instead of .
-            name = name.replace('/', '.').trim();
-
-            // We call the methods in this order because if the missing class is not java related, we don't loop over the
-            // stack trace to look if it's not thrown from an ignored place avoiding an impact on performance.
-            if (isFromMovedPackage(name) && !calledFromIgnoredPlace(e)) {
-                events.put(name, e);
-                if (LOGGER.isLoggable(Level.WARNING))
-                    LOGGER.log(Level.WARNING, "Added a missed class for missing class telemetry. Class: " + name, e);
-            }
-        }
+        if (!enabled()) {
+			return;
+		}
+		//ClassDefFoundError uses / instead of .
+		name = name.replace('/', '.').trim();
+		// We call the methods in this order because if the missing class is not java related, we don't loop over the
+		// stack trace to look if it's not thrown from an ignored place avoiding an impact on performance.
+		if (isFromMovedPackage(name) && !calledFromIgnoredPlace(e)) {
+		    events.put(name, e);
+		    if (LOGGER.isLoggable(Level.WARNING)) {
+				LOGGER.log(Level.WARNING, "Added a missed class for missing class telemetry. Class: " + name, e);
+			}
+		}
     }
 
     /**
@@ -281,15 +282,15 @@ public class MissingClassTelemetry extends Telemetry {
      * @param e the exception to report if needed
      */
     private static void reportException(@Nonnull Throwable e) {
-        if (enabled()) {
-            String name = e.getMessage();
-
-            if (name == null || name.trim().isEmpty()) {
-                LOGGER.log(Level.INFO, "No class name could be extracted from the throwable to determine if it's reportable", e);
-            } else {
-                reportException(name, e);
-            }
-        }
+        if (!enabled()) {
+			return;
+		}
+		String name = e.getMessage();
+		if (name == null || name.trim().isEmpty()) {
+		    LOGGER.log(Level.INFO, "No class name could be extracted from the throwable to determine if it's reportable", e);
+		} else {
+		    reportException(name, e);
+		}
     }
 
     private static boolean isFromMovedPackage(@Nonnull String clazz) {
@@ -307,11 +308,12 @@ public class MissingClassTelemetry extends Telemetry {
      * @param e the exception to look into
      */
     public static void reportExceptionInside(@Nonnull Throwable e) {
-        if (enabled()) {
-            // Use a Set with equity based on == instead of equal to find cycles
-            Set<Throwable> exceptionsReviewed = Collections.newSetFromMap(new IdentityHashMap<>());
-            reportExceptionInside(e, exceptionsReviewed);
-        }
+        if (!enabled()) {
+			return;
+		}
+		// Use a Set with equity based on == instead of equal to find cycles
+		Set<Throwable> exceptionsReviewed = Collections.newSetFromMap(new IdentityHashMap<>());
+		reportExceptionInside(e, exceptionsReviewed);
     }
 
     /**
@@ -338,20 +340,18 @@ public class MissingClassTelemetry extends Telemetry {
             return true;
         }
 
-        // We search in its cause exception
-        if (e.getCause() != null) {
-            if (reportExceptionInside(e.getCause(), exceptionsReviewed)) {
-                return true;
-            }
-        }
+        boolean condition = e.getCause() != null && reportExceptionInside(e.getCause(), exceptionsReviewed);
+		// We search in its cause exception
+        if (condition) {
+		    return true;
+		}
 
         // We search in its suppressed exceptions
         for (Throwable suppressed: e.getSuppressed()) {
-            if (suppressed != null) {
-                if (reportExceptionInside(suppressed, exceptionsReviewed)) {
-                    return true;
-                }
-            }
+            boolean condition1 = suppressed != null && reportExceptionInside(suppressed, exceptionsReviewed);
+			if (condition1) {
+			    return true;
+			}
         }
 
         // If this exception or its ancestors are not related with missed classes

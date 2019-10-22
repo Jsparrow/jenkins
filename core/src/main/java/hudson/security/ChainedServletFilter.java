@@ -42,35 +42,41 @@ import javax.servlet.ServletResponse;
  * @author Kohsuke Kawaguchi
  */
 public class ChainedServletFilter implements Filter {
-    // array is assumed to be immutable once set
+    private static final Logger LOGGER = Logger.getLogger(ChainedServletFilter.class.getName());
+	// array is assumed to be immutable once set
     protected volatile Filter[] filters;
 
-    public ChainedServletFilter() {
+	public ChainedServletFilter() {
         filters = new Filter[0];
     }
 
-    public ChainedServletFilter(Filter... filters) {
+	public ChainedServletFilter(Filter... filters) {
         this(Arrays.asList(filters));
     }
 
-    public ChainedServletFilter(Collection<? extends Filter> filters) {
+	public ChainedServletFilter(Collection<? extends Filter> filters) {
         setFilters(filters);
     }
 
-    public void setFilters(Collection<? extends Filter> filters) {
+	public void setFilters(Collection<? extends Filter> filters) {
         this.filters = filters.toArray(new Filter[0]);
     }
 
-    public void init(FilterConfig filterConfig) throws ServletException {
-        if (LOGGER.isLoggable(Level.FINEST))
-            for (Filter f : filters)
-                LOGGER.finest("ChainedServletFilter contains: " + f);
+	@Override
+	public void init(FilterConfig filterConfig) throws ServletException {
+        if (LOGGER.isLoggable(Level.FINEST)) {
+			for (Filter f : filters) {
+				LOGGER.finest("ChainedServletFilter contains: " + f);
+			}
+		}
 
-        for (Filter f : filters)
-            f.init(filterConfig);
+        for (Filter f : filters) {
+			f.init(filterConfig);
+		}
     }
 
-    public void doFilter(ServletRequest request, ServletResponse response, final FilterChain chain) throws IOException, ServletException {
+	@Override
+	public void doFilter(ServletRequest request, ServletResponse response, final FilterChain chain) throws IOException, ServletException {
         LOGGER.entering(ChainedServletFilter.class.getName(), "doFilter");
 
         new FilterChain() {
@@ -78,7 +84,8 @@ public class ChainedServletFilter implements Filter {
             // capture the array for thread-safety
             private final Filter[] filters = ChainedServletFilter.this.filters;
 
-            public void doFilter(ServletRequest request, ServletResponse response) throws IOException, ServletException {
+            @Override
+			public void doFilter(ServletRequest request, ServletResponse response) throws IOException, ServletException {
                 if(position==filters.length) {
                     // reached to the end
                     chain.doFilter(request,response);
@@ -90,10 +97,10 @@ public class ChainedServletFilter implements Filter {
         }.doFilter(request,response);
     }
 
-    public void destroy() {
-        for (Filter f : filters)
-            f.destroy();
+	@Override
+	public void destroy() {
+        for (Filter f : filters) {
+			f.destroy();
+		}
     }
-
-    private static final Logger LOGGER = Logger.getLogger(ChainedServletFilter.class.getName());
 }

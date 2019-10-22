@@ -40,9 +40,10 @@ public class InitialUserContent {
     @Initializer(after=JOB_LOADED)
     public static void init(Jenkins h) throws IOException {
         File userContentDir = new File(h.getRootDir(), "userContent");
-        if(!userContentDir.exists()) {
-            userContentDir.mkdirs();
-            FileUtils.writeStringToFile(new File(userContentDir,"readme.txt"), Messages.Hudson_USER_CONTENT_README() + "\n");
-        }
+        if (userContentDir.exists()) {
+			return;
+		}
+		userContentDir.mkdirs();
+		FileUtils.writeStringToFile(new File(userContentDir,"readme.txt"), Messages.Hudson_USER_CONTENT_README() + "\n");
     }
 }

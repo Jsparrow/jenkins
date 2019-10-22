@@ -33,23 +33,25 @@ import java.util.List;
  * @see SearchIndexBuilder
  */
 public interface SearchIndex {
-    void find(String token, List<SearchItem> result);
-
-    /**
-     *
-     * This method returns the superset of {@link #find(String, List)}.
-     */
-    void suggest(String token, List<SearchItem> result);
-
     /**
      * Empty set.
      */
     SearchIndex EMPTY = new SearchIndex() {
-        public void find(String token, List<SearchItem> result) {
+        @Override
+		public void find(String token, List<SearchItem> result) {
             // no item to contribute
         }
-        public void suggest(String token, List<SearchItem> result) {
+        @Override
+		public void suggest(String token, List<SearchItem> result) {
             // nothing to suggest
         }
     };
+
+	void find(String token, List<SearchItem> result);
+
+	/**
+     *
+     * This method returns the superset of {@link #find(String, List)}.
+     */
+    void suggest(String token, List<SearchItem> result);
 }

@@ -38,22 +38,25 @@ import javax.annotation.CheckForNull;
  * @since 1.319
  */
 final class RunnerStack {
-    private final Map<Executor,Stack<RunExecution>> stack = new WeakHashMap<>();
+    static final RunnerStack INSTANCE = new RunnerStack();
+	private final Map<Executor,Stack<RunExecution>> stack = new WeakHashMap<>();
 
-    synchronized void push(RunExecution r) {
+	synchronized void push(RunExecution r) {
         Executor e = Executor.currentExecutor();
         Stack<RunExecution> s = stack.computeIfAbsent(e, k -> new Stack<>());
         s.push(r);
     }
 
-    synchronized void pop() {
+	synchronized void pop() {
         Executor e = Executor.currentExecutor();
         Stack<RunExecution> s = stack.get(e);
         s.pop();
-        if(s.isEmpty()) stack.remove(e);
+        if(s.isEmpty()) {
+			stack.remove(e);
+		}
     }
 
-    /**
+	/**
      * Looks up the currently running build, if known.
      * <p>While most {@link Run} implementations do add a {@link RunExecution} to the stack for the duration of the build,
      * those which have a different implementation of {@link Run#run} (or which do additional work after {@link Run#execute} completes)
@@ -71,6 +74,4 @@ final class RunnerStack {
         }
         return null;
     }
-
-    static final RunnerStack INSTANCE = new RunnerStack();
 }

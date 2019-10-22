@@ -52,84 +52,89 @@ import java.io.InputStreamReader;
  */
 @Deprecated
 public class LargeText {
-    /**
-     * Represents the data source of this text.
-     */
-    private interface Source {
-        Session open() throws IOException;
-        long length();
-        boolean exists();
-    }
     private final Source source;
 
-    private volatile boolean completed;
+	private volatile boolean completed;
 
-    public LargeText(final File file, boolean completed) {
+	public LargeText(final File file, boolean completed) {
         this.source = new Source() {
-            public Session open() throws IOException {
+            @Override
+			public Session open() throws IOException {
                 return new FileSession(file);
             }
 
-            public long length() {
+            @Override
+			public long length() {
                 return file.length();
             }
 
-            public boolean exists() {
+            @Override
+			public boolean exists() {
                 return file.exists();
             }
         };
         this.completed = completed;
     }
 
-    public LargeText(final ByteBuffer memory, boolean completed) {
+	public LargeText(final ByteBuffer memory, boolean completed) {
         this.source = new Source() {
-            public Session open() throws IOException {
+            @Override
+			public Session open() throws IOException {
                 return new BufferSession(memory);
             }
 
-            public long length() {
+            @Override
+			public long length() {
                 return memory.length();
             }
 
-            public boolean exists() {
+            @Override
+			public boolean exists() {
                 return true;
             }
         };
         this.completed = completed;
     }
 
-    public void markAsComplete() {
+	public void markAsComplete() {
         completed = true;
     }
 
-    public boolean isComplete() {
+	public boolean isComplete() {
         return completed;
     }
 
-    /**
+	/**
      * Returns {@link Reader} for reading the raw bytes.
      */
     public Reader readAll() throws IOException {
         return new InputStreamReader(new InputStream() {
             final Session session = source.open();
-            public int read() throws IOException {
+            @Override
+			public int read() throws IOException {
                 byte[] buf = new byte[1];
                 int n = session.read(buf);
-                if(n==1)    return buf[0];
-                else        return -1; // EOF
+                if(n==1) {
+					return buf[0];
+				}
+				else {
+					return -1; // EOF
+				}
             }
 
-            public int read(byte[] buf, int off, int len) throws IOException {
+            @Override
+			public int read(byte[] buf, int off, int len) throws IOException {
                 return session.read(buf,off,len);
             }
 
-            public void close() throws IOException {
+            @Override
+			public void close() throws IOException {
                 session.close();
             }
         });
     }
 
-    /**
+	/**
      * Writes the tail portion of the file to the {@link Writer}.
      *
      * <p>
@@ -153,8 +158,9 @@ public class LargeText {
                 // write everything till EOF
                 byte[] buf = new byte[1024];
                 int sz;
-                while ((sz = f.read(buf)) >= 0)
-                    os.write(buf, 0, sz);
+                while ((sz = f.read(buf)) >= 0) {
+					os.write(buf, 0, sz);
+				}
             } else {
                 ByteBuf buf = new ByteBuf(null, f);
                 HeadMark head = new HeadMark(buf);
@@ -171,7 +177,7 @@ public class LargeText {
         return os.getCount()+start;
     }
 
-    /**
+	/**
      * Implements the progressive text handling.
      * This method is used as a "web method" with progressiveText.jelly.
      */
@@ -188,30 +194,43 @@ public class LargeText {
 
         long start = 0;
         String s = req.getParameter("start");
-        if(s!=null)
-            start = Long.parseLong(s);
+        if(s!=null) {
+			start = Long.parseLong(s);
+		}
 
         if(source.length() < start )
-            start = 0;  // text rolled over
+		 {
+			start = 0;  // text rolled over
+		}
 
         CharSpool spool = new CharSpool();
         long r = writeLogTo(start,spool);
 
         rsp.addHeader("X-Text-Size",String.valueOf(r));
-        if(!completed)
-            rsp.addHeader("X-More-Data","true");
+        if(!completed) {
+			rsp.addHeader("X-More-Data","true");
+		}
 
         // when sending big text, try compression. don't bother if it's small
         Writer w;
-        if(r-start>4096)
-            w = rsp.getCompressedWriter(req);
-        else
-            w = rsp.getWriter();
+        if(r-start>4096) {
+			w = rsp.getCompressedWriter(req);
+		} else {
+			w = rsp.getWriter();
+		}
         spool.writeTo(new LineEndNormalizingWriter(w));
         w.close();
 
     }
 
+	/**
+     * Represents the data source of this text.
+     */
+    private interface Source {
+        Session open() throws IOException;
+        long length();
+        boolean exists();
+    }
     /**
      * Points to a byte in the buffer.
      */
@@ -273,8 +292,9 @@ public class LargeText {
                     }
                 }
                 byte b = buf.buf[pos++];
-                if(b=='\r' || b=='\n')
-                    return true;
+                if(b=='\r' || b=='\n') {
+					return true;
+				}
             }
         }
     }
@@ -292,8 +312,9 @@ public class LargeText {
 
             while(!this.isFull()) {
                 int chunk = f.read(buf, size, buf.length - size);
-                if(chunk==-1)
-                    return;
+                if(chunk==-1) {
+					return;
+				}
                 size+= chunk;
             }
         }
@@ -308,7 +329,8 @@ public class LargeText {
      * Methods generally follow the contracts of {@link InputStream}.
      */
     private interface Session extends AutoCloseable {
-        void close() throws IOException;
+        @Override
+		void close() throws IOException;
         void skip(long start) throws IOException;
         int read(byte[] buf) throws IOException;
         int read(byte[] buf, int offset, int length) throws IOException;
@@ -324,19 +346,23 @@ public class LargeText {
             this.file = new RandomAccessFile(file,"r");
         }
 
-        public void close() throws IOException {
+        @Override
+		public void close() throws IOException {
             file.close();
         }
 
-        public void skip(long start) throws IOException {
+        @Override
+		public void skip(long start) throws IOException {
             file.seek(file.getFilePointer()+start);
         }
 
-        public int read(byte[] buf) throws IOException {
+        @Override
+		public int read(byte[] buf) throws IOException {
             return file.read(buf);
         }
 
-        public int read(byte[] buf, int offset, int length) throws IOException {
+        @Override
+		public int read(byte[] buf, int offset, int length) throws IOException {
             return file.read(buf,offset,length);
         }
     }
@@ -352,20 +378,25 @@ public class LargeText {
         }
 
 
-        public void close() throws IOException {
+        @Override
+		public void close() throws IOException {
             in.close();
         }
 
-        public void skip(long n) throws IOException {
-            while(n>0)
-                n -= in.skip(n);
+        @Override
+		public void skip(long n) throws IOException {
+            while(n>0) {
+				n -= in.skip(n);
+			}
         }
 
-        public int read(byte[] buf) throws IOException {
+        @Override
+		public int read(byte[] buf) throws IOException {
             return in.read(buf);
         }
 
-        public int read(byte[] buf, int offset, int length) throws IOException {
+        @Override
+		public int read(byte[] buf, int offset, int length) throws IOException {
             return in.read(buf,offset,length);
         }
     }

@@ -29,36 +29,45 @@ import java.util.Set;
  * @author Kohsuke Kawaguchi
  */
 public class SecretRewriter {
-    private final Cipher cipher;
-    private final SecretKey key;
-
-    /**
+    private static final boolean[] IS_BASE64 = new boolean[128];
+	static {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+        for (int i=0; i<chars.length();i++) {
+			IS_BASE64[chars.charAt(i)] = true;
+		}
+    }
+	private final Cipher cipher;
+	private final SecretKey key;
+	/**
      * How many files have been scanned?
      */
     private int count;
-
-    /**
+	/**
      * Canonical paths of the directories we are recursing to protect
      * against symlink induced cycles.
      */
     private Set<String> callstack = new HashSet<>();
 
-    public SecretRewriter() throws GeneralSecurityException {
+	public SecretRewriter() throws GeneralSecurityException {
         cipher = Secret.getCipher("AES");
         key = HistoricalSecrets.getLegacyKey();
     }
 
-    /** @deprecated SECURITY-376: {@code backupDirectory} is ignored */
+	/** @deprecated SECURITY-376: {@code backupDirectory} is ignored */
     @Deprecated
     public SecretRewriter(File backupDirectory) throws GeneralSecurityException {
         this();
     }
 
-    private String tryRewrite(String s) throws IOException, InvalidKeyException {
+	private String tryRewrite(String s) throws IOException, InvalidKeyException {
         if (s.length()<24)
-            return s;   // Encrypting "" in Secret produces 24-letter characters, so this must be the minimum length
+		 {
+			return s;   // Encrypting "" in Secret produces 24-letter characters, so this must be the minimum length
+		}
         if (!isBase64(s))
-            return s;   // decode throws IOException if the input is not base64, and this is also a very quick way to filter
+		 {
+			return s;   // decode throws IOException if the input is not base64, and this is also a very quick way to filter
+		}
 
         byte[] in;
         try {
@@ -68,19 +77,20 @@ public class SecretRewriter {
         }
         cipher.init(Cipher.DECRYPT_MODE, key);
         Secret sec = HistoricalSecrets.tryDecrypt(cipher, in);
-        if(sec!=null) // matched
-            return sec.getEncryptedValue(); // replace by the new encrypted value
-        else // not encrypted with the legacy key. leave it unmodified
-            return s;
+        if(sec!=null) {
+			return sec.getEncryptedValue(); // replace by the new encrypted value
+		} else {
+			return s;
+		}
     }
 
-    /** @deprecated SECURITY-376: {@code backup} is ignored */
+	/** @deprecated SECURITY-376: {@code backup} is ignored */
     @Deprecated
     public boolean rewrite(File f, File backup) throws InvalidKeyException, IOException {
         return rewrite(f);
     }
 
-    public boolean rewrite(File f) throws InvalidKeyException, IOException {
+	public boolean rewrite(File f) throws InvalidKeyException, IOException {
 
         AtomicFileWriter w = new AtomicFileWriter(f, "UTF-8");
         try {
@@ -97,14 +107,19 @@ public class SecretRewriter {
                         buf.setLength(0);
                         while (true) {
                             int sidx = line.indexOf('>', copied);
-                            if (sidx < 0) break;
+                            if (sidx < 0) {
+								break;
+							}
                             int eidx = line.indexOf('<', sidx);
-                            if (eidx < 0) break;
+                            if (eidx < 0) {
+								break;
+							}
 
                             String elementText = line.substring(sidx + 1, eidx);
                             String replacement = tryRewrite(elementText);
-                            if (!replacement.equals(elementText))
-                                modified = true;
+                            if (!replacement.equals(elementText)) {
+								modified = true;
+							}
 
                             buf.append(line, copied, sidx + 1);
                             buf.append(replacement);
@@ -127,8 +142,7 @@ public class SecretRewriter {
         }
     }
 
-
-    /**
+	/**
      * Recursively scans and rewrites a directory.
      *
      * This method shouldn't abort just because one file fails to rewrite.
@@ -140,7 +154,8 @@ public class SecretRewriter {
     public synchronized int rewriteRecursive(File dir, TaskListener listener) throws InvalidKeyException {
         return rewriteRecursive(dir,"",listener);
     }
-    private int rewriteRecursive(File dir, String relative, TaskListener listener) throws InvalidKeyException {
+
+	private int rewriteRecursive(File dir, String relative, TaskListener listener) throws InvalidKeyException {
         String canonical;
         try {
             canonical = dir.toPath().toRealPath(new LinkOption[0]).toString();
@@ -154,14 +169,17 @@ public class SecretRewriter {
 
         try {
             File[] children = dir.listFiles();
-            if (children==null)     return 0;
+            if (children==null) {
+				return 0;
+			}
 
             int rewritten=0;
             for (File child : children) {
                 String cn = child.getName();
                 if (cn.endsWith(".xml")) {
-                    if ((count++)%100==0)
-                        listener.getLogger().println("Scanning "+child);
+                    if ((count++)%100==0) {
+						listener.getLogger().println("Scanning "+child);
+					}
                     try {
                         if (rewrite(child)) {
                             listener.getLogger().println("Rewritten "+child);
@@ -171,12 +189,12 @@ public class SecretRewriter {
                         Functions.printStackTrace(e, listener.error("Failed to rewrite " + child));
                     }
                 }
-                if (child.isDirectory()) {
-                    if (!isIgnoredDir(child))
-                        rewritten += rewriteRecursive(child,
-                                relative.length()==0 ? cn : relative+'/'+ cn,
-                                listener);
-                }
+                boolean condition = child.isDirectory() && !isIgnoredDir(child);
+				if (condition) {
+					rewritten += rewriteRecursive(child,
+				            relative.isEmpty() ? cn : new StringBuilder().append(relative).append('/').append(cn).toString(),
+				            listener);
+				}
             }
             return rewritten;
         } finally {
@@ -184,33 +202,28 @@ public class SecretRewriter {
         }
     }
 
-    /**
+	/**
      * Decides if this directory is worth visiting or not.
      */
     protected boolean isIgnoredDir(File dir) {
         // ignoring the workspace and the artifacts directories. Both of them
         // are potentially large and they do not store any secrets.
         String n = dir.getName();
-        return n.equals("workspace") || n.equals("artifacts")
-            || n.equals("plugins") // no mutable data here
-            || n.equals(".") || n.equals("..");
+        return "workspace".equals(n) || "artifacts".equals(n)
+            || "plugins".equals(n) // no mutable data here
+            || ".".equals(n) || "..".equals(n);
     }
 
-    private static boolean isBase64(char ch) {
+	private static boolean isBase64(char ch) {
         return ch<128 && IS_BASE64[ch];
     }
 
-    private static boolean isBase64(String s) {
-        for (int i=0; i<s.length(); i++)
-            if (!isBase64(s.charAt(i)))
-                return false;
+	private static boolean isBase64(String s) {
+        for (int i=0; i<s.length(); i++) {
+			if (!isBase64(s.charAt(i))) {
+				return false;
+			}
+		}
         return true;
-    }
-
-    private static final boolean[] IS_BASE64 = new boolean[128];
-    static {
-        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
-        for (int i=0; i<chars.length();i++)
-            IS_BASE64[chars.charAt(i)] = true;
     }
 }

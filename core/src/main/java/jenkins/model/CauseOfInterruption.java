@@ -58,36 +58,39 @@ import javax.annotation.Nonnull;
  */
 @ExportedBean
 public abstract class CauseOfInterruption implements Serializable {
-    /**
+    private static final long serialVersionUID = 1L;
+
+	/**
      * Human readable description of why the build is cancelled.
      */
     @Exported
     public abstract String getShortDescription();
 
-    /**
+	/**
      * Report a line to the listener about this cause.
      */
     public void print(TaskListener listener) {
         listener.getLogger().println(getShortDescription());
     }
 
-    /**
+	/**
      * Indicates that the build was interrupted from UI.
      */
     public static final class UserInterruption extends CauseOfInterruption {
         
-        @Nonnull
+        private static final long serialVersionUID = 1L;
+		@Nonnull
         private final String user;
 
-        public UserInterruption(@Nonnull User user) {
+		public UserInterruption(@Nonnull User user) {
             this.user = user.getId();
         }
 
-        public UserInterruption(@Nonnull String userId) {
+		public UserInterruption(@Nonnull String userId) {
             this.user = userId;
         }
 
-        /**
+		/**
          * Gets ID of the user, who interrupted the build.
          * @return User ID
          * @since 2.31
@@ -96,8 +99,8 @@ public abstract class CauseOfInterruption implements Serializable {
         public String getUserId() {
             return user;
         }
-        
-        /**
+
+		/**
          * Gets user, who caused the interruption.
          * @return User instance if it can be located.
          *         Result of {@link User#getUnknown()} otherwise
@@ -107,8 +110,8 @@ public abstract class CauseOfInterruption implements Serializable {
             final User userInstance = getUserOrNull();
             return userInstance != null ? userInstance : User.getUnknown();
         }
-        
-        /**
+
+		/**
          * Gets user, who caused the interruption.
          * @return User or {@code null} if it has not been found
          * @since 2.31
@@ -118,11 +121,12 @@ public abstract class CauseOfInterruption implements Serializable {
             return User.get(user, false, Collections.emptyMap());
         }
 
-        public String getShortDescription() {
+		@Override
+		public String getShortDescription() {
             return Messages.CauseOfInterruption_ShortDescription(user);
         }
 
-        @Override
+		@Override
         public void print(TaskListener listener) {
             final User userInstance = getUser();
             listener.getLogger().println(
@@ -130,20 +134,18 @@ public abstract class CauseOfInterruption implements Serializable {
                         userInstance != null ? ModelHyperlinkNote.encodeTo(userInstance) : user));
         }
 
-        @Override
+		@Override
         public boolean equals(Object o) {
-            if (o == null || getClass() != o.getClass()) return false;
+            if (o == null || getClass() != o.getClass()) {
+				return false;
+			}
             UserInterruption that = (UserInterruption) o;
             return user.equals(that.user);
         }
 
-        @Override
+		@Override
         public int hashCode() {
             return user.hashCode();
         }
-
-        private static final long serialVersionUID = 1L;
     }
-
-    private static final long serialVersionUID = 1L;
 }

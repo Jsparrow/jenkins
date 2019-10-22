@@ -25,7 +25,7 @@ public class ImpersonatingUserDetailsService implements UserDetailsService {
     }
 
     @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException, DataAccessException {
+    public UserDetails loadUserByUsername(String username) {
         try {
             return base.loadUserByUsername(username);
         } catch (UserMayOrMayNotExistException | DataAccessException e) {
@@ -38,9 +38,10 @@ public class ImpersonatingUserDetailsService implements UserDetailsService {
         User u = User.getById(username, false);
         if (u!=null) {
             LastGrantedAuthoritiesProperty p = u.getProperty(LastGrantedAuthoritiesProperty.class);
-            if (p!=null)
-                return new org.acegisecurity.userdetails.User(username,"",true,true,true,true,
+            if (p!=null) {
+				return new org.acegisecurity.userdetails.User(username,"",true,true,true,true,
                         p.getAuthorities());
+			}
         }
 
         throw e;

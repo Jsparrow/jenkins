@@ -66,19 +66,28 @@ import javax.annotation.Nullable;
  * @since  1.372
  */
 public class LabelAtom extends Label implements Saveable {
-    private DescribableList<LabelAtomProperty,LabelAtomPropertyDescriptor> properties =
+    private static final Logger LOGGER = Logger.getLogger(LabelAtom.class.getName());
+
+	private static final XStream2 XSTREAM = new XStream2();
+
+	static {
+        // Don't want Label.ConverterImpl to be used:
+        XSTREAM.registerConverter(new LabelAtomConverter(), 100);
+    }
+
+	private DescribableList<LabelAtomProperty,LabelAtomPropertyDescriptor> properties =
             new DescribableList<>(this);
 
-    @CopyOnWrite
+	@CopyOnWrite
     protected transient volatile List<Action> transientActions = new Vector<>();
 
-    private String description;
+	private String description;
 
-    public LabelAtom(String name) {
+	public LabelAtom(String name) {
         super(name);
     }
 
-    /**
+	/**
      * If the label contains 'unsafe' chars, escape them.
      */
     @Override
@@ -86,10 +95,10 @@ public class LabelAtom extends Label implements Saveable {
         return escape(name);
     }
 
-    @Override
+	@Override
     public boolean isAtom() { return true; }
 
-    /**
+	/**
      * {@inheritDoc}
      *
      * <p>
@@ -107,67 +116,70 @@ public class LabelAtom extends Label implements Saveable {
         return Collections.unmodifiableList(actions);
     }
 
-    // TODO implement addAction, addOrReplaceAction, removeAction, removeActions, replaceActions
+	// TODO implement addAction, addOrReplaceAction, removeAction, removeActions, replaceActions
 
     protected void updateTransientActions() {
         Vector<Action> ta = new Vector<>();
 
-        for (LabelAtomProperty p : properties)
-            ta.addAll(p.getActions(this));
+        properties.forEach(p -> ta.addAll(p.getActions(this)));
 
         transientActions = ta;
     }
 
-    /**
+	/**
      * @since 1.580
      */
-    public String getDescription() {
+    @Override
+	public String getDescription() {
         return description;
     }
 
-    public void setDescription(String description) throws IOException {
+	public void setDescription(String description) throws IOException {
         this.description = description;
         save();
     }
 
-    /**
+	/**
      * Properties associated with this label.
      */
     public DescribableList<LabelAtomProperty, LabelAtomPropertyDescriptor> getProperties() {
         return properties;
     }
 
-    @Exported
+	@Exported
     public List<LabelAtomProperty> getPropertiesList() {
         return properties.toList();
     }
 
-    @Override
+	@Override
     public boolean matches(VariableResolver<Boolean> resolver) {
         return resolver.resolve(name);
     }
 
-    @Override
+	@Override
     public <V, P> V accept(LabelVisitor<V, P> visitor, P param) {
         return visitor.onAtom(this,param);
     }
 
-    @Override
+	@Override
     public Set<LabelAtom> listAtoms() {
         return Collections.singleton(this);
     }
 
-    @Override
+	@Override
     public LabelOperatorPrecedence precedence() {
         return LabelOperatorPrecedence.ATOM;
     }
 
-    /*package*/ XmlFile getConfigFile() {
-        return new XmlFile(XSTREAM, new File(Jenkins.get().root, "labels/"+name+".xml"));
+	/*package*/ XmlFile getConfigFile() {
+        return new XmlFile(XSTREAM, new File(Jenkins.get().root, new StringBuilder().append("labels/").append(name).append(".xml").toString()));
     }
 
-    public void save() throws IOException {
-        if(BulkChange.contains(this))   return;
+	@Override
+	public void save() throws IOException {
+        if(BulkChange.contains(this)) {
+			return;
+		}
         try {
             getConfigFile().write(this);
             SaveableListener.fireOnChange(this, getConfigFile());
@@ -176,7 +188,7 @@ public class LabelAtom extends Label implements Saveable {
         }
     }
 
-    public void load() {
+	public void load() {
         XmlFile file = getConfigFile();
         if(file.exists()) {
             try {
@@ -189,7 +201,7 @@ public class LabelAtom extends Label implements Saveable {
         updateTransientActions();
     }
 
-    /**
+	/**
      * Returns all the {@link LabelAtomPropertyDescriptor}s that can be potentially configured
      * on this label.
      */
@@ -197,7 +209,7 @@ public class LabelAtom extends Label implements Saveable {
         return LabelAtomProperty.all();
     }
 
-    /**
+	/**
      * Accepts the update to the node configuration.
      */
     @POST
@@ -216,7 +228,7 @@ public class LabelAtom extends Label implements Saveable {
         FormApply.success(".").generateResponse(req, rsp, null);
     }
 
-    /**
+	/**
      * Accepts the new description.
      */
     @RequirePOST
@@ -228,7 +240,7 @@ public class LabelAtom extends Label implements Saveable {
         rsp.sendRedirect(".");  // go to the top page
     }
 
-    /**
+	/**
      * Obtains an atom by its {@linkplain #getName() name}.
      * @see Jenkins#getLabelAtom
      */
@@ -236,22 +248,21 @@ public class LabelAtom extends Label implements Saveable {
         return Jenkins.get().getLabelAtom(l);
     }
 
-    public static LabelAtom findNearest(String name) {
+	public static LabelAtom findNearest(String name) {
         List<String> candidates = new ArrayList<>();
-        for (LabelAtom a : Jenkins.get().getLabelAtoms()) {
-            candidates.add(a.getName());
-        }
+        Jenkins.get().getLabelAtoms().forEach(a -> candidates.add(a.getName()));
         return get(EditDistance.findNearest(name, candidates));
     }
 
-    public static boolean needsEscape(String name) {
+	public static boolean needsEscape(String name) {
         try {
             Jenkins.checkGoodName(name);
             // additional restricted chars
             for( int i=0; i<name.length(); i++ ) {
                 char ch = name.charAt(i);
-                if(" ()\t\n".indexOf(ch)!=-1)
-                    return true;
+                if(" ()\t\n".indexOf(ch)!=-1) {
+					return true;
+				}
             }
             return false;
         } catch (Failure failure) {
@@ -259,34 +270,29 @@ public class LabelAtom extends Label implements Saveable {
         }
     }
 
-    public static String escape(String name) {
-        if (needsEscape(name))
-            return QuotedStringTokenizer.quote(name);
+	public static String escape(String name) {
+        if (needsEscape(name)) {
+			return QuotedStringTokenizer.quote(name);
+		}
         return name;
     }
 
-    private static final Logger LOGGER = Logger.getLogger(LabelAtom.class.getName());
-
-    private static final XStream2 XSTREAM = new XStream2();
-
-    static {
-        // Don't want Label.ConverterImpl to be used:
-        XSTREAM.registerConverter(new LabelAtomConverter(), 100);
-    }
-
-    // class name is not ConverterImpl, to avoid getting picked up by AssociatedConverterImpl
+	// class name is not ConverterImpl, to avoid getting picked up by AssociatedConverterImpl
     private static class LabelAtomConverter extends XStream2.PassthruConverter<LabelAtom> {
-        private Label.ConverterImpl leafLabelConverter = new Label.ConverterImpl();
+        private static final Object IN_NESTED = "VisitingInnerLabelAtom";
+		private Label.ConverterImpl leafLabelConverter = new Label.ConverterImpl();
 
-        private LabelAtomConverter() {
+		private LabelAtomConverter() {
             super(XSTREAM);
         }
 
-        public boolean canConvert(Class type) {
+		@Override
+		public boolean canConvert(Class type) {
             return LabelAtom.class.isAssignableFrom(type);
         }
 
-        public void marshal(Object source, HierarchicalStreamWriter writer, MarshallingContext context) {
+		@Override
+		public void marshal(Object source, HierarchicalStreamWriter writer, MarshallingContext context) {
             if (context.get(IN_NESTED)==null) {
                 context.put(IN_NESTED,true);
                 try {
@@ -294,11 +300,13 @@ public class LabelAtom extends Label implements Saveable {
                 } finally {
                     context.put(IN_NESTED,false);
                 }
-            } else
-                leafLabelConverter.marshal(source,writer,context);
+            } else {
+				leafLabelConverter.marshal(source,writer,context);
+			}
         }
 
-        public Object unmarshal(HierarchicalStreamReader reader, UnmarshallingContext context) {
+		@Override
+		public Object unmarshal(HierarchicalStreamReader reader, UnmarshallingContext context) {
             if (context.get(IN_NESTED)==null) {
                 context.put(IN_NESTED,true);
                 try {
@@ -306,15 +314,14 @@ public class LabelAtom extends Label implements Saveable {
                 } finally {
                     context.put(IN_NESTED,false);
                 }
-            } else
-                return leafLabelConverter.unmarshal(reader,context);
+            } else {
+				return leafLabelConverter.unmarshal(reader,context);
+			}
         }
 
-        @Override
+		@Override
         protected void callback(LabelAtom obj, UnmarshallingContext context) {
             // noop
         }
-
-        private static final Object IN_NESTED = "VisitingInnerLabelAtom";
     }
 }

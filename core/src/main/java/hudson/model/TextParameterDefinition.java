@@ -38,14 +38,6 @@ public class TextParameterDefinition extends StringParameterDefinition {
         super(name, defaultValue, description);
     }
 
-    @Extension @Symbol({"text","textParam"})
-    public static class DescriptorImpl extends ParameterDescriptor {
-        @Override
-        public String getDisplayName() {
-            return Messages.TextParameterDefinition_DisplayName();
-        }
-    }
-
     @Override
     public ParameterValue createValue(StaplerRequest req, JSONObject jo) {
         TextParameterValue value = req.bindJSON(TextParameterValue.class, jo);
@@ -53,8 +45,16 @@ public class TextParameterDefinition extends StringParameterDefinition {
         return value;
     }
 
-    @Override
+	@Override
     public ParameterValue createValue(String value) {
         return new TextParameterValue(getName(), value, getDescription());
+    }
+
+	@Extension @Symbol({"text","textParam"})
+    public static class DescriptorImpl extends ParameterDescriptor {
+        @Override
+        public String getDisplayName() {
+            return Messages.TextParameterDefinition_DisplayName();
+        }
     }
 }

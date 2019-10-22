@@ -49,7 +49,14 @@ import org.kohsuke.stapler.StaplerRequest;
  * @since 1.269
  */
 public abstract class ViewDescriptor extends Descriptor<View> {
-    /**
+    protected ViewDescriptor(Class<? extends View> clazz) {
+        super(clazz);
+    }
+
+	protected ViewDescriptor() {
+    }
+
+	/**
      * Returns the human-readable name of this type of view. Used
      * in the view creation screen. The string should look like
      * "Abc Def Ghi".
@@ -59,7 +66,7 @@ public abstract class ViewDescriptor extends Descriptor<View> {
         return super.getDisplayName();
     }
 
-    /**
+	/**
      * Some special views are not instantiable, and for those
      * this method returns false.
      */
@@ -67,21 +74,14 @@ public abstract class ViewDescriptor extends Descriptor<View> {
         return true;
     }
 
-    /**
+	/**
      * Jelly fragment included in the "new view" page.
      */
     public final String getNewViewDetailPage() {
-        return '/'+clazz.getName().replace('.','/').replace('$','/')+"/newViewDetail.jelly";
+        return new StringBuilder().append('/').append(clazz.getName().replace('.','/').replace('$','/')).append("/newViewDetail.jelly").toString();
     }
 
-    protected ViewDescriptor(Class<? extends View> clazz) {
-        super(clazz);
-    }
-
-    protected ViewDescriptor() {
-    }
-
-    /**
+	/**
      * Auto-completion for the "copy from" field in the new job page.
      */
     @Restricted(DoNotUse.class)
@@ -103,33 +103,33 @@ public abstract class ViewDescriptor extends Descriptor<View> {
         return candidates;
     }
 
-    /**
+	/**
      * Possible {@link ListViewColumnDescriptor}s that can be used with this view.
      */
     public List<Descriptor<ListViewColumn>> getColumnsDescriptors() {
         StaplerRequest request = Stapler.getCurrentRequest();
-        if (request != null) {
-            View view = request.findAncestorObject(clazz);
-            return view == null ? DescriptorVisibilityFilter.applyType(clazz, ListViewColumn.all())
-                    : DescriptorVisibilityFilter.apply(view, ListViewColumn.all());
-        }
-        return ListViewColumn.all();
+        if (request == null) {
+			return ListViewColumn.all();
+		}
+		View view = request.findAncestorObject(clazz);
+		return view == null ? DescriptorVisibilityFilter.applyType(clazz, ListViewColumn.all())
+		        : DescriptorVisibilityFilter.apply(view, ListViewColumn.all());
     }
 
-    /**
+	/**
      * Possible {@link ViewJobFilter} types that can be used with this view.
      */
     public List<Descriptor<ViewJobFilter>> getJobFiltersDescriptors() {
         StaplerRequest request = Stapler.getCurrentRequest();
-        if (request != null) {
-            View view = request.findAncestorObject(clazz);
-            return view == null ? DescriptorVisibilityFilter.applyType(clazz, ViewJobFilter.all())
-                    : DescriptorVisibilityFilter.apply(view, ViewJobFilter.all());
-        }
-        return ViewJobFilter.all();
+        if (request == null) {
+			return ViewJobFilter.all();
+		}
+		View view = request.findAncestorObject(clazz);
+		return view == null ? DescriptorVisibilityFilter.applyType(clazz, ViewJobFilter.all())
+		        : DescriptorVisibilityFilter.apply(view, ViewJobFilter.all());
     }
 
-    /**
+	/**
      * Validation of the display name field.
      *
      * @param view the view to check the new display name of.
@@ -154,7 +154,7 @@ public abstract class ViewDescriptor extends Descriptor<View> {
         return FormValidation.ok();
     }
 
-    /**
+	/**
      * Returns true if this {@link View} type is applicable to the given {@link ViewGroup} type.
      * <p>
      * Default implementation returns {@code true} always.
@@ -166,7 +166,7 @@ public abstract class ViewDescriptor extends Descriptor<View> {
         return true;
     }
 
-    /**
+	/**
      * Returns true if this {@link View} type is applicable in the specific {@link ViewGroup}.
      * <p>
      * Default implementation returns {@link #isApplicable(Class)} for the {@link ViewGroup}’s {@link Object#getClass}.

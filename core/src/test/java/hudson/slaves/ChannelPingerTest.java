@@ -44,13 +44,13 @@ public class ChannelPingerTest {
 
     @After
     public void restoreSystemProperties() throws Exception {
-        for (Map.Entry<String, String> entry : savedSystemProperties.entrySet()) {
+        savedSystemProperties.entrySet().forEach(entry -> {
             if (entry.getValue() != null) {
                 System.setProperty(entry.getKey(), entry.getValue());
             } else {
                 System.clearProperty(entry.getKey());
             }
-        }
+        });
     }
 
     private void preserveSystemProperty(String propertyName) {

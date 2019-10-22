@@ -12,9 +12,10 @@ import java.security.SecureRandom;
  */
 public class MockSecretRule extends ExternalResource {
 
-    private String value;
+    private static final SecureRandom sr = new SecureRandom();
+	private String value;
 
-    @Override
+	@Override
     protected void before() throws Throwable {
         byte[] random = new byte[32];
         sr.nextBytes(random);
@@ -22,12 +23,11 @@ public class MockSecretRule extends ExternalResource {
         Secret.SECRET = value;
     }
 
-    @Override
+	@Override
     protected void after() {
-        if (!Secret.SECRET.equals(value))
-            throw new IllegalStateException("Someone tinkered with Secret.SECRET");
+        if (!Secret.SECRET.equals(value)) {
+			throw new IllegalStateException("Someone tinkered with Secret.SECRET");
+		}
         Secret.SECRET = null;
     }
-
-    private static final SecureRandom sr = new SecureRandom();
 }

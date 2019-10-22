@@ -33,16 +33,16 @@ import java.io.IOException;
  * @author Kohsuke Kawaguchi
 */
 public class AbortException extends IOException {
-    public AbortException() {
+    private static final long serialVersionUID = 1L;
+
+	public AbortException() {
     }
 
-    /**
+	/**
      * When this exception is caught, the specified message will be reported.
      * @since 1.298
      */
     public AbortException(String message) {
         super(message);
     }
-
-    private static final long serialVersionUID = 1L;
 }

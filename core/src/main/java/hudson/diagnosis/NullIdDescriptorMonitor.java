@@ -50,23 +50,24 @@ import static hudson.init.InitMilestone.EXTENSIONS_AUGMENTED;
 @Extension @Symbol("nullId")
 public class NullIdDescriptorMonitor extends AdministrativeMonitor {
 
-    @Override
+    private static final Logger LOGGER = Logger.getLogger(NullIdDescriptorMonitor.class.getName());
+	private final List<Descriptor> problems = new ArrayList<>();
+
+	@Override
     public String getDisplayName() {
         return Messages.NullIdDescriptorMonitor_DisplayName();
     }
 
-    private final List<Descriptor> problems = new ArrayList<>();
-
-    @Override
+	@Override
     public boolean isActivated() {
         return !problems.isEmpty();
     }
 
-    public List<Descriptor> getProblems() {
+	public List<Descriptor> getProblems() {
         return Collections.unmodifiableList(problems);
     }
 
-    @Initializer(after=EXTENSIONS_AUGMENTED)
+	@Initializer(after=EXTENSIONS_AUGMENTED)
     public void verify() {
         Jenkins h = Jenkins.get();
         for (Descriptor d : h.getExtensionList(Descriptor.class)) {
@@ -87,6 +88,4 @@ public class NullIdDescriptorMonitor extends AdministrativeMonitor {
             }
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(NullIdDescriptorMonitor.class.getName());
 }

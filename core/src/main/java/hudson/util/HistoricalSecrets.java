@@ -45,7 +45,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 @Restricted(NoExternalUse.class)
 public class HistoricalSecrets {
 
-    /*package*/ static Secret decrypt(String data, CryptoConfidentialKey key) throws IOException, GeneralSecurityException {
+    static final String MAGIC = "::::MAGIC::::";
+
+	/*package*/ static Secret decrypt(String data, CryptoConfidentialKey key) throws IOException, GeneralSecurityException {
         byte[] in;
         try {
             in = Base64.getDecoder().decode(data.getBytes(StandardCharsets.UTF_8));
@@ -53,7 +55,9 @@ public class HistoricalSecrets {
             throw new IOException("Could not decode secret", ex);
         }
         Secret s = tryDecrypt(key.decrypt(), in);
-        if (s!=null)    return s;
+        if (s!=null) {
+			return s;
+		}
 
         // try our historical key for backward compatibility
         Cipher cipher = Secret.getCipher("AES");
@@ -61,18 +65,19 @@ public class HistoricalSecrets {
         return tryDecrypt(cipher, in);
     }
 
-    /*package*/ static Secret tryDecrypt(Cipher cipher, byte[] in) {
+	/*package*/ static Secret tryDecrypt(Cipher cipher, byte[] in) {
         try {
             String plainText = new String(cipher.doFinal(in), UTF_8);
-            if(plainText.endsWith(MAGIC))
-                return new Secret(plainText.substring(0,plainText.length()-MAGIC.length()));
+            if(plainText.endsWith(MAGIC)) {
+				return new Secret(plainText.substring(0,plainText.length()-MAGIC.length()));
+			}
             return null;
         } catch (GeneralSecurityException e) {
             return null; // if the key doesn't match with the bytes, it can result in BadPaddingException
         }
     }
 
-    /**
+	/**
      * Turns {@link Jenkins#getSecretKey()} into an AES key.
      *
      * @deprecated
@@ -82,9 +87,9 @@ public class HistoricalSecrets {
     @Deprecated
     /*package*/ static SecretKey getLegacyKey() throws GeneralSecurityException {
         String secret = Secret.SECRET;
-        if(secret==null)    return Jenkins.get().getSecretKeyAsAES128();
+        if(secret==null) {
+			return Jenkins.get().getSecretKeyAsAES128();
+		}
         return Util.toAes128Key(secret);
     }
-
-    static final String MAGIC = "::::MAGIC::::";
 }

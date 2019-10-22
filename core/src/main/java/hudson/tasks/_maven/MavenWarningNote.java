@@ -38,21 +38,22 @@ import java.util.regex.Pattern;
  * @author Kohsuke Kawaguchi
  */
 public class MavenWarningNote extends ConsoleNote {
-    public MavenWarningNote() {
+    public static Pattern PATTERN = Pattern.compile("^\\[WARNING\\]");
+
+	public MavenWarningNote() {
     }
 
-    @Override
+	@Override
     public ConsoleAnnotator annotate(Object context, MarkupText text, int charPos) {
         text.addMarkup(0,text.length(),"<span class=warning-inline>","</span>");
         return null;
     }
 
-    @Extension @Symbol("mavenWarnings")
+	@Extension @Symbol("mavenWarnings")
     public static final class DescriptorImpl extends ConsoleAnnotationDescriptor {
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return "Maven Warnings";
         }
     }
-
-    public static Pattern PATTERN = Pattern.compile("^\\[WARNING\\]");
 }

@@ -53,25 +53,24 @@ public class StaplerSignaturesTest {
                 "method java.lang.Object wait long",
                 "method java.lang.Object wait"
         ));
-        public void getFoo() {}
-        public void getFoo(String arg) {}
-        public static void getFoo(int arg) {}
-        public static void getFoo(long arg) {}
-        public void getFoo(SomeClass arg) {}
-        public void doFoo(StaplerRequest req, StaplerResponse rsp) {}
-        @StaplerDispatchable @JsonResponse
-        public void doWhatever(@QueryParameter String arg) {}
-
-        static Set<String> FIELD_SIGNATURES = new HashSet<>(Arrays.asList(
+		static Set<String> FIELD_SIGNATURES = new HashSet<>(Arrays.asList(
                 "field jenkins.security.stapler.StaplerSignaturesTest$SomeClass whatever",
                 "field jenkins.security.stapler.StaplerSignaturesTest$SomeClass thing",
                 "staticField jenkins.security.stapler.StaplerSignaturesTest$SomeClass staticField",
                 "field jenkins.security.stapler.StaplerSignaturesTest$SomeClass stringList"
         ));
-        public String whatever;
-        public Object thing;
-        public static Object staticField;
-        public List<String> stringList;
+		public static Object staticField;
+		public String whatever;
+		public Object thing;
+		public List<String> stringList;
+		public void getFoo() {}
+		public void getFoo(String arg) {}
+		public static void getFoo(int arg) {}
+		public static void getFoo(long arg) {}
+		public void getFoo(SomeClass arg) {}
+		public void doFoo(StaplerRequest req, StaplerResponse rsp) {}
+		@StaplerDispatchable @JsonResponse
+        public void doWhatever(@QueryParameter String arg) {}
 
     }
 
@@ -97,12 +96,7 @@ public class StaplerSignaturesTest {
                 "method java.lang.Object wait long",
                 "method java.lang.Object wait"
         ));
-        public void getFoo() {}
-        public void subtypeExclusive(){}
-        public void subtypeExclusive(String arg){}
-        public void varargMethod(String... args){}
-
-        static Set<String> FIELD_SIGNATURES = new HashSet<>(Arrays.asList(
+		static Set<String> FIELD_SIGNATURES = new HashSet<>(Arrays.asList(
                 "field jenkins.security.stapler.StaplerSignaturesTest$SomeSubclass whatever",
                 "field jenkins.security.stapler.StaplerSignaturesTest$SomeClass whatever",
                 "field jenkins.security.stapler.StaplerSignaturesTest$SomeClass thing",
@@ -110,7 +104,12 @@ public class StaplerSignaturesTest {
                 "staticField jenkins.security.stapler.StaplerSignaturesTest$SomeClass staticField",
                 "field jenkins.security.stapler.StaplerSignaturesTest$SomeClass stringList"
         ));
-        public String whatever;
-        public static Object staticField;
+		public static Object staticField;
+		public String whatever;
+		@Override
+		public void getFoo() {}
+		public void subtypeExclusive(){}
+		public void subtypeExclusive(String arg){}
+		public void varargMethod(String... args){}
     }
 }

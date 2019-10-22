@@ -111,8 +111,9 @@ public abstract class AgentProtocol implements ExtensionPoint {
     public static AgentProtocol of(String protocolName) {
         for (AgentProtocol p : all()) {
             String n = p.getName();
-            if (n!=null && n.equals(protocolName))
-                return p;
+            if (n!=null && n.equals(protocolName)) {
+				return p;
+			}
         }
         return null;
     }

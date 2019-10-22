@@ -35,38 +35,41 @@ import static java.util.logging.Level.WARNING;
  * @author Kohsuke Kawaguchi
  */
 public abstract class AbstractAsyncNodeMonitorDescriptor<T> extends AbstractNodeMonitorDescriptor<T> {
-    protected AbstractAsyncNodeMonitorDescriptor() {
+    private static final Logger LOGGER = Logger.getLogger(AbstractAsyncNodeMonitorDescriptor.class.getName());
+
+	protected AbstractAsyncNodeMonitorDescriptor() {
     }
 
-    protected AbstractAsyncNodeMonitorDescriptor(long interval) {
+	protected AbstractAsyncNodeMonitorDescriptor(long interval) {
         super(interval);
     }
 
-    protected AbstractAsyncNodeMonitorDescriptor(Class<? extends NodeMonitor> clazz) {
+	protected AbstractAsyncNodeMonitorDescriptor(Class<? extends NodeMonitor> clazz) {
         super(clazz);
     }
 
-    protected AbstractAsyncNodeMonitorDescriptor(Class<? extends NodeMonitor> clazz, long interval) {
+	protected AbstractAsyncNodeMonitorDescriptor(Class<? extends NodeMonitor> clazz, long interval) {
         super(clazz, interval);
     }
 
-    /**
+	/**
      * Creates a {@link Callable} that performs the monitoring when executed.
      */
     protected abstract @CheckForNull Callable<T,IOException> createCallable(Computer c);
 
-    @Override
+	@Override
     protected T monitor(Computer c) throws IOException, InterruptedException {
         VirtualChannel ch = c.getChannel();
         if (ch != null) {
             Callable<T,IOException> cc = createCallable(c);
-            if (cc!=null)
-                return ch.call(cc);
+            if (cc!=null) {
+				return ch.call(cc);
+			}
         }
         return null;
     }
 
-    /**
+	/**
      * Performs all monitoring concurrently.
      *
      * @return Mapping from computer to monitored value. The map values can be null for several reasons, see {@link Result}
@@ -78,7 +81,7 @@ public abstract class AbstractAsyncNodeMonitorDescriptor<T> extends AbstractNode
         return monitorDetailed().getMonitoringData();
     }
 
-    /**
+	/**
      * Perform monitoring with detailed reporting.
      */
     protected final @Nonnull Result<T> monitorDetailed() throws InterruptedException {
@@ -91,8 +94,9 @@ public abstract class AbstractAsyncNodeMonitorDescriptor<T> extends AbstractNode
                 futures.put(c,null);    // sentinel value
                 if (ch!=null) {
                     Callable<T, ?> cc = createCallable(c);
-                    if (cc!=null)
-                        futures.put(c,ch.callAsync(cc));
+                    if (cc!=null) {
+						futures.put(c,ch.callAsync(cc));
+					}
                 }
             } catch (RuntimeException | IOException e) {
                 error(c, e);
@@ -123,17 +127,15 @@ public abstract class AbstractAsyncNodeMonitorDescriptor<T> extends AbstractNode
         return new Result<>(data, skipped);
     }
 
-    private void error(Computer c, Throwable x) {
+	private void error(Computer c, Throwable x) {
         if (c instanceof SlaveComputer) {
             Functions.printStackTrace(x, ((SlaveComputer) c).getListener().error("Failed to monitor for " + getDisplayName()));
         } else {
-            LOGGER.log(WARNING, "Failed to monitor " + c.getDisplayName() + " for " + getDisplayName(), x);
+            LOGGER.log(WARNING, new StringBuilder().append("Failed to monitor ").append(c.getDisplayName()).append(" for ").append(getDisplayName()).toString(), x);
         }
     }
 
-    private static final Logger LOGGER = Logger.getLogger(AbstractAsyncNodeMonitorDescriptor.class.getName());
-
-    /**
+	/**
      * Result object for {@link AbstractAsyncNodeMonitorDescriptor#monitorDetailed()} to facilitate extending information
      * returned in the future.
      *

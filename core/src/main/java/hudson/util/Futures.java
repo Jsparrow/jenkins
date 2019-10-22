@@ -38,23 +38,28 @@ public class Futures {
      */
     public static <T> Future<T> precomputed(final T value) {
         return new Future<T>() {
-            public boolean cancel(boolean mayInterruptIfRunning) {
+            @Override
+			public boolean cancel(boolean mayInterruptIfRunning) {
                 return false;
             }
 
-            public boolean isCancelled() {
+            @Override
+			public boolean isCancelled() {
                 return false;
             }
 
-            public boolean isDone() {
+            @Override
+			public boolean isDone() {
                 return true;
             }
 
-            public T get() {
+            @Override
+			public T get() {
                 return value;
             }
 
-            public T get(long timeout, TimeUnit unit) {
+            @Override
+			public T get(long timeout, TimeUnit unit) {
                 return value;
             }
         };

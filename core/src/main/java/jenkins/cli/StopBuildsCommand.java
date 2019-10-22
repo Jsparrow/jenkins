@@ -63,7 +63,7 @@ public class StopBuildsCommand extends CLICommand {
             if (item instanceof Job) {
                 jobsToStop.add((Job) item);
             } else {
-                throw new IllegalArgumentException("Job not found: '" + jobName + "'");
+                throw new IllegalArgumentException(new StringBuilder().append("Job not found: '").append(jobName).append("'").toString());
             }
         }
 
@@ -81,10 +81,11 @@ public class StopBuildsCommand extends CLICommand {
     private void stopJobBuilds(final Job job) {
         final Run lastBuild = job.getLastBuild();
         final String jobName = job.getFullDisplayName();
-        if (lastBuild != null && lastBuild.isBuilding()) {
-            stopBuild(lastBuild, jobName);
-            checkAndStopPreviousBuilds(lastBuild, jobName);
-        }
+        if (!(lastBuild != null && lastBuild.isBuilding())) {
+			return;
+		}
+		stopBuild(lastBuild, jobName);
+		checkAndStopPreviousBuilds(lastBuild, jobName);
     }
 
     private void stopBuild(final Run build,

@@ -56,17 +56,26 @@ import org.kohsuke.accmod.restrictions.NoExternalUse;
  */
 public final class RunMap<R extends Run<?,R>> extends AbstractLazyLoadRunMap<R> implements Iterable<R> {
     /**
+     * @deprecated  as of 1.485
+     *      Use {@link ReverseComparator}
+     */
+    @Deprecated
+    public static final Comparator<Comparable> COMPARATOR = (Comparable o1, Comparable o2) -> o2.compareTo(o1);
+
+	private static final Logger LOGGER = Logger.getLogger(RunMap.class.getName());
+
+	/**
      * Read-only view of this map.
      */
     private final SortedMap<Integer,R> view = Collections.unmodifiableSortedMap(this);
 
-    private Constructor<R> cons;
+	private Constructor<R> cons;
 
-    /** Normally overwritten by {@link LazyBuildMixIn#onLoad} or {@link LazyBuildMixIn#onCreatedFromScratch}, in turn created during {@link Job#onLoad}. */
+	/** Normally overwritten by {@link LazyBuildMixIn#onLoad} or {@link LazyBuildMixIn#onCreatedFromScratch}, in turn created during {@link Job#onLoad}. */
     @Restricted(NoExternalUse.class)
     public RunIdMigrator runIdMigrator = new RunIdMigrator();
 
-    // TODO: before first complete build
+	// TODO: before first complete build
     // patch up next/previous build link
 
 
@@ -79,7 +88,7 @@ public final class RunMap<R extends Run<?,R>> extends AbstractLazyLoadRunMap<R> 
         super(null); // will be set later
     }
 
-    /**
+	/**
      * @param cons
      *      Used to create new instance of {@link Run}.
      */
@@ -88,96 +97,84 @@ public final class RunMap<R extends Run<?,R>> extends AbstractLazyLoadRunMap<R> 
         this.cons = cons;
     }
 
-    public boolean remove(R run) {
+	public boolean remove(R run) {
         return removeValue(run);
     }
 
-    /**
+	/**
      * Walks through builds, newer ones first.
      */
-    public Iterator<R> iterator() {
+    @Override
+	public Iterator<R> iterator() {
         return new Iterator<R>() {
             R last = null;
             R next = newestBuild();
 
-            public boolean hasNext() {
+            @Override
+			public boolean hasNext() {
                 return next!=null;
             }
 
-            public R next() {
+            @Override
+			public R next() {
                 last = next;
-                if (last!=null)
-                    next = last.getPreviousBuild();
-                else
-                    throw new NoSuchElementException();
+                if (last!=null) {
+					next = last.getPreviousBuild();
+				} else {
+					throw new NoSuchElementException();
+				}
                 return last;
             }
 
-            public void remove() {
-                if (last==null)
-                    throw new UnsupportedOperationException();
+            @Override
+			public void remove() {
+                if (last==null) {
+					throw new UnsupportedOperationException();
+				}
                 removeValue(last);
             }
         };
     }
 
-    @Override
+	@Override
     public boolean removeValue(R run) {
         run.dropLinks();
         runIdMigrator.delete(dir, run.getId());
         return super.removeValue(run);
     }
 
-    /**
+	/**
      * Gets the read-only view of this map.
      */
     public SortedMap<Integer,R> getView() {
         return view;
     }
 
-    /**
+	/**
      * This is the newest build (with the biggest build number)
      */
     public R newestValue() {
         return search(Integer.MAX_VALUE, DESC);
     }
 
-    /**
+	/**
      * This is the oldest build (with the smallest build number)
      */
     public R oldestValue() {
         return search(Integer.MIN_VALUE, ASC);
     }
 
-    /**
-     * @deprecated  as of 1.485
-     *      Use {@link ReverseComparator}
-     */
-    @Deprecated
-    public static final Comparator<Comparable> COMPARATOR = new Comparator<Comparable>() {
-        public int compare(Comparable o1, Comparable o2) {
-            return o2.compareTo(o1);
-        }
-    };
-
-    /**
-     * {@link Run} factory.
-     */
-    public interface Constructor<R extends Run<?,R>> {
-        R create(File dir) throws IOException;
-    }
-
-    @Override
+	@Override
     protected final int getNumberOf(R r) {
         return r.getNumber();
     }
 
-    @Override
+	@Override
     protected final String getIdOf(R r) {
         return r.getId();
     }
 
-    /**
+	/**
      * Add a <em>new</em> build to the map.
      * Do not use when loading existing builds (use {@link #put(Integer, Object)}).
      */
@@ -186,16 +183,16 @@ public final class RunMap<R extends Run<?,R>> extends AbstractLazyLoadRunMap<R> 
         // Defense against JENKINS-23152 and its ilk.
         File rootDir = r.getRootDir();
         if (rootDir.isDirectory()) {
-            throw new IllegalStateException("JENKINS-23152: " + rootDir + " already existed; will not overwrite with " + r);
+            throw new IllegalStateException(new StringBuilder().append("JENKINS-23152: ").append(rootDir).append(" already existed; will not overwrite with ").append(r).toString());
         }
-        if (!r.getClass().getName().equals("hudson.matrix.MatrixRun")) { // JENKINS-26739: grandfathered in
+        if (!"hudson.matrix.MatrixRun".equals(r.getClass().getName())) { // JENKINS-26739: grandfathered in
             proposeNewNumber(r.getNumber());
         }
         rootDir.mkdirs();
         return super._put(r);
     }
 
-    @Override public R getById(String id) {
+	@Override public R getById(String id) {
         int n;
         try {
             n = Integer.parseInt(id);
@@ -205,7 +202,7 @@ public final class RunMap<R extends Run<?,R>> extends AbstractLazyLoadRunMap<R> 
         return getByNumber(n);
     }
 
-    /**
+	/**
      * Reuses the same reference as much as we can.
      * <p>
      * If concurrency ends up creating a few extra, that's OK, because
@@ -216,7 +213,7 @@ public final class RunMap<R extends Run<?,R>> extends AbstractLazyLoadRunMap<R> 
         return r.createReference();
     }
 
-    @Override
+	@Override
     protected R retrieve(File d) throws IOException {
         if(new File(d,"build.xml").exists()) {
             // if the build result file isn't in the directory, ignore it.
@@ -224,7 +221,7 @@ public final class RunMap<R extends Run<?,R>> extends AbstractLazyLoadRunMap<R> 
                 R b = cons.create(d);
                 b.onLoad();
                 if (LOGGER.isLoggable(FINEST)) {
-                    LOGGER.log(FINEST, "Loaded " + b.getFullDisplayName() + " in " + Thread.currentThread().getName(), new ThisIsHowItsLoaded());
+                    LOGGER.log(FINEST, new StringBuilder().append("Loaded ").append(b.getFullDisplayName()).append(" in ").append(Thread.currentThread().getName()).toString(), new ThisIsHowItsLoaded());
                 }
                 return b;
             } catch (Exception | InstantiationError e) {
@@ -234,7 +231,7 @@ public final class RunMap<R extends Run<?,R>> extends AbstractLazyLoadRunMap<R> 
         return null;
     }
 
-    /**
+	/**
      * Backward compatibility method that notifies {@link RunMap} of who the owner is.
      *
      * Traditionally, this method blocked and loaded all the build records on the disk,
@@ -253,7 +250,12 @@ public final class RunMap<R extends Run<?,R>> extends AbstractLazyLoadRunMap<R> 
         initBaseDir(job.getBuildDir());
     }
 
-    private static final Logger LOGGER = Logger.getLogger(RunMap.class.getName());
+	/**
+     * {@link Run} factory.
+     */
+    public interface Constructor<R extends Run<?,R>> {
+        R create(File dir) throws IOException;
+    }
 
     private static class ThisIsHowItsLoaded extends Exception {}
 }

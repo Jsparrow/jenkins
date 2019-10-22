@@ -46,11 +46,13 @@ public class ArchitectureMonitor extends NodeMonitor {
             return new GetArchTask();
         }
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.ArchitectureMonitor_DisplayName();
         }
 
-        public NodeMonitor newInstance(StaplerRequest req, JSONObject formData) throws FormException {
+        @Override
+		public NodeMonitor newInstance(StaplerRequest req, JSONObject formData) throws FormException {
             return new ArchitectureMonitor();
         }
     }
@@ -59,12 +61,13 @@ public class ArchitectureMonitor extends NodeMonitor {
      * Obtains the string that represents the architecture.
      */
     private static class GetArchTask extends MasterToSlaveCallable<String,IOException> {
-        public String call() {
+        private static final long serialVersionUID = 1L;
+
+		@Override
+		public String call() {
             String os = System.getProperty("os.name");
             String arch = System.getProperty("os.arch");
-            return os+" ("+arch+')';
+            return new StringBuilder().append(os).append(" (").append(arch).append(')').toString();
         }
-
-        private static final long serialVersionUID = 1L;
     }
 }

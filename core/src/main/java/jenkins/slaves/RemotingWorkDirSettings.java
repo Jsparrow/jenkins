@@ -204,11 +204,6 @@ public class RemotingWorkDirSettings implements Describable<RemotingWorkDirSetti
         return bldr.toString();
     }
     
-    @Extension
-    public static class DescriptorImpl extends Descriptor<RemotingWorkDirSettings> {
-        
-    }
-    
     /**
      * Gets default settings for the disabled work directory.
      * 
@@ -218,12 +213,17 @@ public class RemotingWorkDirSettings implements Describable<RemotingWorkDirSetti
     public static RemotingWorkDirSettings getDisabledDefaults() {
         return LEGACY_DEFAULT;
     }
-    
-    /**
+
+	/**
      * Gets default settings of the enabled work directory.
      */
     @Nonnull
     public static RemotingWorkDirSettings getEnabledDefaults() {
         return ENABLED_DEFAULT;
+    }
+
+	@Extension
+    public static class DescriptorImpl extends Descriptor<RemotingWorkDirSettings> {
+        
     }
 }

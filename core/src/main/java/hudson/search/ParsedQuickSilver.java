@@ -40,65 +40,100 @@ import java.beans.Introspector;
  */
 final class ParsedQuickSilver {
     private static final Map<Class,ParsedQuickSilver> TABLE = new HashMap<>();
+	private final List<Getter> getters = new ArrayList<>();
 
-    synchronized static ParsedQuickSilver get(Class<? extends SearchableModelObject> clazz) {
-        ParsedQuickSilver pqs = TABLE.get(clazz);
-        if(pqs==null)
-            TABLE.put(clazz,pqs = new ParsedQuickSilver(clazz));
-        return pqs;
-    }
-
-    private final List<Getter> getters = new ArrayList<>();
-
-    private ParsedQuickSilver(Class<? extends SearchableModelObject> clazz) {
+	private ParsedQuickSilver(Class<? extends SearchableModelObject> clazz) {
         QuickSilver qs;
 
         for (Method m : clazz.getMethods()) {
             qs = m.getAnnotation(QuickSilver.class);
             if(qs!=null) {
                 String url = stripGetPrefix(m);
-                if(qs.value().length==0)
-                    getters.add(new MethodGetter(url,splitName(url),m));
-                else {
-                    for (String name : qs.value())
-                        getters.add(new MethodGetter(url,name,m));
+                if(qs.value().length==0) {
+					getters.add(new MethodGetter(url,splitName(url),m));
+				} else {
+                    for (String name : qs.value()) {
+						getters.add(new MethodGetter(url,name,m));
+					}
                 }
             }
         }
         for (Field f : clazz.getFields()) {
             qs = f.getAnnotation(QuickSilver.class);
             if(qs!=null) {
-                if(qs.value().length==0)
-                    getters.add(new FieldGetter(f.getName(),splitName(f.getName()),f));
-                else {
-                    for (String name : qs.value())
-                        getters.add(new FieldGetter(f.getName(),name,f));
+                if(qs.value().length==0) {
+					getters.add(new FieldGetter(f.getName(),splitName(f.getName()),f));
+				} else {
+                    for (String name : qs.value()) {
+						getters.add(new FieldGetter(f.getName(),name,f));
+					}
                 }
             }
         }
     }
 
-    /**
+	static synchronized ParsedQuickSilver get(Class<? extends SearchableModelObject> clazz) {
+        ParsedQuickSilver pqs = TABLE.get(clazz);
+        if(pqs==null) {
+			TABLE.put(clazz,pqs = new ParsedQuickSilver(clazz));
+		}
+        return pqs;
+    }
+
+	/**
      * Convert names like "abcDefGhi" to "abc def ghi".
      */
     private String splitName(String url) {
         StringBuilder buf = new StringBuilder(url.length()+5);
         for(String token : url.split("(?<=[a-z])(?=[A-Z])")) {
-            if(buf.length()>0)  buf.append(' ');
+            if(buf.length()>0) {
+				buf.append(' ');
+			}
             buf.append(Introspector.decapitalize(token));
         }
         return buf.toString();
     }
 
-    private String stripGetPrefix(Method m) {
+	private String stripGetPrefix(Method m) {
         String n = m.getName();
-        if(n.startsWith("get"))
-            n = Introspector.decapitalize(n.substring(3));
+        if(n.startsWith("get")) {
+			n = Introspector.decapitalize(n.substring(3));
+		}
         return n;
     }
 
+	private static IllegalAccessError toError(IllegalAccessException e) {
+        IllegalAccessError iae = new IllegalAccessError();
+        iae.initCause(e);
+        return iae;
+    }
 
-    static abstract class Getter {
+	public void addTo(SearchIndexBuilder builder, final Object instance) {
+        for (final Getter getter : getters) {
+			builder.add(new SearchItem() {
+                @Override
+				public String getSearchName() {
+                    return getter.searchName;
+                }
+
+                @Override
+				public String getSearchUrl() {
+                    return getter.url;
+                }
+
+                @Override
+				public SearchIndex getSearchIndex() {
+                    Object child = getter.get(instance);
+                    if(child==null) {
+						return SearchIndex.EMPTY;
+					}
+                    return ((SearchableModelObject) child).getSearchIndex();
+                }
+            });
+		}
+    }
+
+    abstract static class Getter {
         final String url;
         final String searchName;
 
@@ -118,17 +153,20 @@ final class ParsedQuickSilver {
             this.method = method;
         }
 
-        Object get(Object obj) {
+        @Override
+		Object get(Object obj) {
             try {
                 return method.invoke(obj);
             } catch (IllegalAccessException e) {
                 throw toError(e);
             } catch (InvocationTargetException e) {
                 Throwable x = e.getTargetException();
-                if (x instanceof Error)
-                    throw (Error) x;
-                if (x instanceof RuntimeException)
-                    throw (RuntimeException) x;
+                if (x instanceof Error) {
+					throw (Error) x;
+				}
+                if (x instanceof RuntimeException) {
+					throw (RuntimeException) x;
+				}
                 throw new Error(e);
             }
         }
@@ -142,37 +180,13 @@ final class ParsedQuickSilver {
             this.field = field;
         }
 
-        Object get(Object obj) {
+        @Override
+		Object get(Object obj) {
             try {
                 return field.get(obj);
             } catch (IllegalAccessException e) {
                 throw toError(e);
             }
         }
-    }
-
-    private static IllegalAccessError toError(IllegalAccessException e) {
-        IllegalAccessError iae = new IllegalAccessError();
-        iae.initCause(e);
-        return iae;
-    }
-
-    public void addTo(SearchIndexBuilder builder, final Object instance) {
-        for (final Getter getter : getters)
-            builder.add(new SearchItem() {
-                public String getSearchName() {
-                    return getter.searchName;
-                }
-
-                public String getSearchUrl() {
-                    return getter.url;
-                }
-
-                public SearchIndex getSearchIndex() {
-                    Object child = getter.get(instance);
-                    if(child==null) return SearchIndex.EMPTY;
-                    return ((SearchableModelObject) child).getSearchIndex();
-                }
-            });
     }
 }

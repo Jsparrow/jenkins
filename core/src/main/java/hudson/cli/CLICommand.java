@@ -106,6 +106,37 @@ import javax.annotation.Nonnull;
 @LegacyInstancesAreScopedToHudson
 public abstract class CLICommand implements ExtensionPoint, Cloneable {
     /**
+     * Shared text, which is reported back to CLI if an error happens in commands 
+     * taking lists of parameters.
+     * @since 2.26
+     */
+    static final String CLI_LISTPARAM_SUMMARY_ERROR_TEXT = "Error occurred while performing this command, see previous stderr output.";
+
+	private static final Logger LOGGER = Logger.getLogger(CLICommand.class.getName());
+
+	private static final ThreadLocal<CLICommand> CURRENT_COMMAND = new ThreadLocal<>();
+
+	static {
+        // register option handlers that are defined
+        ClassLoaders cls = new ClassLoaders();
+        Jenkins j = Jenkins.getInstanceOrNull();
+        if (j!=null) {// only when running on the master
+            cls.put(j.getPluginManager().uberClassLoader);
+
+            ResourceNameIterator servicesIter =
+                new DiscoverServiceNames(cls).findResourceNames(OptionHandler.class.getName());
+            final ResourceClassIterator itr =
+                new DiscoverClasses(cls).findResourceClasses(servicesIter);
+
+            while(itr.hasNext()) {
+                Class h = itr.nextResourceClass().loadClass();
+                Class c = Types.erasure(Types.getTypeArgument(Types.getBaseClass(h, OptionHandler.class), 0));
+                CmdLineParser.registerHandler(c,h);
+            }
+        }
+    }
+
+	/**
      * Connected to stdout and stderr of the CLI agent that initiated the session.
      * IOW, if you write to these streams, the person who launched the CLI command
      * will see the messages in his terminal.
@@ -114,16 +145,14 @@ public abstract class CLICommand implements ExtensionPoint, Cloneable {
      * (In contrast, calling {@code System.out.println(...)} would print out
      * the message to the server log file, which is probably not what you want.
      */
-    public transient PrintStream stdout,stderr;
+    public transient PrintStream stdout;
 
-    /**
-     * Shared text, which is reported back to CLI if an error happens in commands 
-     * taking lists of parameters.
-     * @since 2.26
-     */
-    static final String CLI_LISTPARAM_SUMMARY_ERROR_TEXT = "Error occurred while performing this command, see previous stderr output.";
-    
-    /**
+	/**
+	 * Connected to stdout and stderr of the CLI agent that initiated the session. IOW, if you write to these streams, the person who launched the CLI command will see the messages in his terminal. <p> (In contrast, calling  {@code  System.out.println(...)}  would print out the message to the server log file, which is probably not what you want.
+	 */
+	public transient PrintStream stderr;
+
+	/**
      * Connected to stdin of the CLI agent.
      *
      * <p>
@@ -131,29 +160,29 @@ public abstract class CLICommand implements ExtensionPoint, Cloneable {
      */
     public transient InputStream stdin;
 
-    /**
+	/**
      * @deprecated No longer used.
      */
     @Deprecated
     public transient Channel channel;
 
-    /**
+	/**
      * The locale of the client. Messages should be formatted with this resource.
      */
     public transient Locale locale;
 
-    /**
+	/**
      * The encoding of the client, if defined.
      */
     private transient @CheckForNull Charset encoding;
 
-    /**
+	/**
      * Set by the caller of the CLI system if the transport already provides
      * authentication.
      */
     private transient Authentication transportAuth;
 
-    /**
+	/**
      * Gets the command name.
      *
      * <p>
@@ -169,20 +198,22 @@ public abstract class CLICommand implements ExtensionPoint, Cloneable {
         name = name.substring(name.lastIndexOf('.') + 1); // short name
         name = name.substring(name.lastIndexOf('$')+1);
         if(name.endsWith("Command"))
-            name = name.substring(0,name.length()-7); // trim off the command
+		 {
+			name = name.substring(0,name.length()-7); // trim off the command
+		}
 
         // convert "FooBarZot" into "foo-bar-zot"
         // Locale is fixed so that "CreateInstance" always become "create-instance" no matter where this is run.
         return name.replaceAll("([a-z0-9])([A-Z])","$1-$2").toLowerCase(Locale.ENGLISH);
     }
 
-    /**
+	/**
      * Gets the quick summary of what this command does.
      * Used by the help command to generate the list of commands.
      */
     public abstract String getShortDescription();
 
-    /**
+	/**
      * Entry point to the CLI command.
      * 
      * <p>
@@ -241,11 +272,13 @@ public abstract class CLICommand implements ExtensionPoint, Cloneable {
 
             sc.setAuthentication(auth = getTransportAuthentication());
 
-            if (!(this instanceof HelpCommand || this instanceof WhoAmICommand))
-                Jenkins.getActiveInstance().checkPermission(Jenkins.READ);
+            if (!(this instanceof HelpCommand || this instanceof WhoAmICommand)) {
+				Jenkins.getActiveInstance().checkPermission(Jenkins.READ);
+			}
             p.parseArgument(args.toArray(new String[0]));
-            if (!(this instanceof HelpCommand || this instanceof WhoAmICommand))
-                Jenkins.getActiveInstance().checkPermission(Jenkins.READ);
+            if (!(this instanceof HelpCommand || this instanceof WhoAmICommand)) {
+				Jenkins.getActiveInstance().checkPermission(Jenkins.READ);
+			}
             LOGGER.log(Level.FINE, "Invoking CLI command {0}, with {1} arguments, as user {2}.",
                     new Object[] {getName(), args.size(), auth.getName()});
             int res = run();
@@ -290,7 +323,7 @@ public abstract class CLICommand implements ExtensionPoint, Cloneable {
             String id = UUID.randomUUID().toString();
             LOGGER.log(Level.INFO, "CLI login attempt failed: " + id, e);
             stderr.println();
-            stderr.println("ERROR: Bad Credentials. Search the server log for " + id + " for more details.");
+            stderr.println(new StringBuilder().append("ERROR: Bad Credentials. Search the server log for ").append(id).append(" for more details.").toString());
             return 7;
         } catch (Throwable e) {
             final String errorMsg = String.format("Unexpected exception occurred while performing %s command.",
@@ -302,11 +335,13 @@ public abstract class CLICommand implements ExtensionPoint, Cloneable {
             return 1;
         } finally {
             if(sc != null)
-                sc.setAuthentication(old); // restore
+			 {
+				sc.setAuthentication(old); // restore
+			}
         }
     }
 
-    /**
+	/**
      * Get parser for this command.
      *
      * Exposed to be overridden by {@link hudson.cli.declarative.CLIRegisterer}.
@@ -316,7 +351,7 @@ public abstract class CLICommand implements ExtensionPoint, Cloneable {
         return new CmdLineParser(this);
     }
 
-    /**
+	/**
      * @deprecated Specific to Remoting-based protocol.
      */
     @Deprecated
@@ -324,7 +359,7 @@ public abstract class CLICommand implements ExtensionPoint, Cloneable {
         throw new AbortException("This command is requesting the -remoting mode which is no longer supported. See https://jenkins.io/redirect/cli-command-requires-channel");
     }
 
-    /**
+	/**
      * Determines if the user authentication is attempted through CLI before running this command.
      *
      * <p>
@@ -346,7 +381,7 @@ public abstract class CLICommand implements ExtensionPoint, Cloneable {
         return auth== Jenkins.ANONYMOUS;
     }
 
-    /**
+	/**
      * Returns the identity of the client as determined at the CLI transport level.
      *
      * <p>
@@ -364,15 +399,17 @@ public abstract class CLICommand implements ExtensionPoint, Cloneable {
      */
     public Authentication getTransportAuthentication() {
         Authentication a = transportAuth; 
-        if (a==null)    a = Jenkins.ANONYMOUS;
+        if (a==null) {
+			a = Jenkins.ANONYMOUS;
+		}
         return a;
     }
 
-    public void setTransportAuth(Authentication transportAuth) {
+	public void setTransportAuth(Authentication transportAuth) {
         this.transportAuth = transportAuth;
     }
 
-    /**
+	/**
      * Executes the command, and return the exit code.
      * 
      * <p>
@@ -399,7 +436,7 @@ public abstract class CLICommand implements ExtensionPoint, Cloneable {
      */
     protected abstract int run() throws Exception;
 
-    protected void printUsage(PrintStream stderr, CmdLineParser p) {
+	protected void printUsage(PrintStream stderr, CmdLineParser p) {
         stderr.print("java -jar jenkins-cli.jar " + getName());
         p.printSingleLineUsage(stderr);
         stderr.println();
@@ -407,7 +444,7 @@ public abstract class CLICommand implements ExtensionPoint, Cloneable {
         p.printUsage(stderr);
     }
 
-    /**
+	/**
      * Get single line summary as a string.
      */
     @Restricted(NoExternalUse.class)
@@ -417,7 +454,7 @@ public abstract class CLICommand implements ExtensionPoint, Cloneable {
         return out.toString();
     }
 
-    /**
+	/**
      * Get usage as a string.
      */
     @Restricted(NoExternalUse.class)
@@ -427,7 +464,7 @@ public abstract class CLICommand implements ExtensionPoint, Cloneable {
         return out.toString();
     }
 
-    /**
+	/**
      * Get long description as a string.
      */
     @Restricted(NoExternalUse.class)
@@ -440,7 +477,7 @@ public abstract class CLICommand implements ExtensionPoint, Cloneable {
         return out.toString();
     }
 
-    /**
+	/**
      * Called while producing usage. This is a good method to override
      * to render the general description of the command that goes beyond
      * a single-line summary. 
@@ -449,7 +486,7 @@ public abstract class CLICommand implements ExtensionPoint, Cloneable {
         stderr.println(getShortDescription());
     }
 
-    /**
+	/**
      * Convenience method for subtypes to obtain the system property of the client.
      * @deprecated Specific to Remoting-based protocol.
      */
@@ -459,7 +496,7 @@ public abstract class CLICommand implements ExtensionPoint, Cloneable {
         return null; // never run
     }
 
-    /**
+	/**
      * Define the encoding for the command.
      * @since 2.54
      */
@@ -467,7 +504,7 @@ public abstract class CLICommand implements ExtensionPoint, Cloneable {
         this.encoding = encoding;
     }
 
-    protected @Nonnull Charset getClientCharset() throws IOException, InterruptedException {
+	protected @Nonnull Charset getClientCharset() throws IOException, InterruptedException {
         if (encoding != null) {
             return encoding;
         }
@@ -476,7 +513,7 @@ public abstract class CLICommand implements ExtensionPoint, Cloneable {
         return Charset.defaultCharset();
     }
 
-    /**
+	/**
      * Convenience method for subtypes to obtain environment variables of the client.
      * @deprecated Specific to Remoting-based protocol.
      */
@@ -486,7 +523,7 @@ public abstract class CLICommand implements ExtensionPoint, Cloneable {
         return null; // never run
     }
 
-    /**
+	/**
      * Creates a clone to be used to execute a command.
      */
     protected CLICommand createClone() {
@@ -497,7 +534,7 @@ public abstract class CLICommand implements ExtensionPoint, Cloneable {
         }
     }
 
-    /**
+	/**
      * Auto-discovers {@link OptionHandler}s and add them to the given command line parser.
      */
     protected void registerOptionHandlers() {
@@ -511,58 +548,31 @@ public abstract class CLICommand implements ExtensionPoint, Cloneable {
         }
     }
 
-    /**
+	/**
      * Returns all the registered {@link CLICommand}s.
      */
     public static ExtensionList<CLICommand> all() {
         return ExtensionList.lookup(CLICommand.class);
     }
 
-    /**
+	/**
      * Obtains a copy of the command for invocation.
      */
     public static CLICommand clone(String name) {
-        for (CLICommand cmd : all())
-            if(name.equals(cmd.getName()))
-                return cmd.createClone();
-        return null;
+        return all().stream().filter(cmd -> name.equals(cmd.getName())).findFirst().map(CLICommand::createClone).orElse(null);
     }
 
-    private static final Logger LOGGER = Logger.getLogger(CLICommand.class.getName());
-
-    private static final ThreadLocal<CLICommand> CURRENT_COMMAND = new ThreadLocal<>();
-
-    /*package*/ static CLICommand setCurrent(CLICommand cmd) {
+	/*package*/ static CLICommand setCurrent(CLICommand cmd) {
         CLICommand old = getCurrent();
         CURRENT_COMMAND.set(cmd);
         return old;
     }
 
-    /**
+	/**
      * If the calling thread is in the middle of executing a CLI command, return it. Otherwise null.
      */
     public static CLICommand getCurrent() {
         return CURRENT_COMMAND.get();
-    }
-
-    static {
-        // register option handlers that are defined
-        ClassLoaders cls = new ClassLoaders();
-        Jenkins j = Jenkins.getInstanceOrNull();
-        if (j!=null) {// only when running on the master
-            cls.put(j.getPluginManager().uberClassLoader);
-
-            ResourceNameIterator servicesIter =
-                new DiscoverServiceNames(cls).findResourceNames(OptionHandler.class.getName());
-            final ResourceClassIterator itr =
-                new DiscoverClasses(cls).findResourceClasses(servicesIter);
-
-            while(itr.hasNext()) {
-                Class h = itr.nextResourceClass().loadClass();
-                Class c = Types.erasure(Types.getTypeArgument(Types.getBaseClass(h, OptionHandler.class), 0));
-                CmdLineParser.registerHandler(c,h);
-            }
-        }
     }
 
 }

@@ -65,7 +65,8 @@ public abstract class AbstractScmTagAction extends TaskAction implements BuildBa
         this((Run) build);
     }
 
-    public final String getUrlName() {
+    @Override
+	public final String getUrlName() {
         // to make this consistent with CVSSCM, even though the name is bit off
         return "tagBuild";
     }
@@ -73,7 +74,8 @@ public abstract class AbstractScmTagAction extends TaskAction implements BuildBa
     /**
      * Defaults to {@link SCM#TAG}.
      */
-    protected Permission getPermission() {
+    @Override
+	protected Permission getPermission() {
         return SCM.TAG;
     }
 
@@ -101,7 +103,8 @@ public abstract class AbstractScmTagAction extends TaskAction implements BuildBa
      */
     public abstract boolean isTagged();
 
-    protected ACL getACL() {
+    @Override
+	protected ACL getACL() {
         return run.getACL();
     }
 
@@ -110,8 +113,9 @@ public abstract class AbstractScmTagAction extends TaskAction implements BuildBa
     }
 
     protected synchronized String chooseAction() {
-        if(workerThread!=null)
-            return "inProgress.jelly";
+        if(workerThread!=null) {
+			return "inProgress.jelly";
+		}
         return "tagForm.jelly";
     }
 

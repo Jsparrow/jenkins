@@ -31,23 +31,25 @@ import java.util.Enumeration;
 @Extension @Symbol("assetManager")
 public class AssetManager implements UnprotectedRootAction {
 
-    // not shown in the UI
+    private static final Method $findResource = init();
+
+	// not shown in the UI
     @Override
     public String getIconFileName() {
         return null;
     }
 
-    @Override
+	@Override
     public String getDisplayName() {
         return null;
     }
 
-    @Override
+	@Override
     public String getUrlName() {
         return "assets";
     }
 
-    /**
+	/**
      * Exposes assets in the core classloader over HTTP.
      */
     public void doDynamic(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
@@ -70,7 +72,7 @@ public class AssetManager implements UnprotectedRootAction {
         rsp.serveLocalizedFile(req, resource, expires);
     }
 
-    /**
+	/**
      * Locates the asset from the classloader.
      *
      * <p>
@@ -84,8 +86,9 @@ public class AssetManager implements UnprotectedRootAction {
         }
 
         try {
-            if (path.contains("..")) // crude avoidance of directory traversal attack
-                throw new IllegalArgumentException(path);
+            if (path.contains("..")) {
+				throw new IllegalArgumentException(path);
+			}
 
             String name;
             if (path.charAt(0) == '/') {
@@ -109,9 +112,7 @@ public class AssetManager implements UnprotectedRootAction {
         }
     }
 
-    private static final Method $findResource = init();
-
-    private static Method init() {
+	private static Method init() {
         try {
             Method m = ClassLoader.class.getDeclaredMethod("findResource", String.class);
             m.setAccessible(true);

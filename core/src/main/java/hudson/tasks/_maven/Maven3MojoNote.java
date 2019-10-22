@@ -49,21 +49,22 @@ import java.util.regex.Pattern;
  * @author Mirko Friedenhagen
  */
 public class Maven3MojoNote extends ConsoleNote {
-    public Maven3MojoNote() {
+    public static Pattern PATTERN = Pattern.compile("\\[INFO\\] --- .+-plugin:[^:]+:[^ ]+ \\(.+\\) @ .+ ---");
+
+	public Maven3MojoNote() {
     }
 
-    @Override
+	@Override
     public ConsoleAnnotator annotate(Object context, MarkupText text, int charPos) {
         text.addMarkup(7,text.length(),"<b class=maven-mojo>","</b>");
         return null;
     }
 
-    @Extension @Symbol("maven3Mojos")
+	@Extension @Symbol("maven3Mojos")
     public static final class DescriptorImpl extends ConsoleAnnotationDescriptor {
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return "Maven 3 Mojos";
         }
     }
-
-    public static Pattern PATTERN = Pattern.compile("\\[INFO\\] --- .+-plugin:[^:]+:[^ ]+ \\(.+\\) @ .+ ---");
 }

@@ -44,9 +44,7 @@ import java.util.logging.Logger;
 public class StaplerFilteredActionListener implements FilteredDoActionTriggerListener, FilteredGetterTriggerListener, FilteredFieldTriggerListener, FilteredDispatchTriggerListener {
     private static final Logger LOGGER = Logger.getLogger(StaplerFilteredActionListener.class.getName());
 
-    private static final String LOG_MESSAGE = "New Stapler routing rules result in the URL \"{0}\" no longer being allowed. " +
-            "If you consider it safe to use, add the following to the whitelist: \"{1}\". " +
-            "Learn more: https://jenkins.io/redirect/stapler-routing";
+    private static final String LOG_MESSAGE = new StringBuilder().append("New Stapler routing rules result in the URL \"{0}\" no longer being allowed. ").append("If you consider it safe to use, add the following to the whitelist: \"{1}\". ").append("Learn more: https://jenkins.io/redirect/stapler-routing").toString();
     
     @Override 
     public boolean onDoActionTrigger(Function f, StaplerRequest req, StaplerResponse rsp, Object node) {
@@ -77,9 +75,8 @@ public class StaplerFilteredActionListener implements FilteredDoActionTriggerLis
 
     @Override
     public boolean onDispatchTrigger(StaplerRequest req, StaplerResponse rsp, Object node, String viewName) {
-        LOGGER.warning(() -> "New Stapler dispatch rules result in the URL \"" + req.getPathInfo() + "\" no longer being allowed. " +
-                "If you consider it safe to use, add the following to the whitelist: \"" + node.getClass().getName() + " " + viewName + "\". "+
-                "Learn more: https://jenkins.io/redirect/stapler-facet-restrictions");
+        LOGGER.warning(() -> new StringBuilder().append("New Stapler dispatch rules result in the URL \"").append(req.getPathInfo()).append("\" no longer being allowed. ").append("If you consider it safe to use, add the following to the whitelist: \"").append(node.getClass().getName()).append(" ")
+				.append(viewName).append("\". ").append("Learn more: https://jenkins.io/redirect/stapler-facet-restrictions").toString());
         return false;
     }
 }

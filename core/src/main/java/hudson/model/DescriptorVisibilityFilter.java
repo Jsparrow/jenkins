@@ -70,36 +70,39 @@ public abstract class DescriptorVisibilityFilter implements ExtensionPoint {
 
         if (source == null) {
             // JENKINS-40545: throwing instead of logging so jelly can amend the actual jelly expression that failed.
-            throw new NullPointerException("Descriptor list is null for context '" + contextClass + "' in thread '" + Thread.currentThread().getName() + "'");
+            throw new NullPointerException(new StringBuilder().append("Descriptor list is null for context '").append(contextClass).append("' in thread '").append(Thread.currentThread().getName()).append("'").toString());
         }
 
         OUTER:
         for (T d : source) {
             if (LOGGER.isLoggable(Level.FINE)) {
-                LOGGER.fine("Determining visibility of " + d + " in context " + context);
+                LOGGER.fine(new StringBuilder().append("Determining visibility of ").append(d).append(" in context ").append(context).toString());
             }
             for (DescriptorVisibilityFilter f : filters) {
                 if (LOGGER.isLoggable(Level.FINER)) {
-                    LOGGER.finer("Querying " + f + " for visibility of " + d + " in " + context);
+                    LOGGER.finer(new StringBuilder().append("Querying ").append(f).append(" for visibility of ").append(d).append(" in ").append(context)
+							.toString());
                 }
                 try {
                     if (contextClass != null && !f.filterType(contextClass, d)) {
                         if (LOGGER.isLoggable(Level.CONFIG)) {
-                            LOGGER.config("Filter " + f + " hides " + d + " in contexts of type " + contextClass);
+                            LOGGER.config(new StringBuilder().append("Filter ").append(f).append(" hides ").append(d).append(" in contexts of type ")
+									.append(contextClass).toString());
                         }
                         continue OUTER; // veto-ed. not shown
                     }
                     if (!f.filter(context, d)) {
                         if (LOGGER.isLoggable(Level.CONFIG)) {
-                            LOGGER.config("Filter " + f + " hides " + d + " in context " + context);
+                            LOGGER.config(new StringBuilder().append("Filter ").append(f).append(" hides ").append(d).append(" in context ")
+									.append(context).toString());
                         }
                         continue OUTER; // veto-ed. not shown
                     }
                 } catch (Error e) {
-                    LOGGER.log(Level.WARNING, "Encountered error while processing filter " + f + " for context " + context, e);
+                    LOGGER.log(Level.WARNING, new StringBuilder().append("Encountered error while processing filter ").append(f).append(" for context ").append(context).toString(), e);
                     throw e;
                 } catch (Throwable e) {
-                    LOGGER.log(logLevelFor(f), "Uncaught exception from filter " + f + " for context " + context, e);
+                    LOGGER.log(logLevelFor(f), new StringBuilder().append("Uncaught exception from filter ").append(f).append(" for context ").append(context).toString(), e);
                     continue OUTER; // veto-ed. not shown
                 }
             }
@@ -115,25 +118,27 @@ public abstract class DescriptorVisibilityFilter implements ExtensionPoint {
         OUTER:
         for (T d : source) {
             if (LOGGER.isLoggable(Level.FINE)) {
-                LOGGER.fine("Determining visibility of " + d + " in contexts of type " + contextClass);
+                LOGGER.fine(new StringBuilder().append("Determining visibility of ").append(d).append(" in contexts of type ").append(contextClass).toString());
             }
             for (DescriptorVisibilityFilter f : filters) {
                 if (LOGGER.isLoggable(Level.FINER)) {
-                    LOGGER.finer("Querying " + f + " for visibility of " + d + " in type " + contextClass);
+                    LOGGER.finer(new StringBuilder().append("Querying ").append(f).append(" for visibility of ").append(d).append(" in type ").append(contextClass)
+							.toString());
                 }
                 try {
                     if (contextClass != null && !f.filterType(contextClass, d)) {
                         if (LOGGER.isLoggable(Level.CONFIG)) {
-                            LOGGER.config("Filter " + f + " hides " + d + " in contexts of type " + contextClass);
+                            LOGGER.config(new StringBuilder().append("Filter ").append(f).append(" hides ").append(d).append(" in contexts of type ")
+									.append(contextClass).toString());
                         }
                         continue OUTER; // veto-ed. not shown
                     }
                 } catch (Error e) {
                     LOGGER.log(Level.WARNING,
-                            "Encountered error while processing filter " + f + " for contexts of type " + contextClass, e);
+                            new StringBuilder().append("Encountered error while processing filter ").append(f).append(" for contexts of type ").append(contextClass).toString(), e);
                     throw e;
                 } catch (Throwable e) {
-                    LOGGER.log(logLevelFor(f), "Uncaught exception from filter " + f + " for context of type " + contextClass, e);
+                    LOGGER.log(logLevelFor(f), new StringBuilder().append("Uncaught exception from filter ").append(f).append(" for context of type ").append(contextClass).toString(), e);
                     continue OUTER; // veto-ed. not shown
                 }
             }

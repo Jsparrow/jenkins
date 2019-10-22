@@ -20,62 +20,68 @@ import static hudson.Functions.isWindows;
  * @author Kohsuke Kawaguchi
  */
 class FilePathRuleConfig extends ConfigDirectory<FilePathRule,List<FilePathRule>> {
-    FilePathRuleConfig(File file) {
+    /**
+     *
+     */
+    private static final Pattern PARSER = Pattern.compile("(allow|deny)\\s+([a-z,]+)\\s+(.*)");
+
+	FilePathRuleConfig(File file) {
         super(file);
     }
 
-    @Override
+	@Override
     protected List<FilePathRule> create() {
         return new ArrayList<>();
     }
 
-    @Override
+	@Override
     protected List<FilePathRule> readOnly(List<FilePathRule> base) {
         return ImmutableList.copyOf(base);
     }
 
-    @Override
+	@Override
     protected FilePathRule parse(String line) {
         line = line.trim();
-        if (line.isEmpty())     return null;
+        if (line.isEmpty()) {
+			return null;
+		}
 
         line = line.replace("<BUILDDIR>","<JOBDIR>/builds/<BUILDID>");
         line = line.replace("<BUILDID>","(?:[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]_[0-9][0-9]-[0-9][0-9]-[0-9][0-9]|[0-9]+)");
         line = line.replace("<JOBDIR>","<JENKINS_HOME>/jobs/.+");
-        line = line.replace("<JENKINS_HOME>","\\Q"+Jenkins.get().getRootDir().getPath()+"\\E");
+        line = line.replace("<JENKINS_HOME>",new StringBuilder().append("\\Q").append(Jenkins.get().getRootDir().getPath()).append("\\E").toString());
 
         // config file is always /-separated even on Windows, so bring it back to \-separation.
         // This is done in the context of regex, so it has to be \\, which means in the source code it is \\\\
-        if (isWindows())  line = line.replace("/","\\\\");
+        if (isWindows()) {
+			line = line.replace("/","\\\\");
+		}
 
         Matcher m = PARSER.matcher(line);
-        if (!m.matches())
-            throw new Failure("Invalid filter rule line: "+line);
+        if (!m.matches()) {
+			throw new Failure("Invalid filter rule line: "+line);
+		}
 
         try {
             return new FilePathRule(
                     Pattern.compile(m.group(3)),
                     createOpMatcher(m.group(2)),
-                    m.group(1).equals("allow"));
+                    "allow".equals(m.group(1)));
         } catch (Exception e) {
-            throw new Failure("Invalid filter rule line: "+line+"\n"+ Functions.printThrowable(e));
+            throw new Failure(new StringBuilder().append("Invalid filter rule line: ").append(line).append("\n").append(Functions.printThrowable(e)).toString());
         }
     }
 
-    private OpMatcher createOpMatcher(String token) {
-        if (token.equals("all"))
-            return OpMatcher.ALL;
+	private OpMatcher createOpMatcher(String token) {
+        if ("all".equals(token)) {
+			return OpMatcher.ALL;
+		}
 
         final ImmutableSet ops = ImmutableSet.copyOf(token.split(","));
-        return new OpMatcher() {
-            @Override
-            public boolean matches(String op) {
-                return ops.contains(op);
-            }
-        };
+        return ops::contains;
     }
 
-    public boolean checkFileAccess(String op, File path) throws SecurityException {
+	public boolean checkFileAccess(String op, File path) {
         String pathStr = null;
 
         for (FilePathRule rule : get()) {
@@ -84,8 +90,9 @@ class FilePathRuleConfig extends ConfigDirectory<FilePathRule,List<FilePathRule>
                     // do not canonicalize, so that JENKINS_HOME that spans across
                     // multiple volumes via symlinks can look logically like one unit.
                     pathStr = path.getPath();
-                    if (isWindows())    // Windows accepts '/' as separator, but for rule matching we want to normalize for consistent comparison
-                        pathStr = pathStr.replace('/','\\');
+                    if (isWindows()) {
+						pathStr = pathStr.replace('/','\\');
+					}
                 }
 
                 if (rule.path.matcher(pathStr).matches()) {
@@ -99,9 +106,4 @@ class FilePathRuleConfig extends ConfigDirectory<FilePathRule,List<FilePathRule>
 
         return false;
     }
-
-    /**
-     *
-     */
-    private static final Pattern PARSER = Pattern.compile("(allow|deny)\\s+([a-z,]+)\\s+(.*)");
 }

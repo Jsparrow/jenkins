@@ -45,7 +45,9 @@ import static java.util.logging.Level.WARNING;
  */
 @Deprecated
 public class Service {
-    public static <T> List<T> loadInstances(ClassLoader classLoader, Class<T> type) throws IOException {
+    private static final Logger LOGGER = Logger.getLogger(Service.class.getName());
+
+	public static <T> List<T> loadInstances(ClassLoader classLoader, Class<T> type) throws IOException {
         List<T> result = new ArrayList<>();
 
         final Enumeration<URL> e = classLoader.getResources("META-INF/services/"+type.getName());
@@ -55,11 +57,16 @@ public class Service {
                 String line;
                 while ((line = configFile.readLine()) != null) {
                     line = line.trim();
-                    if (line.startsWith("#") || line.length() == 0) continue;
+                    if (line.startsWith("#") || line.isEmpty()) {
+						continue;
+					}
 
                     try {
                         Class<?> t = classLoader.loadClass(line);
-                        if (!type.isAssignableFrom(t)) continue;      // invalid type
+                        if (!type.isAssignableFrom(t))
+						 {
+							continue;      // invalid type
+						}
 
                         result.add(type.cast(t.newInstance()));
                     } catch (ClassNotFoundException | IllegalAccessException | InstantiationException x) {
@@ -72,7 +79,7 @@ public class Service {
         return result;
     }
 
-    /**
+	/**
      * Look up {@code META-INF/service/<i>SPICLASSNAME</i>} from the classloader
      * and all the discovered classes into the given collection.
      */
@@ -85,10 +92,14 @@ public class Service {
                     String line;
                     while ((line = r.readLine()) != null) {
                         if (line.startsWith("#"))
-                            continue;   // comment line
+						 {
+							continue;   // comment line
+						}
                         line = line.trim();
-                        if (line.length() == 0)
-                            continue;   // empty line. ignore.
+                        if (line.isEmpty())
+						 {
+							continue;   // empty line. ignore.
+						}
 
                         try {
                             result.add(cl.loadClass(line).asSubclass(spi));
@@ -104,6 +115,4 @@ public class Service {
             LOGGER.log(Level.WARNING, "Failed to look up service providers for "+spi, x);
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(Service.class.getName());
 }

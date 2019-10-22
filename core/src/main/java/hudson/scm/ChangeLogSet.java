@@ -108,8 +108,9 @@ public abstract class ChangeLogSet<T extends ChangeLogSet.Entry> implements Iter
     @Exported
     public final Object[] getItems() {
         List<T> r = new ArrayList<>();
-        for (T t : this)
-            r.add(t);
+        for (T t : this) {
+			r.add(t);
+		}
         return r.toArray();
     }
 
@@ -137,21 +138,22 @@ public abstract class ChangeLogSet<T extends ChangeLogSet.Entry> implements Iter
     }
 
     @ExportedBean(defaultVisibility=999)
-    public static abstract class Entry {
-        private ChangeLogSet parent;
+    public abstract static class Entry {
+        static final Logger LOGGER = Logger.getLogger(ChangeLogSet.Entry.class.getName());
+		private ChangeLogSet parent;
 
-        public ChangeLogSet getParent() {
+		public ChangeLogSet getParent() {
             return parent;
         }
 
-        /**
+		/**
          * Should be invoked before a {@link ChangeLogSet} is exposed to public.
          */
         protected void setParent(ChangeLogSet parent) {
             this.parent = parent;
         }
 
-        /**
+		/**
          * Returns a human readable display name of the commit number, revision number, and such thing
          * that identifies this entry.
          *
@@ -168,7 +170,7 @@ public abstract class ChangeLogSet<T extends ChangeLogSet.Entry> implements Iter
             return null;
         }
 
-        /**
+		/**
          * Returns the timestamp of this commit in the {@link Date#getTime()} format.
          *
          * <p>
@@ -184,7 +186,7 @@ public abstract class ChangeLogSet<T extends ChangeLogSet.Entry> implements Iter
             return -1;
         }
 
-        /**
+		/**
          * Gets the "commit message".
          *
          * <p>
@@ -196,7 +198,7 @@ public abstract class ChangeLogSet<T extends ChangeLogSet.Entry> implements Iter
         @Exported
         public abstract String getMsg();
 
-        /**
+		/**
          * The user who made this change.
          *
          * @return
@@ -205,7 +207,7 @@ public abstract class ChangeLogSet<T extends ChangeLogSet.Entry> implements Iter
         @Exported
         public abstract User getAuthor();
 
-        /**
+		/**
          * Returns a set of paths in the workspace that was
          * affected by this change.
          *
@@ -217,8 +219,8 @@ public abstract class ChangeLogSet<T extends ChangeLogSet.Entry> implements Iter
          */
         @Exported
         public abstract Collection<String> getAffectedPaths();
-        
-        /**
+
+		/**
          * Returns a set of paths in the workspace that was
          * affected by this change.
          * <p>
@@ -237,36 +239,39 @@ public abstract class ChangeLogSet<T extends ChangeLogSet.Entry> implements Iter
 	        ChangeLogSet parent = getParent();
 	        if ( null != parent ) {
 		        String kind = parent.getKind();
-		        if ( null != kind && kind.trim().length() > 0 ) scm = kind;
+		        if ( null != kind && kind.trim().length() > 0 ) {
+					scm = kind;
+				}
 	        }
 	        throw new UnsupportedOperationException("getAffectedFiles() is not implemented by " + scm);
         }
 
-        /**
+		/**
          * Gets the text fully marked up by {@link ChangeLogAnnotator}.
          */
         public String getMsgAnnotated() {
             MarkupText markup = new MarkupText(getMsg());
-            for (ChangeLogAnnotator a : ChangeLogAnnotator.all())
-                try {
+            ChangeLogAnnotator.all().forEach(a -> {
+				try {
                     a.annotate(parent.run, this, markup);
                 } catch(Exception e) {
-                    LOGGER.info("ChangeLogAnnotator " + a.toString() + " failed to annotate message '" + getMsg() + "'; " + e.getMessage());
+                    LOGGER.info(new StringBuilder().append("ChangeLogAnnotator ").append(a.toString()).append(" failed to annotate message '").append(getMsg()).append("'; ")
+							.append(e.getMessage()).toString());
                 } catch(Error e) {
-                    LOGGER.severe("ChangeLogAnnotator " + a.toString() + " failed to annotate message '" + getMsg() + "'; " + e.getMessage());
+                    LOGGER.severe(new StringBuilder().append("ChangeLogAnnotator ").append(a.toString()).append(" failed to annotate message '").append(getMsg()).append("'; ")
+							.append(e.getMessage()).toString());
                 }
+			});
 
             return markup.toString(false);
         }
 
-        /**
+		/**
          * Message escaped for HTML
          */
         public String getMsgEscaped() {
             return Util.escape(getMsg());
         }
-        
-        static final Logger LOGGER = Logger.getLogger(ChangeLogSet.Entry.class.getName());
     }
     
     /**

@@ -91,12 +91,14 @@ import org.kohsuke.stapler.StaplerRequest;
  */
 public class BuildTrigger extends Recorder implements DependencyDeclarer {
 
-    /**
+    private static final Logger LOGGER = Logger.getLogger(BuildTrigger.class.getName());
+
+	/**
      * Comma-separated list of other projects to be scheduled.
      */
     private String childProjects;
 
-    /**
+	/**
      * Threshold status to trigger other builds.
      *
      * For compatibility reasons, this field could be null, in which case
@@ -104,42 +106,44 @@ public class BuildTrigger extends Recorder implements DependencyDeclarer {
      */
     private final Result threshold;
 
-    public BuildTrigger(String childProjects, boolean evenIfUnstable) {
+	public BuildTrigger(String childProjects, boolean evenIfUnstable) {
         this(childProjects,evenIfUnstable ? Result.UNSTABLE : Result.SUCCESS);
     }
 
-    @DataBoundConstructor
+	@DataBoundConstructor
     public BuildTrigger(String childProjects, String threshold) {
         this(childProjects, Result.fromString(StringUtils.defaultString(threshold, Result.SUCCESS.toString())));
     }
 
-    public BuildTrigger(String childProjects, Result threshold) {
-        if(childProjects==null)
-            throw new IllegalArgumentException();
+	public BuildTrigger(String childProjects, Result threshold) {
+        if(childProjects==null) {
+			throw new IllegalArgumentException();
+		}
         this.childProjects = childProjects;
         this.threshold = threshold;
     }
 
-    public BuildTrigger(List<AbstractProject> childProjects, Result threshold) {
+	public BuildTrigger(List<AbstractProject> childProjects, Result threshold) {
         this((Collection<AbstractProject>)childProjects,threshold);
     }
 
-    public BuildTrigger(Collection<? extends AbstractProject> childProjects, Result threshold) {
+	public BuildTrigger(Collection<? extends AbstractProject> childProjects, Result threshold) {
         this(Items.toNameList(childProjects),threshold);
     }
 
-    public String getChildProjectsValue() {
+	public String getChildProjectsValue() {
         return childProjects;
     }
 
-    public Result getThreshold() {
-        if(threshold==null)
-            return Result.SUCCESS;
-        else
-            return threshold;
+	public Result getThreshold() {
+        if(threshold==null) {
+			return Result.SUCCESS;
+		} else {
+			return threshold;
+		}
     }
 
-    /**
+	/**
      * @deprecated as of 1.406
      *      Use {@link #getChildProjects(ItemGroup)}
      */
@@ -148,28 +152,29 @@ public class BuildTrigger extends Recorder implements DependencyDeclarer {
         return getChildProjects(Jenkins.get());
     }
 
-    /** @deprecated use {@link #getChildJobs} */
+	/** @deprecated use {@link #getChildJobs} */
     @Deprecated
     public List<AbstractProject> getChildProjects(AbstractProject owner) {
         return getChildProjects(owner==null?null:owner.getParent());
     }
 
-    @Deprecated
+	@Deprecated
     public List<AbstractProject> getChildProjects(ItemGroup base) {
         return Items.fromNameList(base,childProjects,AbstractProject.class);
     }
 
-    @SuppressWarnings("unchecked")
+	@SuppressWarnings("unchecked")
     @Nonnull
     public List<Job<?, ?>> getChildJobs(@Nonnull AbstractProject<?, ?> owner) {
         return Items.fromNameList(owner.getParent(), childProjects, (Class<Job<?, ?>>) (Class) Job.class);
     }
 
-    public BuildStepMonitor getRequiredMonitorService() {
+	@Override
+	public BuildStepMonitor getRequiredMonitorService() {
         return BuildStepMonitor.NONE;
     }
 
-    /**
+	/**
      * @deprecated apparently unused
      */
     @Deprecated
@@ -178,7 +183,7 @@ public class BuildTrigger extends Recorder implements DependencyDeclarer {
         return children.size()==projects.size() && children.containsAll(projects);
     }
 
-    /**
+	/**
      * @deprecated as of 1.406
      *      Use {@link #hasSame(AbstractProject, Collection)}
      */
@@ -187,7 +192,7 @@ public class BuildTrigger extends Recorder implements DependencyDeclarer {
         return hasSame(null,projects);
     }
 
-    @Override
+	@Override
     public boolean perform(AbstractBuild build, Launcher launcher, BuildListener listener) {
         List<Job<?, ?>> jobs = new ArrayList<>();
         for (Job<?, ?> job : getChildJobs(build.getProject())) {
@@ -234,7 +239,7 @@ public class BuildTrigger extends Recorder implements DependencyDeclarer {
         return true;
     }
 
-    /**
+	/**
      * @deprecated since 1.341; use {@link #execute(AbstractBuild,BuildListener)}
      */
     @Deprecated
@@ -242,7 +247,7 @@ public class BuildTrigger extends Recorder implements DependencyDeclarer {
         return execute(build, listener);
     }
 
-    /**
+	/**
      * Convenience method to trigger downstream builds.
      *
      * @param build
@@ -259,7 +264,8 @@ public class BuildTrigger extends Recorder implements DependencyDeclarer {
                 graph.getDownstreamDependencies(build.getProject()));
         // Sort topologically
         downstreamProjects.sort(new Comparator<Dependency>() {
-            public int compare(Dependency lhs, Dependency rhs) {
+            @Override
+			public int compare(Dependency lhs, Dependency rhs) {
                 // Swapping lhs/rhs to get reverse sort:
                 return graph.compare(rhs.getDownstreamProject(), lhs.getDownstreamProject());
             }
@@ -289,9 +295,10 @@ public class BuildTrigger extends Recorder implements DependencyDeclarer {
         return true;
     }
 
-    public void buildDependencyGraph(AbstractProject owner, DependencyGraph graph) {
-        for (AbstractProject p : getChildProjects(owner)) // only care about AbstractProject here
-            graph.addDependency(new Dependency(owner, p) {
+	@Override
+	public void buildDependencyGraph(AbstractProject owner, DependencyGraph graph) {
+        for (AbstractProject p : getChildProjects(owner)) {
+			graph.addDependency(new Dependency(owner, p) {
                 @Override
                 public boolean shouldTriggerBuild(AbstractBuild build, TaskListener listener,
                                                   List<Action> actions) {
@@ -300,26 +307,28 @@ public class BuildTrigger extends Recorder implements DependencyDeclarer {
                         LOGGER.log(Level.WARNING, "Running as {0} cannot even see {1} for trigger from {2}", new Object[] {Jenkins.getAuthentication().getName(), downstream, getUpstreamProject()});
                         return false; // do not even issue a warning to build log
                     }
-                    if (!downstream.hasPermission(Item.BUILD)) {
-                        listener.getLogger().println(Messages.BuildTrigger_you_have_no_permission_to_build_(ModelHyperlinkNote.encodeTo(downstream)));
-                        return false;
-                    }
-                    return build.getResult().isBetterOrEqualTo(threshold);
+                    if (downstream.hasPermission(Item.BUILD)) {
+						return build.getResult().isBetterOrEqualTo(threshold);
+					}
+					listener.getLogger().println(Messages.BuildTrigger_you_have_no_permission_to_build_(ModelHyperlinkNote.encodeTo(downstream)));
+					return false;
                 }
             });
+		}
     }
 
-    @Override
+	@Override
     public boolean needsToRunAfterFinalized() {
         return true;
     }
 
-    /** @deprecated Does not handle folder moves. */
+	/** @deprecated Does not handle folder moves. */
     @Deprecated
     public boolean onJobRenamed(String oldName, String newName) {
         // quick test
-        if(!childProjects.contains(oldName))
-            return false;
+        if(!childProjects.contains(oldName)) {
+			return false;
+		}
 
         boolean changed = false;
 
@@ -335,7 +344,9 @@ public class BuildTrigger extends Recorder implements DependencyDeclarer {
         if(changed) {
             StringBuilder b = new StringBuilder();
             for (String p : projects) {
-                if(b.length()>0)    b.append(',');
+                if(b.length()>0) {
+					b.append(',');
+				}
                 b.append(p);
             }
             childProjects = b.toString();
@@ -344,18 +355,20 @@ public class BuildTrigger extends Recorder implements DependencyDeclarer {
         return changed;
     }
 
-    /**
+	/**
      * Correct broken data gracefully (#1537)
      */
     private Object readResolve() {
-        if(childProjects==null)
-            return childProjects="";
+        if(childProjects==null) {
+			return childProjects="";
+		}
         return this;
     }
 
-    @Extension @Symbol("downstream")
+	@Extension @Symbol("downstream")
     public static class DescriptorImpl extends BuildStepDescriptor<Publisher> {
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.BuildTrigger_DisplayName();
         }
 
@@ -390,9 +403,13 @@ public class BuildTrigger extends Recorder implements DependencyDeclarer {
          */
         public FormValidation doCheck(@AncestorInPath AbstractProject project, @QueryParameter String value) {
             // JENKINS-32525: Check that it behaves gracefully for an unknown context
-            if (project == null) return FormValidation.ok(Messages.BuildTrigger_ok_ancestor_is_null());
+            if (project == null) {
+				return FormValidation.ok(Messages.BuildTrigger_ok_ancestor_is_null());
+			}
             // Require CONFIGURE permission on this project
-            if(!project.hasPermission(Item.CONFIGURE))      return FormValidation.ok();
+            if(!project.hasPermission(Item.CONFIGURE)) {
+				return FormValidation.ok();
+			}
 
             StringTokenizer tokens = new StringTokenizer(Util.fixNull(value),",");
             boolean hasProjects = false;
@@ -405,8 +422,9 @@ public class BuildTrigger extends Recorder implements DependencyDeclarer {
                         String alternative = nearest != null ? nearest.getRelativeNameFrom(project) : "?";
                         return FormValidation.error(Messages.BuildTrigger_NoSuchProject(projectName, alternative));
                     }
-                    if(!(item instanceof ParameterizedJobMixIn.ParameterizedJob))
-                        return FormValidation.error(Messages.BuildTrigger_NotBuildable(projectName));
+                    if(!(item instanceof ParameterizedJobMixIn.ParameterizedJob)) {
+						return FormValidation.error(Messages.BuildTrigger_NotBuildable(projectName));
+					}
                     // check whether the supposed user is expected to be able to build
                     Authentication auth = Tasks.getAuthenticationOf(project);
                     if (!item.hasPermission(auth, Item.BUILD)) {
@@ -431,10 +449,10 @@ public class BuildTrigger extends Recorder implements DependencyDeclarer {
             @Override
             public void onLocationChanged(final Item item, final String oldFullName, final String newFullName) {
                 try (ACLContext acl = ACL.as(ACL.SYSTEM)) {
-                    locationChanged(item, oldFullName, newFullName);
+                    locationChanged(oldFullName, newFullName);
                 }
             }
-            private void locationChanged(Item item, String oldFullName, String newFullName) {
+            private void locationChanged(String oldFullName, String newFullName) {
                 // update BuildTrigger of other projects that point to this object.
                 // can't we generalize this?
                 for( Project<?,?> p : Jenkins.get().allItems(Project.class) ) {
@@ -446,7 +464,7 @@ public class BuildTrigger extends Recorder implements DependencyDeclarer {
                             try {
                                 p.save();
                             } catch (IOException e) {
-                                LOGGER.log(Level.WARNING, "Failed to persist project setting during rename from "+oldFullName+" to "+newFullName,e);
+                                LOGGER.log(Level.WARNING, new StringBuilder().append("Failed to persist project setting during rename from ").append(oldFullName).append(" to ").append(newFullName).toString(),e);
                             }
                         }
                     }
@@ -454,6 +472,4 @@ public class BuildTrigger extends Recorder implements DependencyDeclarer {
             }
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(BuildTrigger.class.getName());
 }

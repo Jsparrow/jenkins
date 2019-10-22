@@ -19,24 +19,20 @@ import java.util.logging.Logger;
  * @author Kohsuke Kawaguchi
  */
 abstract class ConfigDirectory<T,COL extends Collection<T>> extends ConfigFile<T,COL> {
-    private final File dir;
+    private static final Logger LOGGER = Logger.getLogger(ConfigDirectory.class.getName());
+	private final File dir;
 
-    protected ConfigDirectory(File file) {
+	protected ConfigDirectory(File file) {
         super(file);
         this.dir = file.getParentFile();
     }
 
-    @Override
+	@Override
     public synchronized void load() {
         COL result = create();
 
         if (dir.exists()) {
-            String[] fragments = dir.list(new FilenameFilter() {
-                @Override
-                public boolean accept(File dir, String name) {
-                    return name.endsWith(".conf");
-                }
-            });
+            String[] fragments = dir.list((File dir, String name) -> name.endsWith(".conf"));
             if (fragments!=null) {
                 Arrays.sort(fragments);
 
@@ -46,10 +42,14 @@ abstract class ConfigDirectory<T,COL extends Collection<T>> extends ConfigFile<T
                         BufferedReader reader = new BufferedReader(new FileReader(f));
                         String line;
                         while ((line=reader.readLine())!=null) {
-                            if (line.startsWith("#")) continue;   // comment
+                            if (line.startsWith("#"))
+							 {
+								continue;   // comment
+							}
                             T r = parse(line);
-                            if (r != null)
-                                result.add(r);
+                            if (r != null) {
+								result.add(r);
+							}
                         }
                     } catch (IOException e) {
                         LOGGER.log(Level.WARNING, "Failed to parse "+f,e);
@@ -60,6 +60,4 @@ abstract class ConfigDirectory<T,COL extends Collection<T>> extends ConfigFile<T
 
         parsed = readOnly(result);
     }
-
-    private static final Logger LOGGER = Logger.getLogger(ConfigDirectory.class.getName());
 }

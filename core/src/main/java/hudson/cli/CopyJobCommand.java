@@ -38,22 +38,23 @@ import org.kohsuke.args4j.Argument;
  */
 @Extension
 public class CopyJobCommand extends CLICommand {
-    @Override
+    @Argument(metaVar="SRC",usage="Name of the job to copy",required=true)
+    public TopLevelItem src;
+
+	@Argument(metaVar="DST",usage="Name of the new job to be created.",index=1,required=true)
+    public String dst;
+
+	@Override
     public String getShortDescription() {
         return Messages.CopyJobCommand_ShortDescription();
     }
 
-    @Argument(metaVar="SRC",usage="Name of the job to copy",required=true)
-    public TopLevelItem src;
-
-    @Argument(metaVar="DST",usage="Name of the new job to be created.",index=1,required=true)
-    public String dst;
-
-    protected int run() throws Exception {
+	@Override
+	protected int run() throws Exception {
         Jenkins jenkins = Jenkins.getActiveInstance();
 
         if (jenkins.getItemByFullName(dst)!=null) {
-            throw new IllegalStateException("Job '"+dst+"' already exists");
+            throw new IllegalStateException(new StringBuilder().append("Job '").append(dst).append("' already exists").toString());
         }
 
         ModifiableTopLevelItemGroup ig = jenkins;

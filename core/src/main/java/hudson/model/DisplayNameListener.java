@@ -39,7 +39,7 @@ import hudson.model.listeners.ItemListener;
 @Extension
 public class DisplayNameListener extends ItemListener {
 
-    private final static Logger LOGGER = Logger.getLogger(DisplayNameListener.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(DisplayNameListener.class.getName());
 
     @Override
     /**
@@ -50,14 +50,15 @@ public class DisplayNameListener extends ItemListener {
      */
     public void onCopied(Item src, Item item) {
         // bug 5056825 - Display name field should be cleared when you copy a job within the same folder.
-        if(item instanceof AbstractItem && src.getParent() == item.getParent()) {
-            AbstractItem dest = (AbstractItem)item;
-            try {                
-                dest.setDisplayName(null);
-            } catch(IOException ioe) {
-                LOGGER.log(Level.WARNING, String.format("onCopied():Exception while trying to clear the displayName for Item.name:%s", item.getName()), ioe);
-            }
-        }
+		if (!(item instanceof AbstractItem && src.getParent() == item.getParent())) {
+			return;
+		}
+		AbstractItem dest = (AbstractItem)item;
+		try {                
+		    dest.setDisplayName(null);
+		} catch(IOException ioe) {
+		    LOGGER.log(Level.WARNING, String.format("onCopied():Exception while trying to clear the displayName for Item.name:%s", item.getName()), ioe);
+		}
     }
 
     @Override
@@ -71,23 +72,24 @@ public class DisplayNameListener extends ItemListener {
      */
     public void onRenamed(Item item, String oldName, String newName) {
         // bug 5077308 - Display name field should be cleared when you rename a job.
-        if(item instanceof AbstractItem) {
-            AbstractItem abstractItem = (AbstractItem)item;
-            if(oldName.equals(abstractItem.getDisplayName())) {
-                // the user renamed the job, but the old project name which is shown as the
-                // displayname if no displayname was set, has been set into the displayname field.
-                // This means that the displayname was never set, so we want to set it
-                // to null as it was before
-                try {
-                    LOGGER.info(String.format("onRenamed():Setting displayname to null for item.name=%s", item.getName()));
-                    abstractItem.setDisplayName(null);
-                }
-                catch(IOException ioe) {
-                    LOGGER.log(Level.WARNING, String.format("onRenamed():Exception while trying to clear the displayName for Item.name:%s",
-                            item.getName()), ioe);
-                }
-            }
-        }
+		if (!(item instanceof AbstractItem)) {
+			return;
+		}
+		AbstractItem abstractItem = (AbstractItem)item;
+		if(oldName.equals(abstractItem.getDisplayName())) {
+		    // the user renamed the job, but the old project name which is shown as the
+		    // displayname if no displayname was set, has been set into the displayname field.
+		    // This means that the displayname was never set, so we want to set it
+		    // to null as it was before
+		    try {
+		        LOGGER.info(String.format("onRenamed():Setting displayname to null for item.name=%s", item.getName()));
+		        abstractItem.setDisplayName(null);
+		    }
+		    catch(IOException ioe) {
+		        LOGGER.log(Level.WARNING, String.format("onRenamed():Exception while trying to clear the displayName for Item.name:%s",
+		                item.getName()), ioe);
+		    }
+		}
     }
 
 }

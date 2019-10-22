@@ -42,23 +42,31 @@ import static java.util.logging.Level.FINER;
  */
 public abstract class SidACL extends ACL {
 
-    @Override
+    private static final Logger LOGGER = Logger.getLogger(SidACL.class.getName());
+
+	@Override
     public boolean hasPermission(@Nonnull Authentication a, Permission permission) {
         if(a==SYSTEM) {
-            if(LOGGER.isLoggable(FINE))
-                LOGGER.fine("hasPermission("+a+","+permission+")=>SYSTEM user has full access");
+            if(LOGGER.isLoggable(FINE)) {
+				LOGGER.fine(new StringBuilder().append("hasPermission(").append(a).append(",").append(permission).append(")=>SYSTEM user has full access").toString());
+			}
             return true;
         }
         Boolean b = _hasPermission(a,permission);
 
-        if(LOGGER.isLoggable(FINE))
-            LOGGER.fine("hasPermission("+a+","+permission+")=>"+(b==null?"null, thus false":b));
+        if(LOGGER.isLoggable(FINE)) {
+			LOGGER.fine(new StringBuilder().append("hasPermission(").append(a).append(",").append(permission).append(")=>")
+					.append(b==null?"null, thus false":b).toString());
+		}
 
-        if(b==null) b=false;    // default to rejection
+        if(b==null)
+		 {
+			b=false;    // default to rejection
+		}
         return b;
     }
 
-    /**
+	/**
      * Implementation that backs up {@link #hasPermission(Authentication, Permission)}.
      *
      * @return
@@ -68,35 +76,44 @@ public abstract class SidACL extends ACL {
     protected Boolean _hasPermission(@Nonnull Authentication a, Permission permission) {
         // ACL entries for this principal takes precedence
         Boolean b = hasPermission(new PrincipalSid(a),permission);
-        if(LOGGER.isLoggable(FINER))
-            LOGGER.finer("hasPermission(PrincipalSID:"+a.getPrincipal()+","+permission+")=>"+b);
-        if(b!=null)
-            return b;
+        if(LOGGER.isLoggable(FINER)) {
+			LOGGER.finer(new StringBuilder().append("hasPermission(PrincipalSID:").append(a.getPrincipal()).append(",").append(permission).append(")=>").append(b)
+					.toString());
+		}
+        if(b!=null) {
+			return b;
+		}
 
         // after that, we check if the groups this principal belongs to
         // has any ACL entries.
         // here we are using GrantedAuthority as a group
         for(GrantedAuthority ga : a.getAuthorities()) {
             b = hasPermission(new GrantedAuthoritySid(ga),permission);
-            if(LOGGER.isLoggable(FINER))
-                LOGGER.finer("hasPermission(GroupSID:"+ga.getAuthority()+","+permission+")=>"+b);
-            if(b!=null)
-                return b;
+            if(LOGGER.isLoggable(FINER)) {
+				LOGGER.finer(new StringBuilder().append("hasPermission(GroupSID:").append(ga.getAuthority()).append(",").append(permission).append(")=>").append(b)
+						.toString());
+			}
+            if(b!=null) {
+				return b;
+			}
         }
 
         // permissions granted to 'everyone' and 'anonymous' users are granted to everyone
         for (Sid sid : AUTOMATIC_SIDS) {
             b = hasPermission(sid,permission);
-            if(LOGGER.isLoggable(FINER))
-                LOGGER.finer("hasPermission("+sid+","+permission+")=>"+b);
-            if(b!=null)
-                return b;
+            if(LOGGER.isLoggable(FINER)) {
+				LOGGER.finer(new StringBuilder().append("hasPermission(").append(sid).append(",").append(permission).append(")=>").append(b)
+						.toString());
+			}
+            if(b!=null) {
+				return b;
+			}
         }
 
         return null;
     }
 
-    /**
+	/**
      * Checks if the given {@link Sid} has the given {@link Permission}.
      *
      * <p>
@@ -116,18 +133,21 @@ public abstract class SidACL extends ACL {
      */
     protected abstract Boolean hasPermission(Sid p, Permission permission);
 
-    protected String toString(Sid p) {
-        if (p instanceof GrantedAuthoritySid)
-            return ((GrantedAuthoritySid) p).getGrantedAuthority();
-        if (p instanceof PrincipalSid)
-            return ((PrincipalSid) p).getPrincipal();
-        if (p == EVERYONE)
-            return "role_everyone";
+	protected String toString(Sid p) {
+        if (p instanceof GrantedAuthoritySid) {
+			return ((GrantedAuthoritySid) p).getGrantedAuthority();
+		}
+        if (p instanceof PrincipalSid) {
+			return ((PrincipalSid) p).getPrincipal();
+		}
+        if (p == EVERYONE) {
+			return "role_everyone";
+		}
         // hmm...
         return p.toString();
     }
 
-    /**
+	/**
      * Creates a new {@link SidACL} that first consults 'this' {@link SidACL} and then delegate to
      * the given parent {@link SidACL}. By doing this at the {@link SidACL} level and not at the
      * {@link ACL} level, this allows the child ACLs to have an explicit deny entry.
@@ -138,13 +158,14 @@ public abstract class SidACL extends ACL {
     public final SidACL newInheritingACL(final SidACL parent) {
         final SidACL child = this;
         return new SidACL() {
-            protected Boolean hasPermission(Sid p, Permission permission) {
+            @Override
+			protected Boolean hasPermission(Sid p, Permission permission) {
                 Boolean b = child.hasPermission(p, permission);
-                if(b!=null) return b;
+                if(b!=null) {
+					return b;
+				}
                 return parent.hasPermission(p,permission);
             }
         };
     }
-
-    private static final Logger LOGGER = Logger.getLogger(SidACL.class.getName());
 }

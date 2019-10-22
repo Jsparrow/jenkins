@@ -23,11 +23,12 @@ public class XmlFileTest {
         xs.alias("hudson", Jenkins.class);
 
         XmlFile xmlFile =  new XmlFile(xs, new File(configUrl.getFile()));
-        if (xmlFile.exists()) {
-            Node n = (Node) xmlFile.read();
-            assertThat(n.getNumExecutors(), is(2));
-            assertThat(n.getMode().toString(), is("NORMAL"));
-        }
+        if (!xmlFile.exists()) {
+			return;
+		}
+		Node n = (Node) xmlFile.read();
+		assertThat(n.getNumExecutors(), is(2));
+		assertThat(n.getMode().toString(), is("NORMAL"));
     }
 
     // KXml2Driver is able to parse XML 1.0 even if it has control characters which
@@ -40,11 +41,12 @@ public class XmlFileTest {
         xs.alias("hudson", Jenkins.class);
 
         XmlFile xmlFile =  new XmlFile(xs, new File(configUrl.getFile()));
-        if (xmlFile.exists()) {
-            Node n = (Node) xmlFile.read();
-            assertThat(n.getNumExecutors(), is(2));
-            assertThat(n.getMode().toString(), is("NORMAL"));
-        }
+        if (!xmlFile.exists()) {
+			return;
+		}
+		Node n = (Node) xmlFile.read();
+		assertThat(n.getNumExecutors(), is(2));
+		assertThat(n.getMode().toString(), is("NORMAL"));
     }
 
     @Test
@@ -54,11 +56,12 @@ public class XmlFileTest {
         xs.alias("hudson", Jenkins.class);
 
         XmlFile xmlFile =  new XmlFile(xs, new File(configUrl.getFile()));
-        if (xmlFile.exists()) {
-            Node n = (Node) xmlFile.read();
-            assertThat(n.getNumExecutors(), is(2));
-            assertThat(n.getMode().toString(), is("NORMAL"));
-        }
+        if (!xmlFile.exists()) {
+			return;
+		}
+		Node n = (Node) xmlFile.read();
+		assertThat(n.getNumExecutors(), is(2));
+		assertThat(n.getMode().toString(), is("NORMAL"));
     }
     
     @Test
@@ -68,11 +71,12 @@ public class XmlFileTest {
         xs.alias("hudson", Jenkins.class);
 
         XmlFile xmlFile =  new XmlFile(xs, new File(configUrl.getFile()));
-        if (xmlFile.exists()) {
-            Node n = (Node) xmlFile.read();
-            assertThat(n.getNumExecutors(), is(2));
-            assertThat(n.getMode().toString(), is("NORMAL"));
-            assertThat(n.getLabelString(), is("LESS_TERMCAP_mb=\u001B[01;31m"));
-        }
+        if (!xmlFile.exists()) {
+			return;
+		}
+		Node n = (Node) xmlFile.read();
+		assertThat(n.getNumExecutors(), is(2));
+		assertThat(n.getMode().toString(), is("NORMAL"));
+		assertThat(n.getLabelString(), is("LESS_TERMCAP_mb=\u001B[01;31m"));
     }
 }

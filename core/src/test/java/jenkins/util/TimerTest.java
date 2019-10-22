@@ -63,29 +63,23 @@ public class TimerTest {
         ScheduledFuture[] futures = new ScheduledFuture[threadCount];
         final ClassLoader bogusClassloader = new GroovyClassLoader();
 
-        Runnable timerTest = new Runnable() {
-            @Override
-            public void run() {
-                ClassLoader cl = Thread.currentThread().getContextClassLoader();
-                Thread.currentThread().setContextClassLoader(bogusClassloader);
-                ScheduledExecutorService exec = Timer.get();
-                for (int i=0; i<threadCount; i++) {
-                    final int j = i;
-                    futures[j] = exec.schedule(new Runnable() {
-                        @Override
-                        public void run() {
-                            try {
-                                startLatch.countDown();
-                                contextClassloaders[j] = Thread.currentThread().getContextClassLoader();
-                            } catch (Exception ex) {
-                                throw  new RuntimeException(ex);
-                            }
-                        }
-                    }, 0, TimeUnit.SECONDS);
-                }
-                Thread.currentThread().setContextClassLoader(cl);
-            }
-        };
+        Runnable timerTest = () -> {
+		    ClassLoader cl = Thread.currentThread().getContextClassLoader();
+		    Thread.currentThread().setContextClassLoader(bogusClassloader);
+		    ScheduledExecutorService exec = Timer.get();
+		    for (int i=0; i<threadCount; i++) {
+		        final int j = i;
+		        futures[j] = exec.schedule(() -> {
+				    try {
+				        startLatch.countDown();
+				        contextClassloaders[j] = Thread.currentThread().getContextClassLoader();
+				    } catch (Exception ex) {
+				        throw  new RuntimeException(ex);
+				    }
+				}, 0, TimeUnit.SECONDS);
+		    }
+		    Thread.currentThread().setContextClassLoader(cl);
+		};
 
         Thread t = new Thread(timerTest);
         t.run();

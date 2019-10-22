@@ -54,14 +54,14 @@ public abstract class UserSeedChangeListener extends ExtensionPoint {
      * @param user The target user
      */
     public static void fireUserSeedRenewed(@Nonnull User user) {
-        for (UserSeedChangeListener l : all()) {
+        all().forEach(l -> {
             try {
                 l.onUserSeedRenewed(user);
             }
             catch (Exception e) {
                 LOGGER.log(Level.WARNING, "Exception caught during onUserSeedRenewed event", e);
             }
-        }
+        });
     }
 
     private static List<UserSeedChangeListener> all() {

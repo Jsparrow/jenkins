@@ -36,9 +36,7 @@ public abstract class ItemVisitor {
      * Visits an {@link ItemGroup} by visits the member items.
      */
     public void onItemGroup(ItemGroup<?> group) {
-        for (Item i : group.getItems())
-            if (i.hasPermission(Item.READ))
-                onItem(i);
+        group.getItems().stream().filter(i -> i.hasPermission(Item.READ)).forEach(this::onItem);
     }
 
     /**
@@ -46,8 +44,9 @@ public abstract class ItemVisitor {
      * visits the children.
      */
     public void onItem(Item i) {
-        if(i instanceof ItemGroup)
-            onItemGroup((ItemGroup)i);
+        if(i instanceof ItemGroup) {
+			onItemGroup((ItemGroup)i);
+		}
     }
 
     /**

@@ -70,7 +70,8 @@ public class NonSerializableSecurityContext implements SecurityContext {
         return false;
     }
 
-    public Authentication getAuthentication() {
+    @Override
+	public Authentication getAuthentication() {
         return authentication;
     }
 
@@ -83,7 +84,8 @@ public class NonSerializableSecurityContext implements SecurityContext {
         }
     }
 
-    public void setAuthentication(Authentication authentication) {
+    @Override
+	public void setAuthentication(Authentication authentication) {
         this.authentication = authentication;
     }
 

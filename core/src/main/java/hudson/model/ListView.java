@@ -150,15 +150,17 @@ public class ListView extends View implements DirectlyModifiableView {
     }
 
     protected void initColumns() {
-        if (columns == null)
-            columns = new DescribableList<>(this,
+        if (columns == null) {
+			columns = new DescribableList<>(this,
                     ListViewColumn.createDefaultInitialColumnList(getClass())
             );
+		}
     }
 
     protected void initJobFilters() {
-        if (jobFilters == null)
-            jobFilters = new DescribableList<>(this);
+        if (jobFilters == null) {
+			jobFilters = new DescribableList<>(this);
+		}
     }
 
     /**
@@ -223,17 +225,22 @@ public class ListView extends View implements DirectlyModifiableView {
             candidates = parent.getItems();
         }
         for (TopLevelItem item : candidates) {
-            if (!names.contains(item.getRelativeNameFrom(getOwner().getItemGroup()))) continue;
+            if (!names.contains(item.getRelativeNameFrom(getOwner().getItemGroup()))) {
+				continue;
+			}
             // Add if no status filter or filter matches enabled/disabled status:
             if(statusFilter == null || !(item instanceof ParameterizedJobMixIn.ParameterizedJob) // TODO or better to call the more generic Job.isBuildable?
-                              || ((ParameterizedJobMixIn.ParameterizedJob)item).isDisabled() ^ statusFilter)
-                items.add(item);
+                              || ((ParameterizedJobMixIn.ParameterizedJob)item).isDisabled() ^ statusFilter) {
+				items.add(item);
+			}
         }
 
         // check the filters
         Iterable<ViewJobFilter> jobFilters = getJobFilters();
         List<TopLevelItem> allItems = new ArrayList<>(parentItems);
-        if (recurse) allItems = expand(allItems, new ArrayList<>());
+        if (recurse) {
+			allItems = expand(allItems, new ArrayList<>());
+		}
     	for (ViewJobFilter jobFilter: jobFilters) {
     		items = jobFilter.filter(items, allItems, this);
     	}
@@ -253,13 +260,13 @@ public class ListView extends View implements DirectlyModifiableView {
     }
 
     private List<TopLevelItem> expand(Collection<TopLevelItem> items, List<TopLevelItem> allItems) {
-        for (TopLevelItem item : items) {
+        items.forEach(item -> {
             if (item instanceof ItemGroup) {
                 ItemGroup<? extends Item> ig = (ItemGroup<? extends Item>) item;
                 expand(Util.filter(ig.getItems(), TopLevelItem.class), allItems);
             }
             allItems.add(item);
-        }
+        });
         return allItems;
     }
     
@@ -270,7 +277,7 @@ public class ListView extends View implements DirectlyModifiableView {
     
     private void includeItems(ItemGroup<? extends TopLevelItem> root, Collection<? extends Item> parentItems, SortedSet<String> names) {
         if (includePattern != null) {
-            for (Item item : parentItems) {
+            parentItems.forEach(item -> {
                 if (recurse && item instanceof ItemGroup) {
                     ItemGroup<?> ig = (ItemGroup<?>) item;
                     includeItems(root, ig.getItems(), names);
@@ -281,12 +288,14 @@ public class ListView extends View implements DirectlyModifiableView {
                         names.add(itemName);
                     }
                 }
-            }
+            });
         }
     }
     
     public synchronized boolean jobNamesContains(TopLevelItem item) {
-        if (item == null) return false;
+        if (item == null) {
+			return false;
+		}
         return jobNames.contains(item.getRelativeNameFrom(getOwner().getItemGroup()));
     }
 
@@ -312,7 +321,9 @@ public class ListView extends View implements DirectlyModifiableView {
     public boolean remove(TopLevelItem item) throws IOException {
         synchronized (this) {
             String name = item.getRelativeNameFrom(getOwner().getItemGroup());
-            if (!jobNames.remove(name)) return false;
+            if (!jobNames.remove(name)) {
+				return false;
+			}
         }
         save();
         return true;
@@ -373,33 +384,36 @@ public class ListView extends View implements DirectlyModifiableView {
     @POST
     public Item doCreateItem(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
         ItemGroup<? extends TopLevelItem> ig = getOwner().getItemGroup();
-        if (ig instanceof ModifiableItemGroup) {
-            TopLevelItem item = ((ModifiableItemGroup<? extends TopLevelItem>)ig).doCreateItem(req, rsp);
-            if (item!=null) {
-                if (needToAddToCurrentView(req)) {
-                    synchronized (this) {
-                        jobNames.add(item.getRelativeNameFrom(getOwner().getItemGroup()));
-                    }
-                    owner.save();
-                }
-            }
-            return item;
-        }
-        return null;
+        if (!(ig instanceof ModifiableItemGroup)) {
+			return null;
+		}
+		TopLevelItem item = ((ModifiableItemGroup<? extends TopLevelItem>)ig).doCreateItem(req, rsp);
+		boolean condition = item!=null && needToAddToCurrentView(req);
+		if (condition) {
+		    synchronized (this) {
+		        jobNames.add(item.getRelativeNameFrom(getOwner().getItemGroup()));
+		    }
+		    owner.save();
+		}
+		return item;
     }
 
     @Override
     @RequirePOST
     public HttpResponse doAddJobToView(@QueryParameter String name) throws IOException, ServletException {
         checkPermission(View.CONFIGURE);
-        if(name==null)
-            throw new Failure("Query parameter 'name' is required");
+        if(name==null) {
+			throw new Failure("Query parameter 'name' is required");
+		}
 
         TopLevelItem item = resolveName(name);
-        if (item == null)
-            throw new Failure("Query parameter 'name' does not correspond to a known item");
+        if (item == null) {
+			throw new Failure("Query parameter 'name' does not correspond to a known item");
+		}
 
-        if (contains(item)) return HttpResponses.ok();
+        if (contains(item)) {
+			return HttpResponses.ok();
+		}
 
         add(item);
         owner.save();
@@ -411,15 +425,18 @@ public class ListView extends View implements DirectlyModifiableView {
     @RequirePOST
     public HttpResponse doRemoveJobFromView(@QueryParameter String name) throws IOException, ServletException {
         checkPermission(View.CONFIGURE);
-        if(name==null)
-            throw new Failure("Query parameter 'name' is required");
+        if(name==null) {
+			throw new Failure("Query parameter 'name' is required");
+		}
 
         TopLevelItem item = resolveName(name);
-        if (item==null)
-            throw new Failure("Query parameter 'name' does not correspond to a known and readable item");
+        if (item==null) {
+			throw new Failure("Query parameter 'name' does not correspond to a known and readable item");
+		}
 
-        if (remove(item))
-            owner.save();
+        if (remove(item)) {
+			owner.save();
+		}
 
         return HttpResponses.ok();
     }
@@ -478,10 +495,11 @@ public class ListView extends View implements DirectlyModifiableView {
     @DataBoundSetter
     public void setIncludeRegex(String includeRegex) {
         this.includeRegex = Util.nullify(includeRegex);
-        if (this.includeRegex == null)
-            this.includePattern = null;
-        else
-            this.includePattern = Pattern.compile(includeRegex);
+        if (this.includeRegex == null) {
+			this.includePattern = null;
+		} else {
+			this.includePattern = Pattern.compile(includeRegex);
+		}
     }
 
     @DataBoundSetter
@@ -494,7 +512,16 @@ public class ListView extends View implements DirectlyModifiableView {
         this.statusFilter = statusFilter;
     }
 
-    @Extension @Symbol("list")
+    /**
+     * @deprecated as of 1.391
+     *  Use {@link ListViewColumn#createDefaultInitialColumnList()}
+     */
+    @Deprecated
+    public static List<ListViewColumn> getDefaultColumns() {
+        return ListViewColumn.createDefaultInitialColumnList(ListView.class);
+    }
+
+	@Extension @Symbol("list")
     public static class DescriptorImpl extends ViewDescriptor {
         @Override
         public String getDisplayName() {
@@ -517,15 +544,6 @@ public class ListView extends View implements DirectlyModifiableView {
         }
     }
 
-    /**
-     * @deprecated as of 1.391
-     *  Use {@link ListViewColumn#createDefaultInitialColumnList()}
-     */
-    @Deprecated
-    public static List<ListViewColumn> getDefaultColumns() {
-        return ListViewColumn.createDefaultInitialColumnList(ListView.class);
-    }
-
     @Restricted(NoExternalUse.class)
     @Extension
     public static final class Listener extends ItemListener {
@@ -545,14 +563,14 @@ public class ListView extends View implements DirectlyModifiableView {
             }
         }
         private void locationChanged(ViewGroup vg, String oldFullName, String newFullName) {
-            for (View v : vg.getViews()) {
+            vg.getViews().forEach(v -> {
                 if (v instanceof ListView) {
                     renameViewItem(oldFullName, newFullName, vg, (ListView) v);
                 }
                 if (v instanceof ViewGroup) {
                     locationChanged((ViewGroup) v, oldFullName, newFullName);
                 }
-            }
+            });
         }
 
         private void renameViewItem(String oldFullName, String newFullName, ViewGroup vg, ListView lv) {
@@ -560,9 +578,8 @@ public class ListView extends View implements DirectlyModifiableView {
             synchronized (lv) {
                 Set<String> oldJobNames = new HashSet<>(lv.jobNames);
                 lv.jobNames.clear();
-                for (String oldName : oldJobNames) {
-                    lv.jobNames.add(Items.computeRelativeNamesAfterRenaming(oldFullName, newFullName, oldName, vg.getItemGroup()));
-                }
+                oldJobNames.forEach(oldName -> lv.jobNames.add(
+						Items.computeRelativeNamesAfterRenaming(oldFullName, newFullName, oldName, vg.getItemGroup())));
                 needsSave = !oldJobNames.equals(lv.jobNames);
             }
             if (needsSave) { // do not hold ListView lock at the time
@@ -590,14 +607,14 @@ public class ListView extends View implements DirectlyModifiableView {
             }
         }
         private void deleted(ViewGroup vg, Item item) {
-            for (View v : vg.getViews()) {
+            vg.getViews().forEach(v -> {
                 if (v instanceof ListView) {
                     deleteViewItem(item, vg, (ListView) v);
                 }
                 if (v instanceof ViewGroup) {
                     deleted((ViewGroup) v, item);
                 }
-            }
+            });
         }
 
         private void deleteViewItem(Item item, ViewGroup vg, ListView lv) {

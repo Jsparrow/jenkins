@@ -56,6 +56,51 @@ import org.kohsuke.accmod.restrictions.NoExternalUse;
  */
 public abstract class ACL {
     /**
+     * Special {@link Sid} that represents "everyone", even including anonymous users.
+     *
+     * <p>
+     * This doesn't need to be included in {@link Authentication#getAuthorities()},
+     * but {@link ACL} is responsible for checking it nonetheless, as if it was the
+     * last entry in the granted authority.
+     */
+    public static final Sid EVERYONE = new Sid() {
+        @Override
+        public String toString() {
+            return "EVERYONE";
+        }
+    };
+
+	/**
+     * The username for the anonymous user
+     */
+    @Restricted(NoExternalUse.class)
+    public static final String ANONYMOUS_USERNAME = "anonymous";
+
+	/**
+     * {@link Sid} that represents the anonymous unauthenticated users.
+     * <p>
+     * {@link HudsonFilter} sets this up, so this sid remains the same
+     * regardless of the current {@link SecurityRealm} in use.
+     */
+    public static final Sid ANONYMOUS = new PrincipalSid(ANONYMOUS_USERNAME);
+
+	protected static final Sid[] AUTOMATIC_SIDS = new Sid[]{EVERYONE,ANONYMOUS};
+
+	/**
+     * The username for the system user
+     */
+    @Restricted(NoExternalUse.class)
+    public static final String SYSTEM_USERNAME = "SYSTEM";
+
+	/**
+     * {@link Sid} that represents the Hudson itself.
+     * <p>
+     * This is used when Hudson is performing computation for itself, instead
+     * of acting on behalf of an user, such as doing builds.
+     */
+    public static final Authentication SYSTEM = new UsernamePasswordAuthenticationToken(SYSTEM_USERNAME,"SYSTEM");
+
+	/**
      * Checks if the current security principal has this permission.
      *
      * <p>
@@ -69,11 +114,12 @@ public abstract class ACL {
         if (a == SYSTEM) {
             return;
         }
-        if(!hasPermission(a,p))
-            throw new AccessDeniedException2(a,p);
+        if(!hasPermission(a,p)) {
+			throw new AccessDeniedException2(a,p);
+		}
     }
 
-    /**
+	/**
      * Checks if the current security principal has this permission.
      *
      * @return false
@@ -87,7 +133,7 @@ public abstract class ACL {
         return hasPermission(a, p);
     }
 
-    /**
+	/**
      * Checks if the given principle has the given permission.
      *
      * <p>
@@ -96,7 +142,7 @@ public abstract class ACL {
      */
     public abstract boolean hasPermission(@Nonnull Authentication a, @Nonnull Permission permission);
 
-    /**
+	/**
      * Creates a simple {@link ACL} implementation based on a “single-abstract-method” easily implemented via lambda syntax.
      * @param impl the implementation of {@link ACL#hasPermission(Authentication, Permission)}
      * @return an adapter to that lambda
@@ -111,7 +157,7 @@ public abstract class ACL {
         };
     }
 
-    /**
+	/**
      * Checks if the current security principal has the permission to create top level items within the specified
      * item group.
      * <p>
@@ -130,10 +176,12 @@ public abstract class ACL {
         }
         if (!hasCreatePermission(a, c, d)) {
             throw new AccessDeniedException(Messages.AccessDeniedException2_MissingPermission(a.getName(),
-                    Item.CREATE.group.title+"/"+Item.CREATE.name + Item.CREATE + "/" + d.getDisplayName()));
+                    new StringBuilder().append(Item.CREATE.group.title).append("/").append(Item.CREATE.name)
+							.append(Item.CREATE).append("/").append(d.getDisplayName()).toString()));
         }
     }
-    /**
+
+	/**
      * Checks if the given principal has the permission to create top level items within the specified item group.
      * <p>
      * Note that {@link #SYSTEM} can be passed in as the authentication parameter,
@@ -150,7 +198,7 @@ public abstract class ACL {
         return true;
     }
 
-    /**
+	/**
      * Checks if the current security principal has the permission to create views within the specified view group.
      * <p>
      * This is just a convenience function.
@@ -168,11 +216,12 @@ public abstract class ACL {
         }
         if (!hasCreatePermission(a, c, d)) {
             throw new AccessDeniedException(Messages.AccessDeniedException2_MissingPermission(a.getName(),
-                    View.CREATE.group.title + "/" + View.CREATE.name + View.CREATE + "/" + d.getDisplayName()));
+                    new StringBuilder().append(View.CREATE.group.title).append("/").append(View.CREATE.name)
+							.append(View.CREATE).append("/").append(d.getDisplayName()).toString()));
         }
     }
 
-    /**
+	/**
      * Checks if the given principal has the permission to create views within the specified view group.
      * <p>
      * Note that {@link #SYSTEM} can be passed in as the authentication parameter,
@@ -189,55 +238,7 @@ public abstract class ACL {
         return true;
     }
 
-    //
-    // Sid constants
-    //
-
-    /**
-     * Special {@link Sid} that represents "everyone", even including anonymous users.
-     *
-     * <p>
-     * This doesn't need to be included in {@link Authentication#getAuthorities()},
-     * but {@link ACL} is responsible for checking it nonetheless, as if it was the
-     * last entry in the granted authority.
-     */
-    public static final Sid EVERYONE = new Sid() {
-        @Override
-        public String toString() {
-            return "EVERYONE";
-        }
-    };
-
-    /**
-     * The username for the anonymous user
-     */
-    @Restricted(NoExternalUse.class)
-    public static final String ANONYMOUS_USERNAME = "anonymous";
-    /**
-     * {@link Sid} that represents the anonymous unauthenticated users.
-     * <p>
-     * {@link HudsonFilter} sets this up, so this sid remains the same
-     * regardless of the current {@link SecurityRealm} in use.
-     */
-    public static final Sid ANONYMOUS = new PrincipalSid(ANONYMOUS_USERNAME);
-
-    protected static final Sid[] AUTOMATIC_SIDS = new Sid[]{EVERYONE,ANONYMOUS};
-
-    /**
-     * The username for the system user
-     */
-    @Restricted(NoExternalUse.class)
-    public static final String SYSTEM_USERNAME = "SYSTEM";
-
-    /**
-     * {@link Sid} that represents the Hudson itself.
-     * <p>
-     * This is used when Hudson is performing computation for itself, instead
-     * of acting on behalf of an user, such as doing builds.
-     */
-    public static final Authentication SYSTEM = new UsernamePasswordAuthenticationToken(SYSTEM_USERNAME,"SYSTEM");
-
-    /**
+	/**
      * Changes the {@link Authentication} associated with the current thread
      * to the specified one, and returns  the previous security context.
      * 
@@ -259,7 +260,7 @@ public abstract class ACL {
         return old;
     }
 
-    /**
+	/**
      * Safer variant of {@link #impersonate(Authentication)} that does not require a finally-block.
      * @param auth authentication, such as {@link #SYSTEM}
      * @param body an action to run with this alternate authentication in effect
@@ -276,7 +277,7 @@ public abstract class ACL {
         }
     }
 
-    /**
+	/**
      * Safer variant of {@link #impersonate(Authentication)} that does not require a finally-block.
      * @param auth authentication, such as {@link #SYSTEM}
      * @param body an action to run with this alternate authentication in effect (try {@link NotReallyRoleSensitiveCallable})
@@ -293,7 +294,7 @@ public abstract class ACL {
         }
     }
 
-    /**
+	/**
      * Changes the {@link Authentication} associated with the current thread to the specified one and returns an
      * {@link AutoCloseable} that restores the previous security context.
      *
@@ -315,7 +316,7 @@ public abstract class ACL {
         return context;
     }
 
-    /**
+	/**
      * Changes the {@link Authentication} associated with the current thread to the specified one and returns an
      * {@link AutoCloseable} that restores the previous security context.
      *
@@ -336,7 +337,7 @@ public abstract class ACL {
         return as(user == null ? Jenkins.ANONYMOUS : user.impersonate());
     }
 
-    /**
+	/**
      * Checks if the given authentication is anonymous by checking its class.
      * @see Jenkins#ANONYMOUS
      * @see AnonymousAuthenticationToken
@@ -345,4 +346,10 @@ public abstract class ACL {
         //TODO use AuthenticationTrustResolver instead to be consistent through the application
         return authentication instanceof AnonymousAuthenticationToken;
     }
+
+    //
+    // Sid constants
+    //
+
+    
 }

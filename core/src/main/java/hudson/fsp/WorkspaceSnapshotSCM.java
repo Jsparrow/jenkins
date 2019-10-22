@@ -67,6 +67,70 @@ public class WorkspaceSnapshotSCM extends SCM {
     }
 
     /**
+     * Obtains the {@link WorkspaceSnapshot} object that this {@link SCM} points to,
+     * or throws {@link hudson.fsp.WorkspaceSnapshotSCM.ResolvedFailedException} upon failing.
+     *
+     * @return never null.
+     */
+    public Snapshot resolve() throws ResolvedFailedException {
+        Jenkins h = Jenkins.get();
+        AbstractProject<?,?> job = h.getItemByFullName(jobName, AbstractProject.class);
+        if(job==null) {
+            if(h.getItemByFullName(jobName)==null) {
+                AbstractProject nearest = AbstractProject.findNearest(jobName);
+                throw new ResolvedFailedException(Messages.WorkspaceSnapshotSCM_NoSuchJob(jobName,nearest.getFullName()));
+            } else {
+				throw new ResolvedFailedException(Messages.WorkspaceSnapshotSCM_IncorrectJobType(jobName));
+			}
+        }
+
+        PermalinkList permalinks = job.getPermalinks();
+        Permalink p = permalinks.get(permalink);
+        if(p==null) {
+			throw new ResolvedFailedException(Messages.WorkspaceSnapshotSCM_NoSuchPermalink(permalink,jobName));
+		}
+
+        AbstractBuild<?,?> b = (AbstractBuild<?,?>)p.resolve(job);
+        if(b==null) {
+			throw new ResolvedFailedException(Messages.WorkspaceSnapshotSCM_NoBuild(permalink,jobName));
+		}
+
+        WorkspaceSnapshot snapshot = b.getAction(WorkspaceSnapshot.class);
+        if(snapshot==null) {
+			throw new ResolvedFailedException(Messages.WorkspaceSnapshotSCM_NoWorkspace(jobName,permalink));
+		}
+
+        return new Snapshot(snapshot,b);
+    }
+
+	@Override public SCMRevisionState calcRevisionsFromBuild(AbstractBuild<?, ?> build, Launcher launcher, TaskListener listener) throws IOException, InterruptedException {
+        return null;
+    }
+
+	@Override protected PollingResult compareRemoteRevisionWith(AbstractProject project, Launcher launcher, FilePath workspace, TaskListener listener, SCMRevisionState baseline) throws IOException, InterruptedException {
+        return PollingResult.NO_CHANGES;
+    }
+
+	@Override public boolean checkout(AbstractBuild build, Launcher launcher, FilePath workspace, BuildListener listener, File changelogFile) throws IOException, InterruptedException {
+        try {
+            resolve().restoreTo(workspace,listener);
+            return true;
+        } catch (ResolvedFailedException e) {
+            listener.error(e.getMessage()); // stack trace is meaningless
+            build.setResult(Result.FAILURE);
+            return false;
+        }
+    }
+
+	@Override public ChangeLogParser createChangeLogParser() {
+        return null;
+    }
+
+	@Override public SCMDescriptor<?> getDescriptor() {
+        return null;
+    }
+
+	/**
      * {@link Exception} indicating that the resolution of the job/permalink failed.
      */
     private final class ResolvedFailedException extends Exception {
@@ -86,64 +150,5 @@ public class WorkspaceSnapshotSCM extends SCM {
         void restoreTo(FilePath dst,TaskListener listener) throws IOException, InterruptedException {
             snapshot.restoreTo(owner,dst,listener);
         }
-    }
-    /**
-     * Obtains the {@link WorkspaceSnapshot} object that this {@link SCM} points to,
-     * or throws {@link hudson.fsp.WorkspaceSnapshotSCM.ResolvedFailedException} upon failing.
-     *
-     * @return never null.
-     */
-    public Snapshot resolve() throws ResolvedFailedException {
-        Jenkins h = Jenkins.get();
-        AbstractProject<?,?> job = h.getItemByFullName(jobName, AbstractProject.class);
-        if(job==null) {
-            if(h.getItemByFullName(jobName)==null) {
-                AbstractProject nearest = AbstractProject.findNearest(jobName);
-                throw new ResolvedFailedException(Messages.WorkspaceSnapshotSCM_NoSuchJob(jobName,nearest.getFullName()));
-            } else
-                throw new ResolvedFailedException(Messages.WorkspaceSnapshotSCM_IncorrectJobType(jobName));
-        }
-
-        PermalinkList permalinks = job.getPermalinks();
-        Permalink p = permalinks.get(permalink);
-        if(p==null)
-            throw new ResolvedFailedException(Messages.WorkspaceSnapshotSCM_NoSuchPermalink(permalink,jobName));
-
-        AbstractBuild<?,?> b = (AbstractBuild<?,?>)p.resolve(job);
-        if(b==null)
-            throw new ResolvedFailedException(Messages.WorkspaceSnapshotSCM_NoBuild(permalink,jobName));
-
-        WorkspaceSnapshot snapshot = b.getAction(WorkspaceSnapshot.class);
-        if(snapshot==null)
-            throw new ResolvedFailedException(Messages.WorkspaceSnapshotSCM_NoWorkspace(jobName,permalink));
-
-        return new Snapshot(snapshot,b);
-    }
-
-    @Override public SCMRevisionState calcRevisionsFromBuild(AbstractBuild<?, ?> build, Launcher launcher, TaskListener listener) throws IOException, InterruptedException {
-        return null;
-    }
-
-    @Override protected PollingResult compareRemoteRevisionWith(AbstractProject project, Launcher launcher, FilePath workspace, TaskListener listener, SCMRevisionState baseline) throws IOException, InterruptedException {
-        return PollingResult.NO_CHANGES;
-    }
-
-    @Override public boolean checkout(AbstractBuild build, Launcher launcher, FilePath workspace, BuildListener listener, File changelogFile) throws IOException, InterruptedException {
-        try {
-            resolve().restoreTo(workspace,listener);
-            return true;
-        } catch (ResolvedFailedException e) {
-            listener.error(e.getMessage()); // stack trace is meaningless
-            build.setResult(Result.FAILURE);
-            return false;
-        }
-    }
-
-    @Override public ChangeLogParser createChangeLogParser() {
-        return null;
-    }
-
-    @Override public SCMDescriptor<?> getDescriptor() {
-        return null;
     }
 }

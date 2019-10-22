@@ -40,15 +40,16 @@ import org.kohsuke.args4j.Argument;
  */
 @Extension
 public class ListJobsCommand extends CLICommand {
-    @Override
+    @Argument(metaVar="NAME",usage="Name of the view",required=false)
+    public String name;
+
+	@Override
     public String getShortDescription() {
         return Messages.ListJobsCommand_ShortDescription();
     }
 
-    @Argument(metaVar="NAME",usage="Name of the view",required=false)
-    public String name;
-
-    protected int run() throws Exception {
+	@Override
+	protected int run() throws Exception {
         Jenkins h = Jenkins.getActiveInstance();
         final Collection<TopLevelItem> jobs;
 
@@ -70,7 +71,7 @@ public class ListJobsCommand extends CLICommand {
                 }
                 // No view and no item group with the given name found.
                 else {
-                    throw new IllegalArgumentException("No view or item group with the given name '" + name + "' found.");
+                    throw new IllegalArgumentException(new StringBuilder().append("No view or item group with the given name '").append(name).append("' found.").toString());
                 }
             }
         }
@@ -80,9 +81,7 @@ public class ListJobsCommand extends CLICommand {
         }
 
         // Print all jobs.
-        for (TopLevelItem item : jobs) {
-            stdout.println(item.getName());
-        }
+		jobs.forEach(item -> stdout.println(item.getName()));
 
         return 0;
     }

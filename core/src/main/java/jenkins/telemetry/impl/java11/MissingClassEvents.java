@@ -100,8 +100,6 @@ public class MissingClassEvents {
 
     @Override
     public String toString() {
-        return "MissingClassEvents{" +
-                "events=" + events +
-                '}';
+        return new StringBuilder().append("MissingClassEvents{").append("events=").append(events).append('}').toString();
     }
 }

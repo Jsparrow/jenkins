@@ -48,73 +48,90 @@ public abstract class QueueTaskFilter implements Queue.Task {
         this.base = base;
     }
 
-    public Label getAssignedLabel() {
+    @Override
+	public Label getAssignedLabel() {
         return base.getAssignedLabel();
     }
 
-    public Node getLastBuiltOn() {
+    @Override
+	public Node getLastBuiltOn() {
         return base.getLastBuiltOn();
     }
 
-    @Deprecated
+    @Override
+	@Deprecated
     public boolean isBuildBlocked() {
         return base.isBuildBlocked();
     }
 
-    @Deprecated
+    @Override
+	@Deprecated
     public String getWhyBlocked() {
         return base.getWhyBlocked();
     }
 
-    public CauseOfBlockage getCauseOfBlockage() {
+    @Override
+	public CauseOfBlockage getCauseOfBlockage() {
         return base.getCauseOfBlockage();
     }
 
-    public String getName() {
+    @Override
+	public String getName() {
         return base.getName();
     }
 
-    public String getFullDisplayName() {
+    @Override
+	public String getFullDisplayName() {
         return base.getFullDisplayName();
     }
 
-    public long getEstimatedDuration() {
+    @Override
+	public long getEstimatedDuration() {
         return base.getEstimatedDuration();
     }
 
-    public @CheckForNull Executable createExecutable() throws IOException {
+    @Override
+	public @CheckForNull Executable createExecutable() throws IOException {
         return base.createExecutable();
     }
 
-    public void checkAbortPermission() {
+    @Override
+	public void checkAbortPermission() {
         base.checkAbortPermission();
     }
 
-    public boolean hasAbortPermission() {
+    @Override
+	public boolean hasAbortPermission() {
         return base.hasAbortPermission();
     }
 
-    public String getUrl() {
+    @Override
+	public String getUrl() {
         return base.getUrl();
     }
 
-    public boolean isConcurrentBuild() {
+    @Override
+	public boolean isConcurrentBuild() {
         return base.isConcurrentBuild();
     }
 
-    public String getDisplayName() {
+    @Override
+	public String getDisplayName() {
         return base.getDisplayName();
     }
 
-    public ResourceList getResourceList() {
+    @Override
+	public ResourceList getResourceList() {
         return base.getResourceList();
     }
 
-    public Collection<? extends SubTask> getSubTasks() {
+    @Override
+	public Collection<? extends SubTask> getSubTasks() {
         return base.getSubTasks();
     }
 
-    public Object getSameNodeConstraint() {
+    @Override
+	public Object getSameNodeConstraint() {
         return base.getSameNodeConstraint();
     }
 }

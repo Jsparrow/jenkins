@@ -96,7 +96,7 @@ public final class UserDetailsCache {
      * @throws UsernameNotFoundException if a previous lookup resulted in the same
      */
     @CheckForNull
-    public UserDetails getCached(String idOrFullName) throws UsernameNotFoundException {
+    public UserDetails getCached(String idOrFullName) {
         Boolean exists = existenceCache.getIfPresent(idOrFullName);
         if (exists != null && !exists) {
             throw new UserMayOrMayNotExistException(String.format("\"%s\" does not exist", idOrFullName));
@@ -118,7 +118,7 @@ public final class UserDetailsCache {
      * @throws ExecutionException if anything else went wrong in the cache lookup/retrieval
      */
     @Nonnull
-    public UserDetails loadUserByUsername(String idOrFullName) throws UsernameNotFoundException, DataAccessException, ExecutionException {
+    public UserDetails loadUserByUsername(String idOrFullName) throws ExecutionException {
         Boolean exists = existenceCache.getIfPresent(idOrFullName);
         if(exists != null && !exists) {
             throw new UsernameNotFoundException(String.format("\"%s\" does not exist", idOrFullName));
@@ -172,8 +172,7 @@ public final class UserDetailsCache {
                 UserDetails userDetails = jenkins.getSecurityRealm().loadUserByUsername(idOrFullName);
                 if (userDetails == null) {
                     existenceCache.put(this.idOrFullName, Boolean.FALSE);
-                    throw new NullPointerException("hudson.security.SecurityRealm should never return null. "
-                                                   + jenkins.getSecurityRealm() + " returned null for idOrFullName='" + idOrFullName + "'");
+                    throw new NullPointerException(new StringBuilder().append("hudson.security.SecurityRealm should never return null. ").append(jenkins.getSecurityRealm()).append(" returned null for idOrFullName='").append(idOrFullName).append("'").toString());
                 }
                 existenceCache.put(this.idOrFullName, Boolean.TRUE);
                 return userDetails;

@@ -15,7 +15,9 @@ import java.util.logging.Logger;
  * @since 1.378
  */
 public abstract class ComputerPinger implements ExtensionPoint {
-    /**
+    private static final Logger LOGGER = Logger.getLogger(ComputerPinger.class.getName());
+
+	/**
      * Is the specified address reachable?
      *
      * @param ia      The address to check.
@@ -23,14 +25,14 @@ public abstract class ComputerPinger implements ExtensionPoint {
      */
     public abstract boolean isReachable(InetAddress ia, int timeout) throws IOException;
 
-    /**
+	/**
      * Get all registered instances.
      */
     public static ExtensionList<ComputerPinger> all() {
         return ExtensionList.lookup(ComputerPinger.class);
     }
 
-    /**
+	/**
      * Is this computer reachable via the given address?
      *
      * @param ia      The address to check.
@@ -43,14 +45,14 @@ public abstract class ComputerPinger implements ExtensionPoint {
                     return true;
                 }
             } catch (IOException e) {
-                LOGGER.fine("Error checking reachability with " + pinger + ": " + e.getMessage());
+                LOGGER.fine(new StringBuilder().append("Error checking reachability with ").append(pinger).append(": ").append(e.getMessage()).toString());
             }
         }
 
         return false;
     }
-    
-    /**
+
+	/**
      * Default pinger - use Java built-in functionality.  This doesn't always work,
      * a host may be reachable even if this returns false.
      */
@@ -61,6 +63,4 @@ public abstract class ComputerPinger implements ExtensionPoint {
             return ia.isReachable((int)TimeUnit.SECONDS.toMillis(timeout));
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(ComputerPinger.class.getName());
 }

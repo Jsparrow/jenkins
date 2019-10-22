@@ -7,6 +7,7 @@ import hudson.model.Descriptor;
 import jenkins.model.Jenkins;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * {@link Descriptor} for {@link SCMCheckoutStrategy}.
@@ -35,10 +36,7 @@ public abstract class SCMCheckoutStrategyDescriptor extends Descriptor<SCMChecko
     
     public static List<SCMCheckoutStrategyDescriptor> _for(AbstractProject p) {
         List<SCMCheckoutStrategyDescriptor> r = Lists.newArrayList();
-        for (SCMCheckoutStrategyDescriptor d : all()) {
-            if (d.isApplicable(p))
-                r.add(d);
-        }
+        r.addAll(all().stream().filter(d -> d.isApplicable(p)).collect(Collectors.toList()));
         return r;
     }
                 

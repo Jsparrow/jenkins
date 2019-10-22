@@ -71,12 +71,7 @@ public class ToolLocationNodeProperty extends NodeProperty<Node> {
     }
 
     public String getHome(ToolInstallation installation) {
-        for (ToolLocation location : locations) {
-            if (location.getName().equals(installation.getName()) && location.getType() == installation.getDescriptor()) {
-                return location.getHome();
-            }
-        }
-        return null;
+        return locations.stream().filter(location -> location.getName().equals(installation.getName()) && location.getType() == installation.getDescriptor()).findFirst().map(ToolLocation::getHome).orElse(null);
     }
 
     /**
@@ -119,7 +114,8 @@ public class ToolLocationNodeProperty extends NodeProperty<Node> {
     @Extension @Symbol("toolLocation")
     public static class DescriptorImpl extends NodePropertyDescriptor {
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.ToolLocationNodeProperty_displayName();
         }
 
@@ -128,7 +124,7 @@ public class ToolLocationNodeProperty extends NodeProperty<Node> {
         }
 
         public String getKey(ToolInstallation installation) {
-            return installation.getDescriptor().getClass().getName() + "@" + installation.getName();
+            return new StringBuilder().append(installation.getDescriptor().getClass().getName()).append("@").append(installation.getName()).toString();
         }
 
         @Override
@@ -178,7 +174,7 @@ public class ToolLocationNodeProperty extends NodeProperty<Node> {
         }
 
         public String getKey() {
-            return type + "@" + name;
+            return new StringBuilder().append(type).append("@").append(name).toString();
         }
     }
 }

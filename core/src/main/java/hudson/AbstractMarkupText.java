@@ -83,7 +83,7 @@ public abstract class AbstractMarkupText {
      * @since 1.349
      */
     public void addHyperlink( int startPos, int endPos, String url ) {
-        addMarkup(startPos,endPos,"<a href='"+url+"'>","</a>");
+        addMarkup(startPos,endPos,new StringBuilder().append("<a href='").append(url).append("'>").toString(),"</a>");
     }
 
     /**
@@ -93,7 +93,7 @@ public abstract class AbstractMarkupText {
      * @since 1.395
      */
     public void addHyperlinkLowKey( int startPos, int endPos, String url ) {
-        addMarkup(startPos,endPos,"<a class='lowkey' href='"+url+"'>","</a>");
+        addMarkup(startPos,endPos,new StringBuilder().append("<a class='lowkey' href='").append(url).append("'>").toString(),"</a>");
     }
 
     /**
@@ -119,8 +119,9 @@ public abstract class AbstractMarkupText {
         String text = getText();
         Matcher m = pattern.matcher(text);
 
-        if(m.find())
-            return createSubText(m);
+        if(m.find()) {
+			return createSubText(m);
+		}
 
         return null;
     }
@@ -148,13 +149,17 @@ public abstract class AbstractMarkupText {
             if(idx>0) {
                 char ch = text.charAt(idx-1);
                 if(Character.isLetter(ch) || Character.isDigit(ch))
-                    continue;   // not at a word boundary
+				 {
+					continue;   // not at a word boundary
+				}
             }
             idx = m.end();
             if(idx<text.length()) {
                 char ch = text.charAt(idx);
                 if(Character.isLetter(ch) || Character.isDigit(ch))
-                    continue;   // not at a word boundary
+				 {
+					continue;   // not at a word boundary
+				}
             }
             r.add(createSubText(m));
         }

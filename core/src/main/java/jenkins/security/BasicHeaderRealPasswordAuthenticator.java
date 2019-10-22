@@ -41,12 +41,21 @@ import static java.util.logging.Level.*;
  */
 @Extension
 public class BasicHeaderRealPasswordAuthenticator extends BasicHeaderAuthenticator {
-    private AuthenticationDetailsSource authenticationDetailsSource = new AuthenticationDetailsSourceImpl();
+    private static final Logger LOGGER = Logger.getLogger(BasicHeaderRealPasswordAuthenticator.class.getName());
 
-    @Override
+	/**
+     * Legacy property to disable the real password support.
+     * Now that this is an extension, {@link ExtensionFilter} is a better way to control this.
+     */
+    public static boolean DISABLE = SystemProperties.getBoolean("jenkins.security.ignoreBasicAuth");
+
+	private AuthenticationDetailsSource authenticationDetailsSource = new AuthenticationDetailsSourceImpl();
+
+	@Override
     public Authentication authenticate(HttpServletRequest req, HttpServletResponse rsp, String username, String password) throws IOException, ServletException {
-        if (DISABLE)
-            return null;
+        if (DISABLE) {
+			return null;
+		}
 
         UsernamePasswordAuthenticationToken authRequest =
                 new UsernamePasswordAuthenticationToken(username, password);
@@ -63,12 +72,4 @@ public class BasicHeaderRealPasswordAuthenticator extends BasicHeaderAuthenticat
             return null;
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(BasicHeaderRealPasswordAuthenticator.class.getName());
-
-    /**
-     * Legacy property to disable the real password support.
-     * Now that this is an extension, {@link ExtensionFilter} is a better way to control this.
-     */
-    public static boolean DISABLE = SystemProperties.getBoolean("jenkins.security.ignoreBasicAuth");
 }

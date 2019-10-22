@@ -28,15 +28,27 @@ import java.util.TreeSet;
  * @author Kohsuke Kawaguchi
  */
 public class RegistryKey {
-    /**
+    //
+// Root keys
+//
+    public static final RegistryKey CLASSES_ROOT = new RegistryKey(0x80000000);
+
+	public static final RegistryKey CURRENT_USER = new RegistryKey(0x80000001);
+
+	public static final RegistryKey LOCAL_MACHINE = new RegistryKey(0x80000002);
+
+	public static final RegistryKey USERS = new RegistryKey(0x80000003);
+
+	/**
      * 32bit Windows key value.
      */
     private int handle;
 
-    private final RegistryKey root;
-    private final String path;
+	private final RegistryKey root;
 
-    /**
+	private final String path;
+
+	/**
      * Constructor for the root key.
      */
     private RegistryKey(int handle) {
@@ -45,19 +57,23 @@ public class RegistryKey {
         path = "";
     }
 
-    private RegistryKey(RegistryKey ancestor, String path,int handle) {
+	private RegistryKey(RegistryKey ancestor, String path,int handle) {
         this.handle = handle;
         this.root = ancestor.root;
         this.path = combine(ancestor.path,path);
     }
 
-    private static String combine(String a, String b) {
-        if(a.length()==0)   return b;
-        if(b.length()==0)   return a;
-        return a+'\\'+b;
+	private static String combine(String a, String b) {
+        if(a.isEmpty()) {
+			return b;
+		}
+        if(b.isEmpty()) {
+			return a;
+		}
+        return new StringBuilder().append(a).append('\\').append(b).toString();
     }
 
-    /**
+	/**
      * Converts a Windows buffer to a Java String.
      *
      * @param buf buffer
@@ -68,7 +84,7 @@ public class RegistryKey {
         return new String(buf, 0, buf.length - 2, StandardCharsets.UTF_16LE);
     }
 
-    /**
+	/**
      * Converts a Windows buffer to an int.
      *
      * @param buf buffer
@@ -78,19 +94,20 @@ public class RegistryKey {
         return ((buf[0] & 0xff) + ((buf[1] & 0xff) << 8) + ((buf[2] & 0xff) << 16) + ((buf[3] & 0xff) << 24));
     }
 
-    public String getStringValue(String valueName) {
+	public String getStringValue(String valueName) {
         return convertBufferToString(getValue(valueName));
     }
 
-    /**
+	/**
      * Read an int value.
      */
     public int getIntValue(String valueName) {
         return convertBufferToInt(getValue(valueName));
     }
 
-    private byte[] getValue(String valueName) {
-        IntByReference pType, lpcbData;
+	private byte[] getValue(String valueName) {
+        IntByReference pType;
+		IntByReference lpcbData;
         byte[] lpData = new byte[1];
 
         pType = new IntByReference();
@@ -111,16 +128,17 @@ public class RegistryKey {
         }
     }
 
-    public void deleteValue(String valueName) {
+	public void deleteValue(String valueName) {
         check(Advapi32.INSTANCE.RegDeleteValue(handle, valueName));
     }
 
-    private void check(int r) {
-        if (r != WINERROR.ERROR_SUCCESS)
-            throw new JnaException(r);
+	private void check(int r) {
+        if (r != WINERROR.ERROR_SUCCESS) {
+			throw new JnaException(r);
+		}
     }
 
-    /**
+	/**
      * Writes a String value.
      */
     public void setValue(String name, String value) {
@@ -131,7 +149,7 @@ public class RegistryKey {
         check(Advapi32.INSTANCE.RegSetValueEx(handle, name, 0, WINNT.REG_SZ, with0, with0.length));
     }
 
-    /**
+	/**
      * Writes a DWORD value.
      */
     public void setValue(String name, int value) {
@@ -144,11 +162,12 @@ public class RegistryKey {
         check(Advapi32.INSTANCE.RegSetValueEx(handle, name, 0, WINNT.REG_DWORD, data, data.length));
     }
 
-    /**
+	/**
      * Does a specified value exist?
      */
     public boolean valueExists(String name) {
-        IntByReference pType, lpcbData;
+        IntByReference pType;
+		IntByReference lpcbData;
         byte[] lpData = new byte[1];
 
         pType = new IntByReference();
@@ -171,7 +190,7 @@ public class RegistryKey {
         }
     }
 
-    /**
+	/**
      * Deletes this key (and disposes the key.)
      */
     public void delete() {
@@ -179,7 +198,7 @@ public class RegistryKey {
         dispose();
     }
 
-    /**
+	/**
      * Get all sub keys of a key.
      *
      * @return array with all sub key names
@@ -202,30 +221,33 @@ public class RegistryKey {
         return subKeys;
     }
 
-    public RegistryKey open(String subKeyName) {
+	public RegistryKey open(String subKeyName) {
         return open(subKeyName,0xF003F/*KEY_ALL_ACCESS*/);
     }
 
-    public RegistryKey openReadonly(String subKeyName) {
+	public RegistryKey openReadonly(String subKeyName) {
         return open(subKeyName,0x20019/*KEY_READ*/);
     }
 
-    public RegistryKey open(String subKeyName, int access) {
+	public RegistryKey open(String subKeyName, int access) {
         IntByReference pHandle = new IntByReference();
         check(Advapi32.INSTANCE.RegOpenKeyEx(handle, subKeyName, 0, access, pHandle));
         return new RegistryKey(this,subKeyName,pHandle.getValue());
     }
 
-    /**
+	/**
      * Get all values under a key.
      *
      * @return TreeMap with name and value pairs
      */
     public TreeMap<String, Object> getValues() {
-        int dwIndex, result;
+        int dwIndex;
+		int result;
         char[] lpValueName;
         byte[] lpData;
-        IntByReference lpcchValueName, lpType, lpcbData;
+        IntByReference lpcchValueName;
+		IntByReference lpType;
+		IntByReference lpcbData;
         String name;
         TreeMap<String, Object> values = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
 
@@ -274,24 +296,16 @@ public class RegistryKey {
         }
     }
 
-
-    @Override
+	@Override
     protected void finalize() throws Throwable {
         super.finalize();
         dispose();
     }
 
-    public void dispose() {
-        if(handle!=0)
-            Advapi32.INSTANCE.RegCloseKey(handle);
+	public void dispose() {
+        if(handle!=0) {
+			Advapi32.INSTANCE.RegCloseKey(handle);
+		}
         handle = 0;
     }
-
-    //
-// Root keys
-//
-    public static final RegistryKey CLASSES_ROOT = new RegistryKey(0x80000000);
-    public static final RegistryKey CURRENT_USER = new RegistryKey(0x80000001);
-    public static final RegistryKey LOCAL_MACHINE = new RegistryKey(0x80000002);
-    public static final RegistryKey USERS = new RegistryKey(0x80000003);
 }

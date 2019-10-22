@@ -38,11 +38,22 @@ import java.util.logging.Logger;
  */
 @Extension @Symbol("diskUsageCheck")
 public class HudsonHomeDiskUsageChecker extends PeriodicWork {
-    public long getRecurrencePeriod() {
+    private static final Logger LOGGER = Logger.getLogger(HudsonHomeDiskUsageChecker.class.getName());
+
+	/**
+     * Gets the minimum amount of space to check for, with a default of 10GB
+     */
+    public static long FREE_SPACE_THRESHOLD = Long.getLong(
+            HudsonHomeDiskUsageChecker.class.getName() + ".freeSpaceThreshold",
+            1024L*1024*1024*10);
+
+	@Override
+	public long getRecurrencePeriod() {
         return HOUR;
     }
 
-    protected void doRun() {
+	@Override
+	protected void doRun() {
             long free = Jenkins.get().getRootDir().getUsableSpace();
             long total = Jenkins.get().getRootDir().getTotalSpace();
             if(free<=0 || total<=0) {
@@ -52,7 +63,7 @@ public class HudsonHomeDiskUsageChecker extends PeriodicWork {
                 return;
             }
 
-            LOGGER.fine("Monitoring disk usage of JENKINS_HOME. total="+total+" free="+free);
+            LOGGER.fine(new StringBuilder().append("Monitoring disk usage of JENKINS_HOME. total=").append(total).append(" free=").append(free).toString());
 
 
             // if it's more than 90% full and less than the minimum, activate
@@ -60,14 +71,5 @@ public class HudsonHomeDiskUsageChecker extends PeriodicWork {
             // and similarly, if you have a 1TB disk, you don't get a warning when you still have 100GB to go.
             HudsonHomeDiskUsageMonitor.get().activated = (total/free>10 && free< FREE_SPACE_THRESHOLD);
     }
-
-    private static final Logger LOGGER = Logger.getLogger(HudsonHomeDiskUsageChecker.class.getName());
-
-    /**
-     * Gets the minimum amount of space to check for, with a default of 10GB
-     */
-    public static long FREE_SPACE_THRESHOLD = Long.getLong(
-            HudsonHomeDiskUsageChecker.class.getName() + ".freeSpaceThreshold",
-            1024L*1024*1024*10);
 
 }

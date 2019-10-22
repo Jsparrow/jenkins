@@ -37,22 +37,6 @@ class MissingClassEvent {
     private String stackTrace;
     private String className;
 
-    String getStackTrace() {
-        return stackTrace;
-    }
-
-    void setStackTrace(String stackTrace) {
-        this.stackTrace = stackTrace;
-    }
-
-    String getClassName() {
-        return className;
-    }
-
-    void setClassName(String className) {
-        this.className = className;
-    }
-
     MissingClassEvent(@Nonnull String name, @Nonnull Throwable t) {
         this.className = name;
 
@@ -64,29 +48,41 @@ class MissingClassEvent {
         this.occurrences = 1;
     }
 
-    String getTime() {
+	String getStackTrace() {
+        return stackTrace;
+    }
+
+	void setStackTrace(String stackTrace) {
+        this.stackTrace = stackTrace;
+    }
+
+	String getClassName() {
+        return className;
+    }
+
+	void setClassName(String className) {
+        this.className = className;
+    }
+
+	String getTime() {
         return time;
     }
 
-    long getOccurrences() {
+	long getOccurrences() {
         return occurrences;
     }
 
-    void setOccurrences(long occurrences) {
+	void setOccurrences(long occurrences) {
         this.occurrences = occurrences;
     }
 
-    void setTime(String time) {
+	void setTime(String time) {
         this.time = time;
     }
 
-    @Override
+	@Override
     public String toString() {
-        return "MissingClassEvent{" +
-                "time='" + time + '\'' +
-                ", occurrences=" + occurrences +
-                ", stackTrace='" + stackTrace + '\'' +
-                ", className='" + className + '\'' +
-                '}';
+        return new StringBuilder().append("MissingClassEvent{").append("time='").append(time).append('\'').append(", occurrences=").append(occurrences).append(", stackTrace='")
+				.append(stackTrace).append('\'').append(", className='").append(className).append('\'').append('}').toString();
     }
 }

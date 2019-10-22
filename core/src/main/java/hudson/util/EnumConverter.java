@@ -30,7 +30,8 @@ import org.apache.commons.beanutils.Converter;
  * @author Kohsuke Kawaguchi
  */
 public class EnumConverter implements Converter {
-    public Object convert(Class aClass, Object object) {
+    @Override
+	public Object convert(Class aClass, Object object) {
         return Enum.valueOf(aClass,object.toString());
     }
 }

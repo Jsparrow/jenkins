@@ -69,13 +69,23 @@ import java.io.IOException;
  * @since 1.249
  */
 public class BulkChange implements Closeable {
-    private final Saveable saveable;
-    public final Exception allocator;
-    private final BulkChange parent;
+    /**
+     * {@link BulkChange}s that are effective currently.
+     */
+    private static final ThreadLocal<BulkChange> INSCOPE = new ThreadLocal<>();
+	/**
+     * Magic {@link Saveable} instance that can make {@link BulkChange} veto
+     * all the save operations by making the {@link #contains(Saveable)} method return
+     * true for everything.
+     */
+    public static final Saveable ALL = () -> {
+	};
+	private final Saveable saveable;
+	public final Exception allocator;
+	private final BulkChange parent;
+	private boolean completed;
 
-    private boolean completed;
-
-    public BulkChange(Saveable saveable) {
+	public BulkChange(Saveable saveable) {
         this.parent = current();
         this.saveable = saveable;
         // remember who allocated this object in case
@@ -86,11 +96,13 @@ public class BulkChange implements Closeable {
         INSCOPE.set(this);
     }
 
-    /**
+	/**
      * Saves the accumulated changes.
      */
     public void commit() throws IOException {
-        if(completed)   return;
+        if(completed) {
+			return;
+		}
         completed = true;
 
         // move this object out of the scope first before save, or otherwise the save() method will do nothing.
@@ -98,7 +110,7 @@ public class BulkChange implements Closeable {
         saveable.save();
     }
 
-    /**
+	/**
      * Alias for {@link #abort()} to make {@link BulkChange} auto-closeable.
      */
     @Override
@@ -106,7 +118,7 @@ public class BulkChange implements Closeable {
         abort();
     }
 
-    /**
+	/**
      * Exits the scope of {@link BulkChange} without saving the changes.
      *
      * <p>
@@ -118,30 +130,28 @@ public class BulkChange implements Closeable {
      * This is so that {@link BulkChange} can be used naturally in the try/finally block.
      */
     public void abort() {
-        if(completed)   return;
+        if(completed) {
+			return;
+		}
         completed = true;
         pop();
     }
 
-    private void pop() {
-        if(current()!=this)
-            throw new AssertionError("Trying to save BulkChange that's not in scope");
+	private void pop() {
+        if(current()!=this) {
+			throw new AssertionError("Trying to save BulkChange that's not in scope");
+		}
         INSCOPE.set(parent);
     }
 
-    /**
-     * {@link BulkChange}s that are effective currently.
-     */
-    private static final ThreadLocal<BulkChange> INSCOPE = new ThreadLocal<>();
-
-    /**
+	/**
      * Gets the {@link BulkChange} instance currently in scope for the current thread.
      */
     public static BulkChange current() {
         return INSCOPE.get();
     }
 
-    /**
+	/**
      * Checks if the given {@link Saveable} is currently in the bulk change.
      *
      * <p>
@@ -149,19 +159,11 @@ public class BulkChange implements Closeable {
      * if the actual persistence should happen now or not.
      */
     public static boolean contains(Saveable s) {
-        for(BulkChange b=current(); b!=null; b=b.parent)
-            if(b.saveable==s || b.saveable==ALL)
-                return true;
+        for(BulkChange b=current(); b!=null; b=b.parent) {
+			if(b.saveable==s || b.saveable==ALL) {
+				return true;
+			}
+		}
         return false;
     }
-
-    /**
-     * Magic {@link Saveable} instance that can make {@link BulkChange} veto
-     * all the save operations by making the {@link #contains(Saveable)} method return
-     * true for everything.
-     */
-    public static final Saveable ALL = new Saveable() {
-        public void save() {
-        }
-    };
 }

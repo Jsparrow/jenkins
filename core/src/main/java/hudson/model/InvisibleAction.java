@@ -38,15 +38,18 @@ package hudson.model;
  * @since 1.188
  */
 public abstract class InvisibleAction implements Action {
-    public final String getIconFileName() {
+    @Override
+	public final String getIconFileName() {
         return null;
     }
 
-    public final String getDisplayName() {
+    @Override
+	public final String getDisplayName() {
         return null;
     }
 
-    public String getUrlName() {
+    @Override
+	public String getUrlName() {
         return null;
     }
 }

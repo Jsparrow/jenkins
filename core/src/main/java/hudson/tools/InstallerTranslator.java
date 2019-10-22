@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.concurrent.Semaphore;
+import java.util.Collections;
 
 /**
  * Actually runs installations.
@@ -40,11 +41,12 @@ import java.util.concurrent.Semaphore;
 @Extension
 public class InstallerTranslator extends ToolLocationTranslator {
 
-    private static final Map<Node,Map<ToolInstallation,Semaphore>> mutexByNode = new WeakHashMap<>();
+    private static final Map<Node,Map<ToolInstallation,Semaphore>> mutexByNode = Collections.unmodifiableMap(new WeakHashMap<>());
 
-    public String getToolHome(Node node, ToolInstallation tool, TaskListener log) throws IOException, InterruptedException {
+    @Override
+	public String getToolHome(Node node, ToolInstallation tool, TaskListener log) throws IOException, InterruptedException {
         if (node.getRootPath() == null) {
-            log.error(node.getDisplayName() + " is offline; cannot locate " + tool.getName());
+            log.error(new StringBuilder().append(node.getDisplayName()).append(" is offline; cannot locate ").append(tool.getName()).toString());
             return null;
         }
         InstallSourceProperty isp = tool.getProperties().get(InstallSourceProperty.class);
@@ -77,9 +79,7 @@ public class InstallerTranslator extends ToolLocationTranslator {
                         node.getDisplayName()));
             }
         }
-        for (String message : inapplicableInstallersMessages) {
-            log.getLogger().println(message);
-        }
+        inapplicableInstallersMessages.forEach(message -> log.getLogger().println(message));
         return null;
     }
 

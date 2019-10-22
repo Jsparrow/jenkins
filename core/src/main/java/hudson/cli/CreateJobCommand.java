@@ -36,19 +36,20 @@ import org.kohsuke.args4j.Argument;
  */
 @Extension
 public class CreateJobCommand extends CLICommand {
-    @Override
+    @Argument(metaVar="NAME",usage="Name of the job to create",required=true)
+    public String name;
+
+	@Override
     public String getShortDescription() {
         return Messages.CreateJobCommand_ShortDescription();
     }
 
-    @Argument(metaVar="NAME",usage="Name of the job to create",required=true)
-    public String name;
-
-    protected int run() throws Exception {
+	@Override
+	protected int run() throws Exception {
         Jenkins h = Jenkins.getActiveInstance();
 
         if (h.getItemByFullName(name)!=null) {
-            throw new IllegalStateException("Job '"+name+"' already exists");
+            throw new IllegalStateException(new StringBuilder().append("Job '").append(name).append("' already exists").toString());
         }
 
         ModifiableTopLevelItemGroup ig = h;

@@ -54,7 +54,8 @@ public class RingBufferLogHandler extends Handler {
         records = new LogRecord[ringSize];
     }
 
-    public synchronized void publish(LogRecord record) {
+    @Override
+	public synchronized void publish(LogRecord record) {
         int len = records.length;
         records[(start+size)%len]=record;
         if(size==len) {
@@ -77,20 +78,24 @@ public class RingBufferLogHandler extends Handler {
      */
     public List<LogRecord> getView() {
         return new AbstractList<LogRecord>() {
-            public LogRecord get(int index) {
+            @Override
+			public LogRecord get(int index) {
                 // flip the order
                 synchronized (RingBufferLogHandler.this) {
                     return records[(start+(size-(index+1)))%records.length];
                 }
             }
 
-            public int size() {
+            @Override
+			public int size() {
                 return size;
             }
         };
     }
 
     // noop
-    public void flush() {}
-    public void close() throws SecurityException {}
+    @Override
+	public void flush() {}
+    @Override
+	public void close() {}
 }

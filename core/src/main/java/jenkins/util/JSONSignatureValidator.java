@@ -46,13 +46,14 @@ import java.util.logging.Logger;
  * @since 1.482
  */
 public class JSONSignatureValidator {
-    private final String name;
+    private static final Logger LOGGER = Logger.getLogger(JSONSignatureValidator.class.getName());
+	private final String name;
 
-    public JSONSignatureValidator(String name) {
+	public JSONSignatureValidator(String name) {
         this.name = name;
     }
 
-    /**
+	/**
      * Verifies the signature in the update center data file.
      */
     public FormValidation verifySignature(JSONObject o) throws IOException {
@@ -103,7 +104,7 @@ public class JSONSignatureValidator {
                     case ERROR:
                         return resultSha512;
                     case WARNING:
-                        LOGGER.log(Level.INFO, "JSON data source '" + name + "' does not provide a SHA-512 content checksum or signature. Looking for SHA-1.");
+                        LOGGER.log(Level.INFO, new StringBuilder().append("JSON data source '").append(name).append("' does not provide a SHA-512 content checksum or signature. Looking for SHA-1.").toString());
                         break;
                     case OK:
                         // fall through
@@ -125,21 +126,22 @@ public class JSONSignatureValidator {
                 case WARNING:
                     if (resultSha512.kind == FormValidation.Kind.WARNING) {
                         // neither signature provided
-                        return FormValidation.error("No correct_signature or correct_signature512 entry found in '" + name + "'.");
+                        return FormValidation.error(new StringBuilder().append("No correct_signature or correct_signature512 entry found in '").append(name).append("'.").toString());
                     }
                 case OK:
                     // fall through
             }
 
-            if (warning!=null)  return warning;
+            if (warning!=null) {
+				return warning;
+			}
             return FormValidation.ok();
         } catch (GeneralSecurityException e) {
             return FormValidation.error(e, "Signature verification failed in "+name);
         }
     }
 
-
-    /**
+	/**
      * Computes the specified {@code digest} and {@code signature} for the provided {@code json} object and checks whether they match {@code digestEntry} and {@signatureEntry} in the provided {@code signatureJson} object.
      *
      * @param json the full update-center.json content
@@ -159,12 +161,12 @@ public class JSONSignatureValidator {
 
         String providedDigest = signatureJson.optString(digestEntry, null);
         if (providedDigest == null) {
-            return FormValidation.warning("No '" + digestEntry + "' found");
+            return FormValidation.warning(new StringBuilder().append("No '").append(digestEntry).append("' found").toString());
         }
 
         String providedSignature = signatureJson.optString(signatureEntry, null);
         if (providedSignature == null) {
-            return FormValidation.warning("No '" + signatureEntry + "' found");
+            return FormValidation.warning(new StringBuilder().append("No '").append(signatureEntry).append("' found").toString());
         }
 
         // until JENKINS-11110 fix, UC used to serve invalid digest (and therefore unverifiable signature)
@@ -188,7 +190,8 @@ public class JSONSignatureValidator {
         // (which is more likely than someone tampering with update center), we can tell
 
         if (!digestMatches(digest.digest(), providedDigest)) {
-            String msg = digestName + " digest mismatch: expected=" + providedDigest + " in '" + name + "'";
+            String msg = new StringBuilder().append(digestName).append(" digest mismatch: expected=").append(providedDigest).append(" in '").append(name).append("'")
+					.toString();
             if (LOGGER.isLoggable(Level.SEVERE)) {
                 LOGGER.severe(msg);
                 LOGGER.severe(json.toString(2));
@@ -197,13 +200,13 @@ public class JSONSignatureValidator {
         }
 
         if (!verifySignature(signature, providedSignature)) {
-            return FormValidation.error(digestName + " based signature in the update center doesn't match with the certificate in '"+name + "'");
+            return FormValidation.error(new StringBuilder().append(digestName).append(" based signature in the update center doesn't match with the certificate in '").append(name).append("'").toString());
         }
 
         return FormValidation.ok();
     }
 
-    /**
+	/**
      * Utility method supporting both possible signature formats: Base64 and Hex
      */
     private boolean verifySignature(Signature signature, String providedSignature) {
@@ -232,15 +235,14 @@ public class JSONSignatureValidator {
         return false;
     }
 
-    /**
+	/**
      * Utility method supporting both possible digest formats: Base64 and Hex
      */
     private boolean digestMatches(byte[] digest, String providedDigest) {
         return providedDigest.equalsIgnoreCase(Hex.encodeHexString(digest)) || providedDigest.equalsIgnoreCase(new String(Base64.getEncoder().encode(digest)));
     }
 
-
-    protected Set<TrustAnchor> loadTrustAnchors(CertificateFactory cf) throws IOException {
+	protected Set<TrustAnchor> loadTrustAnchors(CertificateFactory cf) throws IOException {
         // if we trust default root CAs, we end up trusting anyone who has a valid certificate,
         // which isn't useful at all
         Set<TrustAnchor> anchors = new HashSet<>(); // CertificateUtil.getDefaultRootCAs();
@@ -251,13 +253,13 @@ public class JSONSignatureValidator {
             }
             Certificate certificate;
             try (InputStream in = j.servletContext.getResourceAsStream(cert)) {
-                if (in == null) continue; // our test for paths ending in / should prevent this from happening
+                if (in == null)
+				 {
+					continue; // our test for paths ending in / should prevent this from happening
+				}
                 certificate = cf.generateCertificate(in);
             } catch (CertificateException e) {
-                LOGGER.log(Level.WARNING, String.format("Webapp resources in /WEB-INF/update-center-rootCAs are "
-                                + "expected to be either certificates or .txt files documenting the "
-                                + "certificates, but %s did not parse as a certificate. Skipping this "
-                                + "resource for now.",
+                LOGGER.log(Level.WARNING, String.format(new StringBuilder().append("Webapp resources in /WEB-INF/update-center-rootCAs are ").append("expected to be either certificates or .txt files documenting the ").append("certificates, but %s did not parse as a certificate. Skipping this ").append("resource for now.").toString(),
                         cert), e);
                 continue;
             }
@@ -285,9 +287,7 @@ public class JSONSignatureValidator {
                 } catch (InvalidPathException e) {
                     throw new IOException(e);
                 } catch (CertificateException e) {
-                    LOGGER.log(Level.WARNING, String.format("Files in %s are expected to be either "
-                                    + "certificates or .txt files documenting the certificates, "
-                                    + "but %s did not parse as a certificate. Skipping this file for now.",
+                    LOGGER.log(Level.WARNING, String.format(new StringBuilder().append("Files in %s are expected to be either ").append("certificates or .txt files documenting the certificates, ").append("but %s did not parse as a certificate. Skipping this file for now.").toString(),
                             cert.getParentFile().getAbsolutePath(),
                             cert.getAbsolutePath()), e);
                     continue;
@@ -307,6 +307,4 @@ public class JSONSignatureValidator {
         }
         return anchors;
     }
-
-    private static final Logger LOGGER = Logger.getLogger(JSONSignatureValidator.class.getName());
 }

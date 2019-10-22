@@ -43,10 +43,10 @@ public class CliCrumbExclusion extends CrumbExclusion {
     @Override
     public boolean process(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws IOException, ServletException {
         String pathInfo = request.getPathInfo();
-        if ("/cli".equals(pathInfo)) {
-            chain.doFilter(request, response);
-            return true;
-        }
-        return false;
+        if (!"/cli".equals(pathInfo)) {
+			return false;
+		}
+		chain.doFilter(request, response);
+		return true;
     }
 }

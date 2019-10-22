@@ -56,44 +56,50 @@ public final class ContainerAuthentication implements Authentication {
     public ContainerAuthentication(HttpServletRequest request) {
         this.principal = request.getUserPrincipal();
         if (principal==null)
-            throw new IllegalStateException(); // for anonymous users, we just don't call SecurityContextHolder.getContext().setAuthentication.   
+		 {
+			throw new IllegalStateException(); // for anonymous users, we just don't call SecurityContextHolder.getContext().setAuthentication.   
+		}
 
         // Servlet API doesn't provide a way to list up all roles the current user
         // has, so we need to ask AuthorizationStrategy what roles it is going to check against.
         List<GrantedAuthority> l = new ArrayList<>();
-        for( String g : Jenkins.get().getAuthorizationStrategy().getGroups()) {
-            if(request.isUserInRole(g))
-                l.add(new GrantedAuthorityImpl(g));
-        }
+        Jenkins.get().getAuthorizationStrategy().getGroups().stream().filter(request::isUserInRole).forEach(g -> l.add(new GrantedAuthorityImpl(g)));
         l.add(SecurityRealm.AUTHENTICATED_AUTHORITY);
         authorities = l.toArray(new GrantedAuthority[0]);
     }
 
-    public GrantedAuthority[] getAuthorities() {
+    @Override
+	public GrantedAuthority[] getAuthorities() {
         return authorities;
     }
 
-    public Object getCredentials() {
+    @Override
+	public Object getCredentials() {
         return null;
     }
 
-    public Object getDetails() {
+    @Override
+	public Object getDetails() {
         return null;
     }
 
-    public String getPrincipal() {
+    @Override
+	public String getPrincipal() {
         return principal.getName();
     }
 
-    public boolean isAuthenticated() {
+    @Override
+	public boolean isAuthenticated() {
         return true;
     }
 
-    public void setAuthenticated(boolean isAuthenticated) throws IllegalArgumentException {
+    @Override
+	public void setAuthenticated(boolean isAuthenticated) {
         // noop
     }
 
-    public String getName() {
+    @Override
+	public String getName() {
         return getPrincipal();
     }
 }

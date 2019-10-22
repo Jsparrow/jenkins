@@ -66,7 +66,8 @@ public abstract class MyViewsTabBar extends AbstractDescribableImpl<MyViewsTabBa
         return Jenkins.get().getDescriptorList(MyViewsTabBar.class);
     }
 
-    public MyViewsTabBarDescriptor getDescriptor() {
+    @Override
+	public MyViewsTabBarDescriptor getDescriptor() {
         return (MyViewsTabBarDescriptor)super.getDescriptor();
     }
 

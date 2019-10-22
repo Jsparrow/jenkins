@@ -39,28 +39,29 @@ import org.kohsuke.stapler.StaplerRequest;
  */
 public class DefaultCrumbIssuer extends CrumbIssuer {
     
-    private transient MessageDigest md;
-    private boolean excludeClientIPFromCrumb;
-
     @Restricted(NoExternalUse.class)
     public static /* non-final: Groovy Console */ boolean EXCLUDE_SESSION_ID = SystemProperties.getBoolean(DefaultCrumbIssuer.class.getName() + ".EXCLUDE_SESSION_ID");
+	private static final String X_FORWARDED_FOR = "X-Forwarded-For";
+	private static final Logger LOGGER = Logger.getLogger(DefaultCrumbIssuer.class.getName());
+	private transient MessageDigest md;
+	private boolean excludeClientIPFromCrumb;
 
-    @DataBoundConstructor
+	@DataBoundConstructor
     public DefaultCrumbIssuer(boolean excludeClientIPFromCrumb) {
         this.excludeClientIPFromCrumb = excludeClientIPFromCrumb;
         initializeMessageDigest();
     }
 
-    public boolean isExcludeClientIPFromCrumb() {
+	public boolean isExcludeClientIPFromCrumb() {
         return this.excludeClientIPFromCrumb;
     }
-    
-    private Object readResolve() {
+
+	private Object readResolve() {
         initializeMessageDigest();
         return this;
     }
 
-    private void initializeMessageDigest() {
+	private void initializeMessageDigest() {
         try {
             md = MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException e) {
@@ -68,35 +69,34 @@ public class DefaultCrumbIssuer extends CrumbIssuer {
             LOGGER.log(Level.SEVERE, e, () -> "Cannot find SHA-256 MessageDigest implementation.");
         }
     }
-    
-    /**
+
+	/**
      * {@inheritDoc}
      */
     @Override
     protected synchronized String issueCrumb(ServletRequest request, String salt) {
-        if (request instanceof HttpServletRequest) {
-            if (md != null) {
-                HttpServletRequest req = (HttpServletRequest) request;
-                StringBuilder buffer = new StringBuilder();
-                Authentication a = Jenkins.getAuthentication();
-                buffer.append(a.getName());
-                buffer.append(';');
-                if (!isExcludeClientIPFromCrumb()) {
-                    buffer.append(getClientIP(req));
-                }
-                if (!EXCLUDE_SESSION_ID) {
-                    buffer.append(';');
-                    buffer.append(req.getSession().getId());
-                }
+        boolean condition = request instanceof HttpServletRequest && md != null;
+		if (condition) {
+		    HttpServletRequest req = (HttpServletRequest) request;
+		    StringBuilder buffer = new StringBuilder();
+		    Authentication a = Jenkins.getAuthentication();
+		    buffer.append(a.getName());
+		    buffer.append(';');
+		    if (!isExcludeClientIPFromCrumb()) {
+		        buffer.append(getClientIP(req));
+		    }
+		    if (!EXCLUDE_SESSION_ID) {
+		        buffer.append(';');
+		        buffer.append(req.getSession().getId());
+		    }
 
-                md.update(buffer.toString().getBytes());
-                return Util.toHexString(md.digest(salt.getBytes()));
-            }
-        }
+		    md.update(buffer.toString().getBytes());
+		    return Util.toHexString(md.digest(salt.getBytes()));
+		}
         return null;
     }
 
-    /**
+	/**
      * {@inheritDoc}
      */
     @Override
@@ -112,9 +112,7 @@ public class DefaultCrumbIssuer extends CrumbIssuer {
         return false;
     }
 
-    private static final String X_FORWARDED_FOR = "X-Forwarded-For";
-
-    private String getClientIP(HttpServletRequest req) {
+	private String getClientIP(HttpServletRequest req) {
         String defaultAddress = req.getRemoteAddr();
         String forwarded = req.getHeader(X_FORWARDED_FOR);
         if (forwarded != null) {
@@ -125,11 +123,11 @@ public class DefaultCrumbIssuer extends CrumbIssuer {
         }
         return defaultAddress;
     }
-    
-    @Extension @Symbol("standard")
+
+	@Extension @Symbol("standard")
     public static final class DescriptorImpl extends CrumbIssuerDescriptor<DefaultCrumbIssuer> implements ModelObject, PersistentDescriptor {
 
-        private final static HexStringConfidentialKey CRUMB_SALT = new HexStringConfidentialKey(Jenkins.class,"crumbSalt",16);
+        private static final HexStringConfidentialKey CRUMB_SALT = new HexStringConfidentialKey(Jenkins.class,"crumbSalt",16);
         
         public DescriptorImpl() {
             super(CRUMB_SALT.get(), SystemProperties.getString("hudson.security.csrf.requestfield", CrumbIssuer.DEFAULT_CRUMB_NAME));
@@ -150,6 +148,4 @@ public class DefaultCrumbIssuer extends CrumbIssuer {
             return req.bindJSON(DefaultCrumbIssuer.class, formData);
         }
     }
-    
-    private static final Logger LOGGER = Logger.getLogger(DefaultCrumbIssuer.class.getName());
 }

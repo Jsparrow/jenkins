@@ -35,6 +35,7 @@ import java.lang.reflect.ParameterizedType;
 import jenkins.model.OptionalJobProperty;
 
 import net.sf.json.JSONObject;
+import java.util.stream.Collectors;
 
 /**
  * {@link Descriptor} for {@link JobProperty}.
@@ -67,7 +68,9 @@ public abstract class JobPropertyDescriptor extends Descriptor<JobProperty<?>> {
     public JobProperty<?> newInstance(StaplerRequest req, JSONObject formData) throws FormException {
         // JobPropertyDescriptors are bit different in that we allow them even without any user-visible configuration parameter,
         // so replace the lack of form data by an empty one. 
-        if(formData.isNullObject()) formData=new JSONObject();
+        if(formData.isNullObject()) {
+			formData=new JSONObject();
+		}
 
         return super.newInstance(req, formData);
     }
@@ -100,9 +103,7 @@ public abstract class JobPropertyDescriptor extends Descriptor<JobProperty<?>> {
      */
     public static List<JobPropertyDescriptor> getPropertyDescriptors(Class<? extends Job> clazz) {
         List<JobPropertyDescriptor> r = new ArrayList<>();
-        for (JobPropertyDescriptor p : all())
-            if(p.isApplicable(clazz))
-                r.add(p);
+        r.addAll(all().stream().filter(p -> p.isApplicable(clazz)).collect(Collectors.toList()));
         return r;
     }
 

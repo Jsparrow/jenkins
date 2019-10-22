@@ -46,39 +46,40 @@ import javax.annotation.Nonnull;
  * @author Kohsuke Kawaguchi
  */
 public class ArgumentListBuilder implements Serializable, Cloneable {
-    private final List<String> args = new ArrayList<>();
-    /**
+    private static final long serialVersionUID = 1L;
+	private final List<String> args = new ArrayList<>();
+	/**
      * Bit mask indicating arguments that shouldn't be echoed-back (e.g., password)
      */
     private BitSet mask = new BitSet();
 
-    public ArgumentListBuilder() {
+	public ArgumentListBuilder() {
     }
 
-    public ArgumentListBuilder(String... args) {
+	public ArgumentListBuilder(String... args) {
         add(args);
     }
 
-    public ArgumentListBuilder add(Object a) {
+	public ArgumentListBuilder add(Object a) {
         return add(a.toString(), false);
     }
 
-    /**
+	/**
      * @since 1.378
      */
     public ArgumentListBuilder add(Object a, boolean mask) {
         return add(a.toString(), mask);
     }
 
-    public ArgumentListBuilder add(File f) {
+	public ArgumentListBuilder add(File f) {
         return add(f.getAbsolutePath(), false);
     }
 
-    public ArgumentListBuilder add(String a) {
+	public ArgumentListBuilder add(String a) {
         return add(a,false);
     }
 
-    /**
+	/**
      * Optionally hide this part of the command line from being printed to the log.
      * @param a a command argument
      * @param mask true to suppress in output, false to print normally
@@ -96,19 +97,20 @@ public class ArgumentListBuilder implements Serializable, Cloneable {
         }
         return this;
     }
-    
-    public ArgumentListBuilder prepend(String... args) {
+
+	public ArgumentListBuilder prepend(String... args) {
         // left-shift the mask
         BitSet nm = new BitSet(this.args.size()+args.length);
-        for(int i=0; i<this.args.size(); i++)
-            nm.set(i+args.length, mask.get(i));
+        for(int i=0; i<this.args.size(); i++) {
+			nm.set(i+args.length, mask.get(i));
+		}
         mask = nm;
 
         this.args.addAll(0, Arrays.asList(args));
         return this;
     }
 
-    /**
+	/**
      * Adds an argument by quoting it.
      * This is necessary only in a rare circumstance,
      * such as when adding argument for ssh and rsh.
@@ -117,24 +119,24 @@ public class ArgumentListBuilder implements Serializable, Cloneable {
      * argument is treated as its own string and never merged into one. 
      */
     public ArgumentListBuilder addQuoted(String a) {
-        return add('"'+a+'"', false);
+        return add(new StringBuilder().append('"').append(a).append('"').toString(), false);
     }
 
-    /**
+	/**
      * @since 1.378
      */
     public ArgumentListBuilder addQuoted(String a, boolean mask) {
-        return add('"'+a+'"', mask);
+        return add(new StringBuilder().append('"').append(a).append('"').toString(), mask);
     }
 
-    public ArgumentListBuilder add(String... args) {
+	public ArgumentListBuilder add(String... args) {
         for (String arg : args) {
             add(arg);
         }
         return this;
     }
-    
-    /**
+
+	/**
      * @since 2.72
      */
     public ArgumentListBuilder add(@Nonnull Iterable<String> args) {
@@ -144,37 +146,40 @@ public class ArgumentListBuilder implements Serializable, Cloneable {
         return this;
     }
 
-    /**
+	/**
      * Decomposes the given token into multiple arguments by splitting via whitespace.
      */
     public ArgumentListBuilder addTokenized(String s) {
-        if(s==null) return this;
+        if(s==null) {
+			return this;
+		}
         add(Util.tokenize(s));
         return this;
     }
 
-    /**
+	/**
      * @since 1.378
      */
     public ArgumentListBuilder addKeyValuePair(String prefix, String key, String value, boolean mask) {
-        if(key==null) return this;
-        add(((prefix==null)?"-D":prefix)+key+'='+value, mask);
+        if(key==null) {
+			return this;
+		}
+        add(new StringBuilder().append((prefix==null)?"-D":prefix).append(key).append('=').append(value).toString(), mask);
         return this;
     }
 
-    /**
+	/**
      * Adds key value pairs as "-Dkey=value -Dkey=value ..."
      *
      * {@code -D} portion is configurable as the 'prefix' parameter.
      * @since 1.114
      */
     public ArgumentListBuilder addKeyValuePairs(String prefix, Map<String,String> props) {
-        for (Entry<String,String> e : props.entrySet())
-            addKeyValuePair(prefix, e.getKey(), e.getValue(), false);
+        props.entrySet().forEach(e -> addKeyValuePair(prefix, e.getKey(), e.getValue(), false));
         return this;
     }
 
-    /**
+	/**
      * Adds key value pairs as "-Dkey=value -Dkey=value ..." with masking.
      *
      * @param prefix
@@ -187,13 +192,11 @@ public class ArgumentListBuilder implements Serializable, Cloneable {
      * @since 1.378
      */
     public ArgumentListBuilder addKeyValuePairs(String prefix, Map<String,String> props, Set<String> propsToMask) {
-        for (Entry<String,String> e : props.entrySet()) {
-            addKeyValuePair(prefix, e.getKey(), e.getValue(), (propsToMask != null) && propsToMask.contains(e.getKey()));
-        }
+        props.entrySet().forEach(e -> addKeyValuePair(prefix, e.getKey(), e.getValue(), (propsToMask != null) && propsToMask.contains(e.getKey())));
         return this;
     }
 
-    /**
+	/**
      * Adds key value pairs as "-Dkey=value -Dkey=value ..." by parsing a given string using {@link Properties}.
      *
      * @param prefix
@@ -209,7 +212,7 @@ public class ArgumentListBuilder implements Serializable, Cloneable {
         return addKeyValuePairsFromPropertyString(prefix, properties, vr, null);
     }
 
-    /**
+	/**
      * Adds key value pairs as "-Dkey=value -Dkey=value ..." by parsing a given string using {@link Properties} with masking.
      *
      * @param prefix
@@ -225,17 +228,18 @@ public class ArgumentListBuilder implements Serializable, Cloneable {
      * @since 1.378
      */
     public ArgumentListBuilder addKeyValuePairsFromPropertyString(String prefix, String properties, VariableResolver<String> vr, Set<String> propsToMask) throws IOException {
-        if(properties==null)    return this;
+        if(properties==null) {
+			return this;
+		}
 
         properties = Util.replaceMacro(properties, propertiesGeneratingResolver(vr));
 
-        for (Entry<Object,Object> entry : Util.loadProperties(properties).entrySet()) {
-            addKeyValuePair(prefix, (String)entry.getKey(), entry.getValue().toString(), (propsToMask != null) && propsToMask.contains(entry.getKey()));
-        }
+        Util.loadProperties(properties).entrySet().forEach(entry -> addKeyValuePair(prefix, (String) entry.getKey(), entry.getValue().toString(),
+				(propsToMask != null) && propsToMask.contains(entry.getKey())));
         return this;
     }
 
-    /**
+	/**
      * Creates a resolver generating values to be safely placed in properties string.
      *
      * {@link Properties#load} generally removes single backslashes from input and that
@@ -248,22 +252,21 @@ public class ArgumentListBuilder implements Serializable, Cloneable {
      */
     private static VariableResolver<String> propertiesGeneratingResolver(final VariableResolver<String> original) {
 
-        return new VariableResolver<String>() {
-
-            public String resolve(String name) {
-                final String value = original.resolve(name);
-                if (value == null) return null;
-                // Substitute one backslash with two
-                return value.replaceAll("\\\\", "\\\\\\\\");
-            }
-        };
+        return (String name) -> {
+		    final String value = original.resolve(name);
+		    if (value == null) {
+				return null;
+			}
+		    // Substitute one backslash with two
+		    return value.replaceAll("\\\\", "\\\\\\\\");
+		};
     }
 
-    public String[] toCommandArray() {
+	public String[] toCommandArray() {
         return args.toArray(new String[0]);
     }
-    
-    @Override
+
+	@Override
     public ArgumentListBuilder clone() {
         ArgumentListBuilder r = new ArgumentListBuilder();
         r.args.addAll(this.args);
@@ -271,7 +274,7 @@ public class ArgumentListBuilder implements Serializable, Cloneable {
         return r;
     }
 
-    /**
+	/**
      * Re-initializes the arguments list.
      */
     public void clear() {
@@ -279,28 +282,31 @@ public class ArgumentListBuilder implements Serializable, Cloneable {
         mask.clear();
     }
 
-    public List<String> toList() {
+	public List<String> toList() {
         return args;
     }
 
-    /**
+	/**
      * Just adds quotes around args containing spaces, but no other special characters,
      * so this method should generally be used only for informational/logging purposes.
      */
     public String toStringWithQuote() {
         StringBuilder buf = new StringBuilder();
-        for (String arg : args) {
-            if(buf.length()>0)  buf.append(' ');
+        args.forEach(arg -> {
+            if(buf.length()>0) {
+				buf.append(' ');
+			}
 
-            if(arg.indexOf(' ')>=0 || arg.length()==0)
-                buf.append('"').append(arg).append('"');
-            else
-                buf.append(arg);
-        }
+            if(arg.indexOf(' ')>=0 || arg.isEmpty()) {
+				buf.append('"').append(arg).append('"');
+			} else {
+				buf.append(arg);
+			}
+        });
         return buf.toString();
     }
 
-    /**
+	/**
      * Wrap command in a {@code CMD.EXE} call so we can return the exit code ({@code ERRORLEVEL}).
      * This method takes care of escaping special characters in the command, which
      * is needed since the command is now passed as a string to the {@code CMD.EXE} shell.
@@ -326,7 +332,8 @@ public class ArgumentListBuilder implements Serializable, Cloneable {
      */
     public ArgumentListBuilder toWindowsCommand(boolean escapeVars) {
     	ArgumentListBuilder windowsCommand = new ArgumentListBuilder().add("cmd.exe", "/C");
-        boolean quoted, percent;
+        boolean quoted;
+		boolean percent;
         for (int i = 0; i < args.size(); i++) {
             StringBuilder quotedArgs = new StringBuilder();
             String arg = args.get(i);
@@ -337,21 +344,30 @@ public class ArgumentListBuilder implements Serializable, Cloneable {
                     quoted = startQuoting(quotedArgs, arg, j);
                 }
                 else if (c == '^' || c == '&' || c == '<' || c == '>' || c == '|') {
-                    if (!quoted) quoted = startQuoting(quotedArgs, arg, j);
-                    // quotedArgs.append('^'); See note in javadoc above
+                    if (!quoted)
+					 {
+						quoted = startQuoting(quotedArgs, arg, j);
+						// quotedArgs.append('^'); See note in javadoc above
+					}
                 }
                 else if (c == '"') {
-                    if (!quoted) quoted = startQuoting(quotedArgs, arg, j);
+                    if (!quoted) {
+						quoted = startQuoting(quotedArgs, arg, j);
+					}
                     quotedArgs.append('"');
                 }
                 else if (percent && escapeVars
                          && ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'))) {
-                    if (!quoted) quoted = startQuoting(quotedArgs, arg, j);
+                    if (!quoted) {
+						quoted = startQuoting(quotedArgs, arg, j);
+					}
                     quotedArgs.append('"').append(c);
                     c = '"';
                 }
                 percent = (c == '%');
-                if (quoted) quotedArgs.append(c);
+                if (quoted) {
+					quotedArgs.append(c);
+				}
             }
             if (i == 0) {
                 if (quoted) {
@@ -360,7 +376,11 @@ public class ArgumentListBuilder implements Serializable, Cloneable {
                     quotedArgs.append('"');
                 }
             }
-            if (quoted) quotedArgs.append('"'); else quotedArgs.append(arg);
+            if (quoted) {
+				quotedArgs.append('"');
+			} else {
+				quotedArgs.append(arg);
+			}
             
             windowsCommand.add(quotedArgs, mask.get(i));
         }
@@ -373,7 +393,7 @@ public class ArgumentListBuilder implements Serializable, Cloneable {
         return windowsCommand;
     }
 
-    /**
+	/**
      * Calls toWindowsCommand(false)
      * @see #toWindowsCommand(boolean)
      */
@@ -381,12 +401,12 @@ public class ArgumentListBuilder implements Serializable, Cloneable {
         return toWindowsCommand(false);
     }
 
-    private static boolean startQuoting(StringBuilder buf, String arg, int atIndex) {
+	private static boolean startQuoting(StringBuilder buf, String arg, int atIndex) {
         buf.append('"').append(arg, 0, atIndex);
         return true;
     }
 
-    /**
+	/**
      * Returns true if there are any masked arguments.
      * @return true if there are any masked arguments; false otherwise
      */
@@ -394,18 +414,19 @@ public class ArgumentListBuilder implements Serializable, Cloneable {
         return mask.length()>0;
     }
 
-    /**
+	/**
      * Returns an array of booleans where the masked arguments are marked as true
      * @return an array of booleans.
      */
     public boolean[] toMaskArray() {
         boolean[] mask = new boolean[args.size()];
-        for( int i=0; i<mask.length; i++)
-            mask[i] = this.mask.get(i);
+        for( int i=0; i<mask.length; i++) {
+			mask[i] = this.mask.get(i);
+		}
         return mask;
     }
 
-    /**
+	/**
      * Add a masked argument
      * @param string the argument
      */
@@ -413,29 +434,32 @@ public class ArgumentListBuilder implements Serializable, Cloneable {
         add(string, true);
     }
 
-    public ArgumentListBuilder addMasked(Secret s) {
+	public ArgumentListBuilder addMasked(Secret s) {
         return add(Secret.toString(s),true);
     }
 
-    /**
+	/**
      * Debug/error message friendly output.
      */
-    public String toString() {
+    @Override
+	public String toString() {
         StringBuilder buf = new StringBuilder();
         for (int i=0; i<args.size(); i++) {
             String arg = args.get(i);
-            if (mask.get(i))
-                arg = "******";
+            if (mask.get(i)) {
+				arg = "******";
+			}
 
-            if(buf.length()>0)  buf.append(' ');
+            if(buf.length()>0) {
+				buf.append(' ');
+			}
 
-            if(arg.indexOf(' ')>=0 || arg.length()==0)
-                buf.append('"').append(arg).append('"');
-            else
-                buf.append(arg);
+            if(arg.indexOf(' ')>=0 || arg.isEmpty()) {
+				buf.append('"').append(arg).append('"');
+			} else {
+				buf.append(arg);
+			}
         }
         return buf.toString();
     }
-
-    private static final long serialVersionUID = 1L;
 }

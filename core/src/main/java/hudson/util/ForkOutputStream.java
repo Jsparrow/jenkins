@@ -38,7 +38,8 @@ public class ForkOutputStream extends OutputStream {
         this.rhs = rhs;
     }
 
-    public void write(int b) throws IOException {
+    @Override
+	public void write(int b) throws IOException {
         lhs.write(b);
         rhs.write(b);
     }

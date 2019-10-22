@@ -43,20 +43,20 @@ import java.util.logging.Logger;
  */
 @Extension
 public class DisconnectNodeCommand extends CLICommand {
-    @Argument(metaVar = "NAME", usage = "Slave name, or empty string for master; comma-separated list is supported", required = true, multiValued = true)
-    private List<String> nodes;
-
-    @Option(name = "-m", usage = "Record the reason about why you are disconnecting this node")
-    public String cause;
-
     private static final Logger LOGGER = Logger.getLogger(DisconnectNodeCommand.class.getName());
 
-    @Override
+	@Argument(metaVar = "NAME", usage = "Slave name, or empty string for master; comma-separated list is supported", required = true, multiValued = true)
+    private List<String> nodes;
+
+	@Option(name = "-m", usage = "Record the reason about why you are disconnecting this node")
+    public String cause;
+
+	@Override
     public String getShortDescription() {
         return Messages.DisconnectNodeCommand_ShortDescription();
     }
 
-    @Override
+	@Override
     protected int run() throws Exception {
         boolean errorOccurred = false;
         final Jenkins jenkins = Jenkins.getActiveInstance();
@@ -87,7 +87,7 @@ public class DisconnectNodeCommand extends CLICommand {
                     throw e;
                 }
 
-                stderr.println(node_s + ": " + e.getMessage());
+                stderr.println(new StringBuilder().append(node_s).append(": ").append(e.getMessage()).toString());
                 errorOccurred = true;
                 continue;
             }

@@ -55,7 +55,7 @@ public class EnvVarsTest {
         env.put("A", "Value1");
 
         EnvVars overrides = new EnvVars();
-        overrides.put("PATH", "append" + Platform.current().pathSeparator + "${PATH}");
+        overrides.put("PATH", new StringBuilder().append("append").append(Platform.current().pathSeparator).append("${PATH}").toString());
         overrides.put("B", "${A}Value2");
         overrides.put("C", "${B}${D}");
         overrides.put("D", "${E}");
@@ -65,7 +65,7 @@ public class EnvVarsTest {
         env.overrideExpandingAll(overrides);
 
         assertEquals("Value1Value2Value3", env.get("C"));
-        assertEquals("another" + Platform.current().pathSeparator + "append" + Platform.current().pathSeparator + "orig", env.get("PATH"));
+        assertEquals(new StringBuilder().append("another").append(Platform.current().pathSeparator).append("append").append(Platform.current().pathSeparator).append("orig").toString(), env.get("PATH"));
     }
 
     @Test
@@ -120,7 +120,7 @@ public class EnvVarsTest {
 
         OverrideOrderCalculator calc = new OverrideOrderCalculator(env, overrides);
         List<String> order = calc.getOrderedVariableNames();
-        assertEquals(Arrays.asList("PATH"), order);
+        assertEquals(Collections.singletonList("PATH"), order);
     }
 
     @Test

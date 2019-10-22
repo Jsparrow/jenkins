@@ -48,28 +48,34 @@ import org.acegisecurity.ui.webapp.AuthenticationProcessingFilter;
  * @author Kohsuke Kawaguchi
  */
 public class AuthenticationProcessingFilter2 extends AuthenticationProcessingFilter {
-    @Override
+    private static final Logger LOGGER = Logger.getLogger(AuthenticationProcessingFilter2.class.getName());
+
+	@Override
     protected String determineTargetUrl(HttpServletRequest request) {
         String targetUrl = request.getParameter("from");
         request.getSession().setAttribute("from", targetUrl);
 
-        if (targetUrl == null)
-            return getDefaultTargetUrl();
+        if (targetUrl == null) {
+			return getDefaultTargetUrl();
+		}
 
         if (!Util.isSafeToRedirectTo(targetUrl))
-            return "."; // avoid open redirect
+		 {
+			return "."; // avoid open redirect
+		}
 
         // URL returned from determineTargetUrl() is resolved against the context path,
         // whereas the "from" URL is resolved against the top of the website, so adjust this.
-        if(targetUrl.startsWith(request.getContextPath()))
-            return targetUrl.substring(request.getContextPath().length());
+        if(targetUrl.startsWith(request.getContextPath())) {
+			return targetUrl.substring(request.getContextPath().length());
+		}
 
         // not sure when this happens, but apparently this happens in some case.
         // see #1274
         return targetUrl;
     }
 
-    /**
+	/**
      * @see org.acegisecurity.ui.AbstractProcessingFilter#determineFailureUrl(javax.servlet.http.HttpServletRequest, org.acegisecurity.AuthenticationException)
      */
     @Override
@@ -81,7 +87,7 @@ public class AuthenticationProcessingFilter2 extends AuthenticationProcessingFil
 		return excMap.getProperty(failedClassName, getAuthenticationFailureUrl());
     }
 
-    @Override
+	@Override
     protected void onSuccessfulAuthentication(HttpServletRequest request, HttpServletResponse response, Authentication authResult) throws IOException {
         super.onSuccessfulAuthentication(request,response,authResult);
         // make sure we have a session to store this successful authentication, given that we no longer
@@ -106,7 +112,7 @@ public class AuthenticationProcessingFilter2 extends AuthenticationProcessingFil
         SecurityListener.fireLoggedIn(authResult.getName());
     }
 
-    /**
+	/**
      * Leave the information about login failure.
      *
      * <p>
@@ -121,6 +127,4 @@ public class AuthenticationProcessingFilter2 extends AuthenticationProcessingFil
             SecurityListener.fireFailedToLogIn(auth.getName());
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(AuthenticationProcessingFilter2.class.getName());
 }

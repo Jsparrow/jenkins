@@ -68,6 +68,14 @@ import java.util.List;
  */
 public abstract class PageDecorator extends Descriptor<PageDecorator> implements ExtensionPoint, Describable<PageDecorator> {
     /**
+     * All the registered instances.
+     * @deprecated as of 1.286
+     *      Use {@link #all()} for read access, and use {@link Extension} for registration.
+     */
+    @Deprecated
+    public static final List<PageDecorator> ALL = (List) new DescriptorList<>(PageDecorator.class);
+
+	/**
      * @param yourClass
      *      pass-in "this.getClass()" (except that the constructor parameters cannot use 'this',
      *      so you'd have to hard-code the class name.
@@ -79,19 +87,20 @@ public abstract class PageDecorator extends Descriptor<PageDecorator> implements
         super(yourClass);
     }
 
-    protected PageDecorator() {
+	protected PageDecorator() {
         super(self());
     }
 
-    // this will never work because Descriptor and Describable are the same thing.
+	// this will never work because Descriptor and Describable are the same thing.
 //    protected PageDecorator() {
 //    }
 
-    public final Descriptor<PageDecorator> getDescriptor() {
+    @Override
+	public final Descriptor<PageDecorator> getDescriptor() {
         return this;
     }
 
-    /**
+	/**
      * Obtains the URL of this object, excluding the context path.
      *
      * <p>
@@ -102,15 +111,7 @@ public abstract class PageDecorator extends Descriptor<PageDecorator> implements
         return "descriptor/"+clazz.getName();
     }
 
-    /**
-     * All the registered instances.
-     * @deprecated as of 1.286
-     *      Use {@link #all()} for read access, and use {@link Extension} for registration.
-     */
-    @Deprecated
-    public static final List<PageDecorator> ALL = (List) new DescriptorList<>(PageDecorator.class);
-
-    /**
+	/**
      * Returns all the registered {@link PageDecorator} descriptors.
      */
     public static ExtensionList<PageDecorator> all() {

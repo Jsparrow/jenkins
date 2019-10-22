@@ -81,12 +81,11 @@ public class UpdateSiteWarningsConfiguration extends GlobalConfiguration impleme
     public Set<UpdateSite.Warning> getAllWarnings() {
         HashSet<UpdateSite.Warning> allWarnings = new HashSet<>();
 
-        for (UpdateSite site : Jenkins.get().getUpdateCenter().getSites()) {
-            UpdateSite.Data data = site.getData();
-            if (data != null) {
+        Jenkins.get().getUpdateCenter().getSites().stream().map(UpdateSite::getData).forEach(data -> {
+			if (data != null) {
                 allWarnings.addAll(data.getWarnings());
             }
-        }
+		});
         return allWarnings;
     }
 
@@ -95,11 +94,7 @@ public class UpdateSiteWarningsConfiguration extends GlobalConfiguration impleme
         Set<UpdateSite.Warning> allWarnings = getAllWarnings();
 
         HashSet<UpdateSite.Warning> applicableWarnings = new HashSet<>();
-        for (UpdateSite.Warning warning: allWarnings) {
-            if (warning.isRelevant()) {
-                applicableWarnings.add(warning);
-            }
-        }
+        allWarnings.stream().filter(UpdateSite.Warning::isRelevant).forEach(applicableWarnings::add);
 
         return Collections.unmodifiableSet(applicableWarnings);
     }

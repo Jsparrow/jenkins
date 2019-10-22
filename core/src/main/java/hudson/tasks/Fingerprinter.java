@@ -86,69 +86,73 @@ import jenkins.tasks.SimpleBuildStep;
  */
 public class Fingerprinter extends Recorder implements Serializable, DependencyDeclarer, SimpleBuildStep {
     public static boolean enableFingerprintsInDependencyGraph = SystemProperties.getBoolean(Fingerprinter.class.getName() + ".enableFingerprintsInDependencyGraph");
-    
-    /**
+
+	private static final Logger logger = Logger.getLogger(Fingerprinter.class.getName());
+
+	private static final long serialVersionUID = 1L;
+
+	/**
      * Comma-separated list of files/directories to be fingerprinted.
      */
     private final String targets;
 
-    /**
+	/**
      * Default null 'excludes' pattern as in Ant.
      */
     private String excludes = null;
 
-    /**
+	/**
      * Default ant exclusion
      */
     private Boolean defaultExcludes = true;
 
-    /**
+	/**
      * Indicate whether include and exclude patterns should be considered as case sensitive
      */
     private Boolean caseSensitive = true;
 
-    @Deprecated
+	@Deprecated
     Boolean recordBuildArtifacts;
 
-    @DataBoundConstructor public Fingerprinter(String targets) {
+	@DataBoundConstructor public Fingerprinter(String targets) {
         this.targets = targets;
     }
 
-    @DataBoundSetter public void setExcludes(String excludes) {
-        this.excludes = Util.fixEmpty(excludes);
-    }
-
-    @DataBoundSetter public void setDefaultExcludes(boolean defaultExcludes) {
-        this.defaultExcludes = defaultExcludes;
-    }
-
-    @DataBoundSetter public void setCaseSensitive(boolean caseSensitive) {
-        this.caseSensitive = caseSensitive;
-    }
-
-    @Deprecated
+	@Deprecated
     public Fingerprinter(String targets, boolean recordBuildArtifacts) {
         this(targets);
         this.recordBuildArtifacts = recordBuildArtifacts;
     }
 
-    public String getTargets() {
+	@DataBoundSetter public void setExcludes(String excludes) {
+        this.excludes = Util.fixEmpty(excludes);
+    }
+
+	@DataBoundSetter public void setDefaultExcludes(boolean defaultExcludes) {
+        this.defaultExcludes = defaultExcludes;
+    }
+
+	@DataBoundSetter public void setCaseSensitive(boolean caseSensitive) {
+        this.caseSensitive = caseSensitive;
+    }
+
+	public String getTargets() {
         return targets;
     }
 
-    public String getExcludes() {
+	public String getExcludes() {
         return excludes;
     }
 
-    public boolean getDefaultExcludes() {
+	public boolean getDefaultExcludes() {
         return defaultExcludes;
     }
 
-    public boolean getCaseSensitive() {
+	public boolean getCaseSensitive() {
         return caseSensitive;
     }
 
-    /**
+	/**
      * We ensure that fields are initialized to
      * default values after deserialization.
      */
@@ -162,12 +166,12 @@ public class Fingerprinter extends Recorder implements Serializable, DependencyD
         return this;
     }
 
-    @Deprecated
+	@Deprecated
     public boolean getRecordBuildArtifacts() {
         return recordBuildArtifacts != null && recordBuildArtifacts;
     }
 
-    @Override
+	@Override
     public void perform(Run<?,?> build, FilePath workspace, Launcher launcher, TaskListener listener) throws InterruptedException {
         try {
             listener.getLogger().println(Messages.Fingerprinter_Recording());
@@ -198,69 +202,82 @@ public class Fingerprinter extends Recorder implements Serializable, DependencyD
         // failing to record fingerprints is an error but not fatal
     }
 
-    public BuildStepMonitor getRequiredMonitorService() {
+	@Override
+	public BuildStepMonitor getRequiredMonitorService() {
         return BuildStepMonitor.NONE;
     }
 
-    public void buildDependencyGraph(AbstractProject owner, DependencyGraph graph) {
-        if (enableFingerprintsInDependencyGraph) {
-            RunList builds = owner.getBuilds();
-            Set<String> seenUpstreamProjects = new HashSet<>();
+	@Override
+	public void buildDependencyGraph(AbstractProject owner, DependencyGraph graph) {
+        if (!enableFingerprintsInDependencyGraph) {
+			return;
+		}
+		RunList builds = owner.getBuilds();
+		Set<String> seenUpstreamProjects = new HashSet<>();
+		for (Object build1 : builds) {
+		    Run build = (Run) build1;
+		    for (FingerprintAction action : build.getActions(FingerprintAction.class)) {
+		        for (AbstractProject key : action.getDependencies().keySet()) {
+		            if (key == owner) {
+		                continue;   // Avoid self references
+		            }
 
-            for (Object build1 : builds) {
-                Run build = (Run) build1;
-                for (FingerprintAction action : build.getActions(FingerprintAction.class)) {
-                    for (AbstractProject key : action.getDependencies().keySet()) {
-                        if (key == owner) {
-                            continue;   // Avoid self references
-                        }
+		            AbstractProject p = key;
+		            // TODO is this harmful to call unconditionally, so it would apply also to MavenModule for example?
+		            if ("hudson.matrix.MatrixConfiguration".equals(key.getClass().getName())) {
+		                p = key.getRootProject();
+		            }
 
-                        AbstractProject p = key;
-                        // TODO is this harmful to call unconditionally, so it would apply also to MavenModule for example?
-                        if (key.getClass().getName().equals("hudson.matrix.MatrixConfiguration")) {
-                            p = key.getRootProject();
-                        }
+		            if (seenUpstreamProjects.contains(p.getName())) {
+		                continue;
+		            }
 
-                        if (seenUpstreamProjects.contains(p.getName())) {
-                            continue;
-                        }
-
-                        seenUpstreamProjects.add(p.getName());
-                        graph.addDependency(new Dependency(p, owner) {
-                            @Override
-                            public boolean shouldTriggerBuild(AbstractBuild build,
-                                                              TaskListener listener,
-                                                              List<Action> actions) {
-                                // Fingerprints should not trigger builds.
-                                return false;
-                            }
-                        });
-                    }
-                }
-            }
-        }
+		            seenUpstreamProjects.add(p.getName());
+		            graph.addDependency(new Dependency(p, owner) {
+		                @Override
+		                public boolean shouldTriggerBuild(AbstractBuild build,
+		                                                  TaskListener listener,
+		                                                  List<Action> actions) {
+		                    // Fingerprints should not trigger builds.
+		                    return false;
+		                }
+		            });
+		        }
+		    }
+		}
     }
 
+	private void record(Run<?,?> build, FilePath ws, TaskListener listener, Map<String,String> record, final String targets) throws IOException, InterruptedException {
+        for (Record r : ws.act(new FindRecords(targets, excludes, defaultExcludes, caseSensitive, build.getTimeInMillis()))) {
+            Fingerprint fp = r.addRecord(build);
+            if(fp==null) {
+                listener.error(Messages.Fingerprinter_FailedFor(r.relativePath));
+                continue;
+            }
+            fp.addFor(build);
+            record.put(r.relativePath,fp.getHashString());
+        }
+    }
+    
     private static final class Record implements Serializable {
 
-        final boolean produced;
-        final String relativePath;
-        final String fileName;
-        final String md5sum;
+        private static final long serialVersionUID = 1L;
+		final boolean produced;
+		final String relativePath;
+		final String fileName;
+		final String md5sum;
 
-        public Record(boolean produced, String relativePath, String fileName, String md5sum) {
+		public Record(boolean produced, String relativePath, String fileName, String md5sum) {
             this.produced = produced;
             this.relativePath = relativePath;
             this.fileName = fileName;
             this.md5sum = md5sum;
         }
 
-        Fingerprint addRecord(Run build) throws IOException {
+		Fingerprint addRecord(Run build) throws IOException {
             FingerprintMap map = Jenkins.get().getFingerprintMap();
             return map.getOrCreate(produced?build:null, fileName, md5sum);
         }
-
-        private static final long serialVersionUID = 1L;
     }
 
     private static final class FindRecords extends MasterToSlaveFileCallable<List<Record>> {
@@ -310,21 +327,10 @@ public class Fingerprinter extends Recorder implements Serializable, DependencyD
 
     }
 
-    private void record(Run<?,?> build, FilePath ws, TaskListener listener, Map<String,String> record, final String targets) throws IOException, InterruptedException {
-        for (Record r : ws.act(new FindRecords(targets, excludes, defaultExcludes, caseSensitive, build.getTimeInMillis()))) {
-            Fingerprint fp = r.addRecord(build);
-            if(fp==null) {
-                listener.error(Messages.Fingerprinter_FailedFor(r.relativePath));
-                continue;
-            }
-            fp.addFor(build);
-            record.put(r.relativePath,fp.getHashString());
-        }
-    }
-
     @Extension @Symbol("fingerprint")
     public static class DescriptorImpl extends BuildStepDescriptor<Publisher> {
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.Fingerprinter_DisplayName();
         }
 
@@ -345,7 +351,8 @@ public class Fingerprinter extends Recorder implements Serializable, DependencyD
             return req.bindJSON(Fingerprinter.class, formData);
         }
 
-        public boolean isApplicable(Class<? extends AbstractProject> jobType) {
+        @Override
+		public boolean isApplicable(Class<? extends AbstractProject> jobType) {
             return true;
         }
     }
@@ -355,88 +362,90 @@ public class Fingerprinter extends Recorder implements Serializable, DependencyD
      */
     public static final class FingerprintAction implements RunAction2 {
 
-        private transient Run build;
-        
         private static final Random rand = new Random();
 
-        /**
+		private transient Run build;
+
+		/**
          * From file name to the digest.
          */
         private /*almost final*/ PackedMap<String,String> record;
 
-        private transient WeakReference<Map<String,Fingerprint>> ref;
+		private transient WeakReference<Map<String,Fingerprint>> ref;
 
-        public FingerprintAction(Run build, Map<String, String> record) {
+		public FingerprintAction(Run build, Map<String, String> record) {
             this.build = build;
             this.record = compact(record);
         }
 
-        @Deprecated
+		@Deprecated
         public FingerprintAction(AbstractBuild build, Map<String, String> record) {
             this((Run) build, record);
         }
 
-        public void add(Map<String,String> moreRecords) {
+		public void add(Map<String,String> moreRecords) {
             Map<String,String> r = new HashMap<>(record);
             r.putAll(moreRecords);
             record = compact(r);
             ref = null;
         }
 
-        public String getIconFileName() {
+		@Override
+		public String getIconFileName() {
             return "fingerprint.png";
         }
 
-        public String getDisplayName() {
+		@Override
+		public String getDisplayName() {
             return Messages.Fingerprinter_Action_DisplayName();
         }
 
-        public String getUrlName() {
+		@Override
+		public String getUrlName() {
             return "fingerprints";
         }
 
-        public Run getRun() {
+		public Run getRun() {
             return build;
         }
 
-        @Deprecated
+		@Deprecated
         public AbstractBuild getBuild() {
             return build instanceof AbstractBuild ? (AbstractBuild) build : null;
         }
 
-        /**
+		/**
          * Obtains the raw data.
          */
         public Map<String,String> getRecords() {
             return record;
         }
 
-        @Override public void onLoad(Run<?,?> r) {
+		@Override public void onLoad(Run<?,?> r) {
             build = r;
             record = compact(record);
         }
 
-        @Override public void onAttached(Run<?,?> r) {
+		@Override public void onAttached(Run<?,?> r) {
             // for historical reasons this setup is done in the constructor instead
         }
 
-        /** Share data structure with other builds, mainly those of the same job. */
+		/** Share data structure with other builds, mainly those of the same job. */
         private PackedMap<String,String> compact(Map<String,String> record) {
             Map<String,String> b = new HashMap<>();
-            for (Entry<String,String> e : record.entrySet()) {
-                b.put(e.getKey().intern(), e.getValue().intern());
-            }
+            record.entrySet().forEach(e -> b.put(e.getKey().intern(), e.getValue().intern()));
             return PackedMap.of(b);
         }
 
-        /**
+		/**
          * Map from file names of the fingerprinted file to its fingerprint record.
          */
         public synchronized Map<String,Fingerprint> getFingerprints() {
             if(ref!=null) {
                 Map<String,Fingerprint> m = ref.get();
-                if(m!=null)
-                    return m;
+                if(m!=null) {
+					return m;
+				}
             }
 
             Jenkins h = Jenkins.get();
@@ -445,8 +454,9 @@ public class Fingerprinter extends Recorder implements Serializable, DependencyD
             for (Entry<String, String> r : record.entrySet()) {
                 try {
                     Fingerprint fp = h._getFingerprint(r.getValue());
-                    if(fp!=null)
-                        m.put(r.getKey(), fp);
+                    if(fp!=null) {
+						m.put(r.getKey(), fp);
+					}
                 } catch (IOException e) {
                     logger.log(Level.WARNING,e.getMessage(),e);
                 }
@@ -457,14 +467,14 @@ public class Fingerprinter extends Recorder implements Serializable, DependencyD
             return m;
         }
 
-        /**
+		/**
          * Gets the dependency to other existing builds in a map.
          */
         public Map<AbstractProject,Integer> getDependencies() {
             return getDependencies(false);
         }
-        
-        /**
+
+		/**
          * Gets the dependency to other builds in a map.
          *
          * @param includeMissing true if the original build should be included in
@@ -476,25 +486,40 @@ public class Fingerprinter extends Recorder implements Serializable, DependencyD
 
             for (Fingerprint fp : getFingerprints().values()) {
                 BuildPtr bp = fp.getOriginal();
-                if(bp==null)    continue;       // outside Hudson
-                if(bp.is(build))    continue;   // we are the owner
+                if(bp==null)
+				 {
+					continue;       // outside Hudson
+				}
+                if(bp.is(build))
+				 {
+					continue;   // we are the owner
+				}
 
                 try {
                     Job job = bp.getJob();
-                    if (job==null)  continue;   // project no longer exists
+                    if (job==null)
+					 {
+						continue;   // project no longer exists
+					}
                     if (!(job instanceof AbstractProject)) {
                         // Ignoring this for now. In the future we may want a dependency map function not limited to AbstractProject.
                         // (Could be used by getDependencyChanges if pulled up from AbstractBuild into Run, for example.)
                         continue;
                     }
                     if (job.getParent()==build.getParent())
-                        continue;   // we are the parent of the build owner, that is almost like we are the owner
+					 {
+						continue;   // we are the parent of the build owner, that is almost like we are the owner
+					}
                     if(!includeMissing && job.getBuildByNumber(bp.getNumber())==null)
-                        continue;               // build no longer exists
+					 {
+						continue;               // build no longer exists
+					}
 
                     Integer existing = r.get(job);
                     if(existing!=null && existing>bp.getNumber())
-                        continue;   // the record in the map is already up to date
+					 {
+						continue;   // the record in the map is already up to date
+					}
                     r.put((AbstractProject) job, bp.getNumber());
                 } catch (AccessDeniedException e) {
                     // Need to log in to access this job, so ignore
@@ -506,8 +531,4 @@ public class Fingerprinter extends Recorder implements Serializable, DependencyD
             return r;
         }
     }
-
-    private static final Logger logger = Logger.getLogger(Fingerprinter.class.getName());
-
-    private static final long serialVersionUID = 1L;
 }

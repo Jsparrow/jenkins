@@ -501,9 +501,7 @@ public class HistoryPageFilterTest {
         //TODO: Rewrite in functional style when Java 8 is available
         private List<ParameterValue> buildPropertiesMapToParameterValues(Map<String, String> buildParametersAsMap) {
             List<ParameterValue> parameterValues = new ArrayList<>();
-            for (Map.Entry<String, String> parameter : buildParametersAsMap.entrySet()) {
-                parameterValues.add(new StringParameterValue(parameter.getKey(), parameter.getValue()));
-            }
+            buildParametersAsMap.entrySet().forEach(parameter -> parameterValues.add(new StringParameterValue(parameter.getKey(), parameter.getValue())));
             return parameterValues;
         }
 

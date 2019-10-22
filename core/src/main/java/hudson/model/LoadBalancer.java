@@ -52,6 +52,89 @@ import java.util.logging.Logger;
  */
 public abstract class LoadBalancer implements ExtensionPoint {
     /**
+     * Uses a consistent hash for scheduling.
+     */
+    public static final LoadBalancer CONSISTENT_HASH = new LoadBalancer() {
+        @Override
+        public Mapping map(Task task, MappingWorksheet ws) {
+            // build consistent hash for each work chunk
+            List<ConsistentHash<ExecutorChunk>> hashes = new ArrayList<>(ws.works.size());
+            for (int i=0; i<ws.works.size(); i++) {
+                ConsistentHash<ExecutorChunk> hash = new ConsistentHash<>(new Hash<ExecutorChunk>() {
+                    @Override
+					public String hash(ExecutorChunk node) {
+                        return node.getName();
+                    }
+                });
+
+                // Build a Map to pass in rather than repeatedly calling hash.add() because each call does lots of expensive work
+                List<ExecutorChunk> chunks = ws.works(i).applicableExecutorChunks();
+                Map<ExecutorChunk, Integer> toAdd = Maps.newHashMapWithExpectedSize(chunks.size());
+                chunks.forEach(ec -> toAdd.put(ec, ec.size() * 100));
+                hash.addAll(toAdd);
+
+                hashes.add(hash);
+            }
+
+            // do a greedy assignment
+            Mapping m = ws.new Mapping();
+            assert m.size()==ws.works.size();   // just so that you the reader of the source code don't get confused with the for loop index
+
+            if (assignGreedily(m,task,hashes,0)) {
+                assert m.isCompletelyValid();
+                return m;
+            } else {
+				return null;
+			}
+        }
+
+        private boolean assignGreedily(Mapping m, Task task, List<ConsistentHash<ExecutorChunk>> hashes, int i) {
+            if (i==hashes.size())
+			 {
+				return true;    // fully assigned
+			}
+
+            String key;
+            try {
+                key = task.getAffinityKey();
+            } catch (RuntimeException e) {
+                LOGGER.log(Level.FINE, null, e);
+                // Default implementation of Queue.Task.getAffinityKey, we assume it doesn't fail.
+                key = task.getFullDisplayName();
+            }
+            key += i > 0 ? String.valueOf(i) : "";
+
+            for (ExecutorChunk ec : hashes.get(i).list(key)) {
+                // let's attempt this assignment
+                m.assign(i,ec);
+
+                if (m.isPartiallyValid() && assignGreedily(m,task,hashes,i+1))
+				 {
+					return true;    // successful greedily allocation
+				}
+
+                // otherwise 'ec' wasn't a good fit for us. try next.
+            }
+
+            // every attempt failed
+            m.assign(i,null);
+            return false;
+        }
+    };
+
+	/**
+     * Traditional implementation of this.
+     *
+     * @deprecated as of 1.377
+     *      The only implementation in the core now is the one based on consistent hash.
+     */
+    @Deprecated
+    public static final LoadBalancer DEFAULT = CONSISTENT_HASH;
+
+	private static final Logger LOGGER = Logger.getLogger(LoadBalancer.class.getName());
+
+
+	/**
      * Chooses the executor(s) to carry out the build for the given task.
      *
      * <p>
@@ -74,83 +157,7 @@ public abstract class LoadBalancer implements ExtensionPoint {
      */
     public abstract Mapping map(Task task, MappingWorksheet worksheet);
 
-    /**
-     * Uses a consistent hash for scheduling.
-     */
-    public static final LoadBalancer CONSISTENT_HASH = new LoadBalancer() {
-        @Override
-        public Mapping map(Task task, MappingWorksheet ws) {
-            // build consistent hash for each work chunk
-            List<ConsistentHash<ExecutorChunk>> hashes = new ArrayList<>(ws.works.size());
-            for (int i=0; i<ws.works.size(); i++) {
-                ConsistentHash<ExecutorChunk> hash = new ConsistentHash<>(new Hash<ExecutorChunk>() {
-                    public String hash(ExecutorChunk node) {
-                        return node.getName();
-                    }
-                });
-
-                // Build a Map to pass in rather than repeatedly calling hash.add() because each call does lots of expensive work
-                List<ExecutorChunk> chunks = ws.works(i).applicableExecutorChunks();
-                Map<ExecutorChunk, Integer> toAdd = Maps.newHashMapWithExpectedSize(chunks.size());
-                for (ExecutorChunk ec : chunks) {
-                    toAdd.put(ec, ec.size()*100);
-                }
-                hash.addAll(toAdd);
-
-                hashes.add(hash);
-            }
-
-            // do a greedy assignment
-            Mapping m = ws.new Mapping();
-            assert m.size()==ws.works.size();   // just so that you the reader of the source code don't get confused with the for loop index
-
-            if (assignGreedily(m,task,hashes,0)) {
-                assert m.isCompletelyValid();
-                return m;
-            } else
-                return null;
-        }
-
-        private boolean assignGreedily(Mapping m, Task task, List<ConsistentHash<ExecutorChunk>> hashes, int i) {
-            if (i==hashes.size())   return true;    // fully assigned
-
-            String key;
-            try {
-                key = task.getAffinityKey();
-            } catch (RuntimeException e) {
-                LOGGER.log(Level.FINE, null, e);
-                // Default implementation of Queue.Task.getAffinityKey, we assume it doesn't fail.
-                key = task.getFullDisplayName();
-            }
-            key += i > 0 ? String.valueOf(i) : "";
-
-            for (ExecutorChunk ec : hashes.get(i).list(key)) {
-                // let's attempt this assignment
-                m.assign(i,ec);
-
-                if (m.isPartiallyValid() && assignGreedily(m,task,hashes,i+1))
-                    return true;    // successful greedily allocation
-
-                // otherwise 'ec' wasn't a good fit for us. try next.
-            }
-
-            // every attempt failed
-            m.assign(i,null);
-            return false;
-        }
-    };
-
-    /**
-     * Traditional implementation of this.
-     *
-     * @deprecated as of 1.377
-     *      The only implementation in the core now is the one based on consistent hash.
-     */
-    @Deprecated
-    public static final LoadBalancer DEFAULT = CONSISTENT_HASH;
-
-
-    /**
+	/**
      * Wraps this {@link LoadBalancer} into a decorator that tests the basic sanity of the implementation.
      * Only override this if you find some of the checks excessive, but beware that it's like driving without a seat belt.
      */
@@ -176,7 +183,5 @@ public abstract class LoadBalancer implements ExtensionPoint {
             }
         };
     }
-
-    private static final Logger LOGGER = Logger.getLogger(LoadBalancer.class.getName());
 
 }

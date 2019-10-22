@@ -39,7 +39,8 @@ public class CliLink extends ManagementLink {
         return "terminal.png";
     }
 
-    public String getDisplayName() {
+    @Override
+	public String getDisplayName() {
         return Messages.CliLink_DisplayName();
     }
 

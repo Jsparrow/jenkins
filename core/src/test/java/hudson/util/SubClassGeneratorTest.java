@@ -32,15 +32,6 @@ import org.junit.Test;
  */
 public class SubClassGeneratorTest {
 
-    public static class Foo {
-        String s;
-        double x;
-        int y;
-        public Foo() {}
-        public Foo(String s) {this.s=s;}
-        public Foo(double x, int y) {this.x=x;this.y=y;}
-    }
-
     @Test
     public void foo() throws Exception {
         Class<? extends Foo> c = new SubClassGenerator(getClass().getClassLoader()).generate(Foo.class, "12345");
@@ -54,5 +45,14 @@ public class SubClassGeneratorTest {
         f = c.getConstructor(double.class,int.class).newInstance(1.0,3);
         assertEquals(1.0,f.x,0);
         assertEquals(3,f.y);
+    }
+
+	public static class Foo {
+        String s;
+        double x;
+        int y;
+        public Foo() {}
+        public Foo(String s) {this.s=s;}
+        public Foo(double x, int y) {this.x=x;this.y=y;}
     }
 }

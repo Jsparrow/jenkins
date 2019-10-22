@@ -39,30 +39,12 @@ import org.kohsuke.stapler.QueryParameter;
 
 public class RunParameterDefinition extends SimpleParameterDefinition {
 
-    /**
-     * Constants that control how Run Parameter is filtered.
-     * @since 1.517
-     */
-    public enum RunParameterFilter {
-        ALL,
-        STABLE,
-        SUCCESSFUL,
-        COMPLETED;
+    private static final Logger LOGGER = Logger.getLogger(RunParameterDefinition.class.getName());
+	private final String projectName;
+	private final String runId;
+	private final RunParameterFilter filter;
 
-        public String getName() {
-            return name();
-        }
-
-        static {
-            Stapler.CONVERT_UTILS.register(new EnumConverter(), RunParameterFilter.class);
-        }
-    }
-    
-    private final String projectName;
-    private final String runId;
-    private final RunParameterFilter filter;
-
-    /**
+	/**
      * @since 1.517
      */
     @DataBoundConstructor
@@ -73,7 +55,7 @@ public class RunParameterDefinition extends SimpleParameterDefinition {
         this.filter = filter;
     }
 
-    /**
+	/**
      * @deprecated as of 1.517
      */ 
     @Deprecated
@@ -82,14 +64,14 @@ public class RunParameterDefinition extends SimpleParameterDefinition {
     	this(name, projectName, description, RunParameterFilter.ALL);
     }
 
-    private RunParameterDefinition(String name, String projectName, String runId, String description, RunParameterFilter filter) {
+	private RunParameterDefinition(String name, String projectName, String runId, String description, RunParameterFilter filter) {
         super(name, description);
         this.projectName = projectName;
         this.runId = runId;
         this.filter = filter;
     }
 
-    @Override
+	@Override
     public ParameterDefinition copyWithDefaultValue(ParameterValue defaultValue) {
         if (defaultValue instanceof RunParameterValue) {
             RunParameterValue value = (RunParameterValue) defaultValue;
@@ -99,16 +81,16 @@ public class RunParameterDefinition extends SimpleParameterDefinition {
         }
     }
 
-    @Exported
+	@Exported
     public String getProjectName() {
         return projectName;
     }
 
-    public Job getProject() {
+	public Job getProject() {
         return Jenkins.get().getItemByFullName(projectName, Job.class);
     }
 
-    /**
+	/**
      * @return The current filter value, if filter is null, returns ALL
      * @since 1.517
      */
@@ -118,7 +100,7 @@ public class RunParameterDefinition extends SimpleParameterDefinition {
         return (null == filter) ? RunParameterFilter.ALL : filter;
     }
 
-    /**
+	/**
      * @since 1.517
      * @return Returns a list of builds, filtered based on the filter value.
      */
@@ -136,30 +118,7 @@ public class RunParameterDefinition extends SimpleParameterDefinition {
         }
     }
 
-    @Extension @Symbol({"run","runParam"})
-    public static class DescriptorImpl extends ParameterDescriptor {
-        @Override
-        public String getDisplayName() {
-            return Messages.RunParameterDefinition_DisplayName();
-        }
-
-        @Override
-        public String getHelpFile() {
-            return "/help/parameter/run.html";
-        }
-
-        @Override
-        public ParameterDefinition newInstance(StaplerRequest req, JSONObject formData) throws FormException {
-            return req.bindJSON(RunParameterDefinition.class, formData);
-        }
-        
-        public AutoCompletionCandidates doAutoCompleteProjectName(@QueryParameter String value) {
-            return AutoCompletionCandidates.ofJobNames(Job.class, value, null, Jenkins.get());
-        }
-
-    }
-
-    @Override
+	@Override
     public ParameterValue getDefaultParameterValue() {
         if (runId != null) {
             return createValue(runId);
@@ -195,16 +154,57 @@ public class RunParameterDefinition extends SimpleParameterDefinition {
         }
     }
 
-    @Override
+	@Override
     public ParameterValue createValue(StaplerRequest req, JSONObject jo) {
         RunParameterValue value = req.bindJSON(RunParameterValue.class, jo);
         value.setDescription(getDescription());
         return value;
     }
 
-    public RunParameterValue createValue(String value) {
+	@Override
+	public RunParameterValue createValue(String value) {
         return new RunParameterValue(getName(), value, getDescription());
     }
 
-    private static final Logger LOGGER = Logger.getLogger(RunParameterDefinition.class.getName());
+	/**
+     * Constants that control how Run Parameter is filtered.
+     * @since 1.517
+     */
+    public enum RunParameterFilter {
+        ALL,
+        STABLE,
+        SUCCESSFUL,
+        COMPLETED;
+
+        public String getName() {
+            return name();
+        }
+
+        static {
+            Stapler.CONVERT_UTILS.register(new EnumConverter(), RunParameterFilter.class);
+        }
+    }
+
+	@Extension @Symbol({"run","runParam"})
+    public static class DescriptorImpl extends ParameterDescriptor {
+        @Override
+        public String getDisplayName() {
+            return Messages.RunParameterDefinition_DisplayName();
+        }
+
+        @Override
+        public String getHelpFile() {
+            return "/help/parameter/run.html";
+        }
+
+        @Override
+        public ParameterDefinition newInstance(StaplerRequest req, JSONObject formData) throws FormException {
+            return req.bindJSON(RunParameterDefinition.class, formData);
+        }
+        
+        public AutoCompletionCandidates doAutoCompleteProjectName(@QueryParameter String value) {
+            return AutoCompletionCandidates.ofJobNames(Job.class, value, null, Jenkins.get());
+        }
+
+    }
 }

@@ -43,9 +43,7 @@ public class CompositeCauseOfBlockage extends CauseOfBlockage {
 
     public CompositeCauseOfBlockage(List<CauseOfBlockage> delegates) {
         uniqueReasons = new TreeMap<>();
-        for (CauseOfBlockage delegate : delegates) {
-            uniqueReasons.put(delegate.getShortDescription(), delegate);
-        }
+        delegates.forEach(delegate -> uniqueReasons.put(delegate.getShortDescription(), delegate));
     }
 
     @Override
@@ -55,9 +53,7 @@ public class CompositeCauseOfBlockage extends CauseOfBlockage {
 
     @Override
     public void print(TaskListener listener) {
-        for (CauseOfBlockage delegate : uniqueReasons.values()) {
-            delegate.print(listener);
-        }
+        uniqueReasons.values().forEach(delegate -> delegate.print(listener));
     }
 
 }

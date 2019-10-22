@@ -111,7 +111,11 @@ public abstract class FederatedLoginService implements ExtensionPoint {
     @Nonnull
     public abstract Class<? extends FederatedLoginServiceUserProperty> getUserPropertyClass();
 
-    /**
+    public static ExtensionList<FederatedLoginService> all() {
+        return ExtensionList.lookup(FederatedLoginService.class);
+    }
+
+	/**
      * Identity information as obtained from {@link FederatedLoginService}.
      */
     public abstract class FederatedIdentity implements Serializable {
@@ -163,11 +167,7 @@ public abstract class FederatedLoginService implements ExtensionPoint {
             Class<? extends FederatedLoginServiceUserProperty> pt = getUserPropertyClass();
             String id = getIdentifier();
 
-            for (User u : User.getAll()) {
-                if (u.getProperty(pt).has(id))
-                    return u;
-            }
-            return null;
+            return User.getAll().stream().filter(u -> u.getProperty(pt).has(id)).findFirst().orElse(null);
         }
 
         /**
@@ -185,7 +185,7 @@ public abstract class FederatedLoginService implements ExtensionPoint {
          */
         @SuppressWarnings("ACL.impersonate")
         @Nonnull
-        public User signin() throws UnclaimedIdentityException {
+        public User signin() {
             User u = locateUser();
             if (u!=null) {
                 // login as this user
@@ -211,7 +211,9 @@ public abstract class FederatedLoginService implements ExtensionPoint {
          */
         public void addToCurrentUser() throws IOException {
             User u = User.current();
-            if (u==null)    throw new IllegalStateException("Current request is unauthenticated");
+            if (u==null) {
+				throw new IllegalStateException("Current request is unauthenticated");
+			}
 
             addTo(u);
         }
@@ -245,7 +247,8 @@ public abstract class FederatedLoginService implements ExtensionPoint {
             this.identity = identity;
         }
 
-        public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object node) throws IOException, ServletException {
+        @Override
+		public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object node) throws IOException, ServletException {
             SecurityRealm sr = Jenkins.get().getSecurityRealm();
             if (sr.allowsSignup()) {
                 try {
@@ -260,9 +263,5 @@ public abstract class FederatedLoginService implements ExtensionPoint {
             // just report an error
             req.getView(this,"error").forward(req,rsp);
         }
-    }
-
-    public static ExtensionList<FederatedLoginService> all() {
-        return ExtensionList.lookup(FederatedLoginService.class);
     }
 }

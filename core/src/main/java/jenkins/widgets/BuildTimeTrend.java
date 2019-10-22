@@ -45,21 +45,22 @@ public class BuildTimeTrend extends RunListProgressiveRendering {
         element.put("displayName", build.getDisplayName());
         element.put("duration", build.getDuration());
         element.put("durationString", build.getDurationString());
-        if (build instanceof AbstractBuild) {
-            AbstractBuild<?,?> b = (AbstractBuild) build;
-            Node n = b.getBuiltOn();
-            if (n == null) {
-                String ns = b.getBuiltOnStr();
-                if (ns != null && !ns.isEmpty()) {
-                    element.put("builtOnStr", ns);
-                }
-            } else if (n != Jenkins.get()) {
-                element.put("builtOn", n.getNodeName());
-                element.put("builtOnStr", n.getDisplayName());
-            } else {
-                element.put("builtOnStr", hudson.model.Messages.Hudson_Computer_DisplayName());
-            }
-        }
+        if (!(build instanceof AbstractBuild)) {
+			return;
+		}
+		AbstractBuild<?,?> b = (AbstractBuild) build;
+		Node n = b.getBuiltOn();
+		if (n == null) {
+		    String ns = b.getBuiltOnStr();
+		    if (ns != null && !ns.isEmpty()) {
+		        element.put("builtOnStr", ns);
+		    }
+		} else if (n != Jenkins.get()) {
+		    element.put("builtOn", n.getNodeName());
+		    element.put("builtOnStr", n.getDisplayName());
+		} else {
+		    element.put("builtOnStr", hudson.model.Messages.Hudson_Computer_DisplayName());
+		}
     }
 
 }

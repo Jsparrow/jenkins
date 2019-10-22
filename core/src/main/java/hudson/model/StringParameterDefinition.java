@@ -107,19 +107,6 @@ public class StringParameterDefinition extends SimpleParameterDefinition {
         return value;
     }
 
-    @Extension @Symbol({"string","stringParam"})
-    public static class DescriptorImpl extends ParameterDescriptor {
-        @Override
-        public String getDisplayName() {
-            return Messages.StringParameterDefinition_DisplayName();
-        }
-
-        @Override
-        public String getHelpFile() {
-            return "/help/parameter/string.html";
-        }
-    }
-
     @Override
     public ParameterValue createValue(StaplerRequest req, JSONObject jo) {
         StringParameterValue value = req.bindJSON(StringParameterValue.class, jo);
@@ -130,11 +117,25 @@ public class StringParameterDefinition extends SimpleParameterDefinition {
         return value;
     }
 
-    public ParameterValue createValue(String str) {
+	@Override
+	public ParameterValue createValue(String str) {
         StringParameterValue value = new StringParameterValue(getName(), str, getDescription());
         if (isTrim()) {
             value.doTrim();
         }
         return value;
+    }
+
+	@Extension @Symbol({"string","stringParam"})
+    public static class DescriptorImpl extends ParameterDescriptor {
+        @Override
+        public String getDisplayName() {
+            return Messages.StringParameterDefinition_DisplayName();
+        }
+
+        @Override
+        public String getHelpFile() {
+            return "/help/parameter/string.html";
+        }
     }
 }

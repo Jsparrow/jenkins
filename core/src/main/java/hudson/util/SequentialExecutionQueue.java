@@ -59,7 +59,8 @@ public class SequentialExecutionQueue implements Executor {
     }
 
 
-    public synchronized void execute(@Nonnull Runnable item) {
+    @Override
+	public synchronized void execute(@Nonnull Runnable item) {
         QueueEntry e = entries.get(item);
         if(e==null) {
             e = new QueueEntry(item);
@@ -76,9 +77,11 @@ public class SequentialExecutionQueue implements Executor {
      */
     public synchronized boolean isStarving(long threshold) {
         long now = System.currentTimeMillis();
-        for (QueueEntry e : entries.values())
-            if (now-e.submissionTime > threshold)
-                return true;
+        for (QueueEntry e : entries.values()) {
+			if (now-e.submissionTime > threshold) {
+				return true;
+			}
+		}
         return false;
     }
 
@@ -87,9 +90,7 @@ public class SequentialExecutionQueue implements Executor {
      */
     public synchronized Set<Runnable> getInProgress() {
         Set<Runnable> items = new HashSet<>();
-        for (QueueEntry entry : inProgress) {
-            items.add(entry.item);
-        }
+        inProgress.forEach(entry -> items.add(entry.item));
         return items;
     }
 
@@ -109,7 +110,8 @@ public class SequentialExecutionQueue implements Executor {
             executors.submit(this);
         }
 
-        public void run() {
+        @Override
+		public void run() {
             try {
                 synchronized (SequentialExecutionQueue.this) {
                     assert queued;
@@ -119,11 +121,12 @@ public class SequentialExecutionQueue implements Executor {
                 item.run();
             } finally {
                 synchronized (SequentialExecutionQueue.this) {
-                    if(queued)
-                        // another polling for this job is requested while we were doing the polling. do it again.
+                    if(queued) {
+						// another polling for this job is requested while we were doing the polling. do it again.
                         submit();
-                    else
-                        entries.remove(item);
+					} else {
+						entries.remove(item);
+					}
                     inProgress.remove(this);
                 }
             }

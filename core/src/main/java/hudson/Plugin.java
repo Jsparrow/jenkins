@@ -83,8 +83,14 @@ import jenkins.model.GlobalConfiguration;
 public abstract class Plugin implements Saveable {
 
     private static final Logger LOGGER = Logger.getLogger(Plugin.class.getName());
+	/**
+     * Set by the {@link PluginManager}, before the {@link #start()} method is called.
+     * This points to the {@link PluginWrapper} that wraps
+     * this {@link Plugin} object.
+     */
+    /*package*/ transient PluginWrapper wrapper;
 
-    /**
+	/**
      * You do not need to create custom subtypes:
      * <ul>
      * <li>{@code config.jelly}, {@link #configure(StaplerRequest, JSONObject)}, {@link #load}, and {@link #save}
@@ -100,14 +106,7 @@ public abstract class Plugin implements Saveable {
     @Deprecated
     protected Plugin() {}
 
-    /**
-     * Set by the {@link PluginManager}, before the {@link #start()} method is called.
-     * This points to the {@link PluginWrapper} that wraps
-     * this {@link Plugin} object.
-     */
-    /*package*/ transient PluginWrapper wrapper;
-
-    /**
+	/**
      * Called when a plugin is loaded to make the {@link ServletContext} object available to a plugin.
      * This object allows plugins to talk to the surrounding environment.
      *
@@ -122,7 +121,7 @@ public abstract class Plugin implements Saveable {
     public void setServletContext(ServletContext context) {
     }
 
-    /**
+	/**
      * Gets the paired {@link PluginWrapper}.
      *
      * @since 1.426
@@ -131,7 +130,7 @@ public abstract class Plugin implements Saveable {
         return wrapper;
     }
 
-    /**
+	/**
      * Called to allow plugins to initialize themselves.
      *
      * <p>
@@ -156,7 +155,7 @@ public abstract class Plugin implements Saveable {
     public void start() throws Exception {
     }
 
-    /**
+	/**
      * Called after {@link #start()} is called for all the plugins.
      *
      * @throws Exception
@@ -164,7 +163,7 @@ public abstract class Plugin implements Saveable {
      */
     public void postInitialize() throws Exception {}
 
-    /**
+	/**
      * Called to orderly shut down Hudson.
      *
      * <p>
@@ -182,7 +181,7 @@ public abstract class Plugin implements Saveable {
     public void stop() throws Exception {
     }
 
-    /**
+	/**
      * @since 1.233
      * @deprecated as of 1.305 override {@link #configure(StaplerRequest,JSONObject)} instead
      */
@@ -190,7 +189,7 @@ public abstract class Plugin implements Saveable {
     public void configure(JSONObject formData) throws IOException, ServletException, FormException {
     }
 
-    /**
+	/**
      * Handles the submission for the system configuration.
      *
      * <p>
@@ -221,7 +220,7 @@ public abstract class Plugin implements Saveable {
         configure(formData);
     }
 
-    /**
+	/**
      * This method serves static resources in the plugin under {@code hudson/plugin/SHORTNAME}.
      */
     public void doDynamic(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
@@ -231,7 +230,7 @@ public abstract class Plugin implements Saveable {
         if (path.isEmpty() || path.contains("..") || path.startsWith(".") || path.contains("%")
                 || pathUC.contains("META-INF") || pathUC.contains("WEB-INF")
                 // ClassicPluginStrategy#explode produce that file to know if a new explosion is required or not
-                || pathUC.equals("/.TIMESTAMP2")
+                || "/.TIMESTAMP2".equals(pathUC)
         ) {
             LOGGER.warning("rejecting possibly malicious " + req.getRequestURIWithQueryString());
             rsp.sendError(HttpServletResponse.SC_BAD_REQUEST);
@@ -250,36 +249,40 @@ public abstract class Plugin implements Saveable {
         rsp.serveLocalizedFile(req, new URL(wrapper.baseResourceURL, '.' + path), expires);
     }
 
-//
-// Convenience methods for those plugins that persist configuration
-//
-    /**
-     * Loads serializable fields of this instance from the persisted storage.
-     *
-     * <p>
-     * If there was no previously persisted state, this method is no-op.
-     *
-     * @since 1.245
-     */
-    protected void load() throws IOException {
-        XmlFile xml = getConfigXml();
-        if(xml.exists())
-            xml.unmarshal(this);
-    }
+	//
+	// Convenience methods for those plugins that persist configuration
+	//
+	    /**
+	     * Loads serializable fields of this instance from the persisted storage.
+	     *
+	     * <p>
+	     * If there was no previously persisted state, this method is no-op.
+	     *
+	     * @since 1.245
+	     */
+	    protected void load() throws IOException {
+	        XmlFile xml = getConfigXml();
+	        if(xml.exists()) {
+				xml.unmarshal(this);
+			}
+	    }
 
-    /**
+	/**
      * Saves serializable fields of this instance to the persisted storage.
      *
      * @since 1.245
      */
-    public void save() throws IOException {
-        if(BulkChange.contains(this))   return;
+    @Override
+	public void save() throws IOException {
+        if(BulkChange.contains(this)) {
+			return;
+		}
         XmlFile config = getConfigXml();
         config.write(this);
         SaveableListener.fireOnChange(this, config);
     }
 
-    /**
+	/**
      * Controls the file where {@link #load()} and {@link #save()}
      * persists data.
      *
@@ -292,7 +295,6 @@ public abstract class Plugin implements Saveable {
         return new XmlFile(Jenkins.XSTREAM,
                 new File(Jenkins.get().getRootDir(),wrapper.getShortName()+".xml"));
     }
-
 
     /**
      * Dummy instance of {@link Plugin} to be used when a plugin didn't

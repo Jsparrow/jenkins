@@ -18,28 +18,32 @@ import java.util.logging.Logger;
  * @author Kohsuke Kawaguchi
  */
 public class CallableRejectionConfig extends ConfigFile<Class,Set<Class>> {
-    private final CallableWhitelistConfig whitelist;
+    private static final Logger LOGGER = Logger.getLogger(CallableRejectionConfig.class.getName());
+	private final CallableWhitelistConfig whitelist;
 
-    CallableRejectionConfig(File file, CallableWhitelistConfig whitelist) {
+	CallableRejectionConfig(File file, CallableWhitelistConfig whitelist) {
         super(file);
         this.whitelist = whitelist;
     }
 
-    @Override
+	@Override
     protected Set<Class> create() {
         return new HashSet<>();
     }
 
-    @Override
+	@Override
     protected Set<Class> readOnly(Set<Class> base) {
         return ImmutableSet.copyOf(base);
     }
 
-    @Override
+	@Override
     protected Class parse(String line) {
         try {
             line = line.trim();
-            if (whitelist.contains(line))   return null;    // already whitelisted
+            if (whitelist.contains(line))
+			 {
+				return null;    // already whitelisted
+			}
 
             return Jenkins.get().pluginManager.uberClassLoader.loadClass(line);
         } catch (ClassNotFoundException e) {
@@ -48,7 +52,7 @@ public class CallableRejectionConfig extends ConfigFile<Class,Set<Class>> {
         }
     }
 
-    /**
+	/**
      * This method gets called every time we see a new type of callable that we reject,
      * so that we can persist the list.
      */
@@ -62,18 +66,16 @@ public class CallableRejectionConfig extends ConfigFile<Class,Set<Class>> {
         }
     }
 
-    /**
+	/**
      * Return the object that helps the UI rendering by providing the details.
      */
     public List<RejectedCallable> describe() {
         List<RejectedCallable> l = new ArrayList<>();
         for (Class c : get()) {
-            if (!whitelist.contains(c.getName()))
-                l.add(new RejectedCallable(c));
+            if (!whitelist.contains(c.getName())) {
+				l.add(new RejectedCallable(c));
+			}
         }
         return l;
     }
-
-
-    private static final Logger LOGGER = Logger.getLogger(CallableRejectionConfig.class.getName());
 }

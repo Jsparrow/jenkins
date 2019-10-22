@@ -41,32 +41,33 @@ import java.util.logging.Logger;
 /**
  * {@link TaskListener} which sends messages to a {@link Logger}.
  */
-public class LogTaskListener extends AbstractTaskListener implements TaskListener, Closeable {
+public class LogTaskListener extends AbstractTaskListener implements Closeable {
 
-    // would be simpler to delegate to the LogOutputStream but this would incompatibly change the serial form
+    private static final long serialVersionUID = 1L;
+	// would be simpler to delegate to the LogOutputStream but this would incompatibly change the serial form
     private final TaskListener delegate;
 
-    public LogTaskListener(Logger logger, Level level) {
+	public LogTaskListener(Logger logger, Level level) {
         delegate = new StreamTaskListener(new LogOutputStream(logger, level, new Throwable().getStackTrace()[1]));
     }
 
-    @Override
+	@Override
     public PrintStream getLogger() {
         return delegate.getLogger();
     }
 
-    @Override
+	@Override
     @SuppressWarnings("rawtypes")
     public void annotate(ConsoleNote ann) {
         // no annotation support
     }
 
-    @Override
+	@Override
     public void close() {
         delegate.getLogger().close();
     }
 
-    private static class LogOutputStream extends OutputStream {
+	private static class LogOutputStream extends OutputStream {
 
         private final Logger logger;
         private final Level level;
@@ -106,6 +107,4 @@ public class LogTaskListener extends AbstractTaskListener implements TaskListene
         }
 
     }
-
-    private static final long serialVersionUID = 1L;
 }

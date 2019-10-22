@@ -63,12 +63,146 @@ public interface PermalinkProjectAction extends Action {
      */
     abstract class Permalink {
         /**
+         * List of {@link Permalink}s that are built into Jenkins.
+         */
+        public static final List<Permalink> BUILTIN = new CopyOnWriteArrayList<>();
+
+		public static final Permalink LAST_BUILD = new Permalink() {
+            @Override
+			public String getDisplayName() {
+                return Messages.Permalink_LastBuild();
+            }
+
+            @Override
+			public String getId() {
+                return "lastBuild";
+            }
+
+            @Override
+			public Run<?,?> resolve(Job<?,?> job) {
+                return job.getLastBuild();
+            }
+        };
+
+		public static final Permalink LAST_STABLE_BUILD = new PeepholePermalink() {
+            @Override
+			public String getDisplayName() {
+                return Messages.Permalink_LastStableBuild();
+            }
+
+            @Override
+			public String getId() {
+                return "lastStableBuild";
+            }
+
+            @Override
+            public boolean apply(Run<?, ?> run) {
+                return !run.isBuilding() && run.getResult()==Result.SUCCESS;
+            }
+        };
+
+		public static final Permalink LAST_SUCCESSFUL_BUILD = new PeepholePermalink() {
+            @Override
+			public String getDisplayName() {
+                return Messages.Permalink_LastSuccessfulBuild();
+            }
+
+            @Override
+			public String getId() {
+                return "lastSuccessfulBuild";
+            }
+
+            @Override
+            public boolean apply(Run<?, ?> run) {
+                return !run.isBuilding() && run.getResult().isBetterOrEqualTo(Result.UNSTABLE);
+            }
+        };
+
+		public static final Permalink LAST_FAILED_BUILD = new PeepholePermalink() {
+            @Override
+			public String getDisplayName() {
+                return Messages.Permalink_LastFailedBuild();
+            }
+
+            @Override
+			public String getId() {
+                return "lastFailedBuild";
+            }
+
+            @Override
+            public boolean apply(Run<?, ?> run) {
+                return !run.isBuilding() && run.getResult()==Result.FAILURE;
+            }
+        };
+
+		public static final Permalink LAST_UNSTABLE_BUILD = new PeepholePermalink() {
+            @Override
+			public String getDisplayName() {
+                return Messages.Permalink_LastUnstableBuild();
+            }
+
+            @Override
+			public String getId() {
+                return "lastUnstableBuild";
+            }
+
+            @Override
+            public boolean apply(Run<?, ?> run) {
+                return !run.isBuilding() && run.getResult()==Result.UNSTABLE;
+            }
+        };
+
+		public static final Permalink LAST_UNSUCCESSFUL_BUILD = new PeepholePermalink() {
+            @Override
+			public String getDisplayName() {
+                return Messages.Permalink_LastUnsuccessfulBuild();
+            }
+
+            @Override
+			public String getId() {
+                return "lastUnsuccessfulBuild";
+            }
+
+            @Override
+            public boolean apply(Run<?, ?> run) {
+                return !run.isBuilding() && run.getResult()!=Result.SUCCESS;
+            }
+        };
+
+		public static final Permalink LAST_COMPLETED_BUILD = new PeepholePermalink() {
+            @Override
+			public String getDisplayName() {
+                return Messages.Permalink_LastCompletedBuild();
+            }
+
+            @Override
+			public String getId() {
+                return "lastCompletedBuild";
+            }
+
+            @Override
+            public boolean apply(Run<?, ?> run) {
+                return !run.isBuilding();
+            }
+        };
+
+		static {
+            BUILTIN.add(LAST_BUILD);
+            BUILTIN.add(LAST_STABLE_BUILD);
+            BUILTIN.add(LAST_SUCCESSFUL_BUILD);
+            BUILTIN.add(LAST_FAILED_BUILD);
+            BUILTIN.add(LAST_UNSTABLE_BUILD);
+            BUILTIN.add(LAST_UNSUCCESSFUL_BUILD);
+            BUILTIN.add(LAST_COMPLETED_BUILD);
+        }
+
+		/**
          * String to be displayed in the UI, such as "Last successful build".
          * The convention is to upper case the first letter.
          */
         public abstract String getDisplayName();
 
-        /**
+		/**
          * ID that uniquely identifies this permalink.
          *
          * <p>
@@ -81,127 +215,12 @@ public interface PermalinkProjectAction extends Action {
          */
         public abstract String getId();
 
-        /**
+		/**
          * Resolves the permalink to a build.
          *
          * @return null
          *      if the target of the permalink doesn't exist.
          */
         public abstract @CheckForNull Run<?,?> resolve(Job<?,?> job);
-
-        /**
-         * List of {@link Permalink}s that are built into Jenkins.
-         */
-        public static final List<Permalink> BUILTIN = new CopyOnWriteArrayList<>();
-
-        public static final Permalink LAST_BUILD = new Permalink() {
-            public String getDisplayName() {
-                return Messages.Permalink_LastBuild();
-            }
-
-            public String getId() {
-                return "lastBuild";
-            }
-
-            public Run<?,?> resolve(Job<?,?> job) {
-                return job.getLastBuild();
-            }
-        };
-        public static final Permalink LAST_STABLE_BUILD = new PeepholePermalink() {
-            public String getDisplayName() {
-                return Messages.Permalink_LastStableBuild();
-            }
-
-            public String getId() {
-                return "lastStableBuild";
-            }
-
-            @Override
-            public boolean apply(Run<?, ?> run) {
-                return !run.isBuilding() && run.getResult()==Result.SUCCESS;
-            }
-        };
-        public static final Permalink LAST_SUCCESSFUL_BUILD = new PeepholePermalink() {
-            public String getDisplayName() {
-                return Messages.Permalink_LastSuccessfulBuild();
-            }
-
-            public String getId() {
-                return "lastSuccessfulBuild";
-            }
-
-            @Override
-            public boolean apply(Run<?, ?> run) {
-                return !run.isBuilding() && run.getResult().isBetterOrEqualTo(Result.UNSTABLE);
-            }
-        };
-        public static final Permalink LAST_FAILED_BUILD = new PeepholePermalink() {
-            public String getDisplayName() {
-                return Messages.Permalink_LastFailedBuild();
-            }
-
-            public String getId() {
-                return "lastFailedBuild";
-            }
-
-            @Override
-            public boolean apply(Run<?, ?> run) {
-                return !run.isBuilding() && run.getResult()==Result.FAILURE;
-            }
-        };
-
-        public static final Permalink LAST_UNSTABLE_BUILD = new PeepholePermalink() {
-            public String getDisplayName() {
-                return Messages.Permalink_LastUnstableBuild();
-            }
-
-            public String getId() {
-                return "lastUnstableBuild";
-            }
-
-            @Override
-            public boolean apply(Run<?, ?> run) {
-                return !run.isBuilding() && run.getResult()==Result.UNSTABLE;
-            }
-        };
-
-        public static final Permalink LAST_UNSUCCESSFUL_BUILD = new PeepholePermalink() {
-            public String getDisplayName() {
-                return Messages.Permalink_LastUnsuccessfulBuild();
-            }
-
-            public String getId() {
-                return "lastUnsuccessfulBuild";
-            }
-
-            @Override
-            public boolean apply(Run<?, ?> run) {
-                return !run.isBuilding() && run.getResult()!=Result.SUCCESS;
-            }
-        };
-        public static final Permalink LAST_COMPLETED_BUILD = new PeepholePermalink() {
-            public String getDisplayName() {
-                return Messages.Permalink_LastCompletedBuild();
-            }
-
-            public String getId() {
-                return "lastCompletedBuild";
-            }
-
-            @Override
-            public boolean apply(Run<?, ?> run) {
-                return !run.isBuilding();
-            }
-        };
-
-        static {
-            BUILTIN.add(LAST_BUILD);
-            BUILTIN.add(LAST_STABLE_BUILD);
-            BUILTIN.add(LAST_SUCCESSFUL_BUILD);
-            BUILTIN.add(LAST_FAILED_BUILD);
-            BUILTIN.add(LAST_UNSTABLE_BUILD);
-            BUILTIN.add(LAST_UNSUCCESSFUL_BUILD);
-            BUILTIN.add(LAST_COMPLETED_BUILD);
-        }
     }
 }

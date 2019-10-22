@@ -36,15 +36,15 @@ import java.io.OutputStream;
  * @see DecodingStream
  */
 public class EncodingStream extends FilterOutputStream {
-    public EncodingStream(OutputStream out) {
+    private static final String chars = "0123456789ABCDEF";
+
+	public EncodingStream(OutputStream out) {
         super(out);
     }
 
-    @Override
+	@Override
     public void write(int b) throws IOException {
         out.write(chars.charAt((b >> 4) & 0xF));
         out.write(chars.charAt(b & 0xF));
     }
-
-    private static final String chars = "0123456789ABCDEF";
 }

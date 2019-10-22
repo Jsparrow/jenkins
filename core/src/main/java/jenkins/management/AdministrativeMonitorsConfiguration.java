@@ -40,10 +40,12 @@ import java.util.logging.Logger;
 @Extension
 @Restricted(NoExternalUse.class)
 public class AdministrativeMonitorsConfiguration extends GlobalConfiguration {
-    @Override
+    private static Logger LOGGER = Logger.getLogger(AdministrativeMonitorsConfiguration.class.getName());
+
+	@Override
     public boolean configure(StaplerRequest req, JSONObject json) throws FormException {
         JSONArray monitors = json.optJSONArray("administrativeMonitor");
-        for (AdministrativeMonitor am : AdministrativeMonitor.all()) {
+        AdministrativeMonitor.all().forEach(am -> {
             try {
                 boolean disable;
                 if(monitors != null) {
@@ -55,9 +57,7 @@ public class AdministrativeMonitorsConfiguration extends GlobalConfiguration {
             } catch (IOException e) {
                 LOGGER.log(Level.WARNING, "Failed to process form submission for " + am.id, e);
             }
-        }
+        });
         return true;
     }
-
-    private static Logger LOGGER = Logger.getLogger(AdministrativeMonitorsConfiguration.class.getName());
 }

@@ -52,26 +52,20 @@ public final class ImpersonatingExecutorService extends InterceptingExecutorServ
 
     @Override
     protected Runnable wrap(final Runnable r) {
-        return new Runnable() {
-            @Override
-            public void run() {
-                try (ACLContext ctxt = ACL.as(authentication)) {
-                    r.run();
-                }
-            }
-        };
+        return () -> {
+		    try (ACLContext ctxt = ACL.as(authentication)) {
+		        r.run();
+		    }
+		};
     }
 
     @Override
     protected <V> Callable<V> wrap(final Callable<V> r) {
-        return new Callable<V>() {
-            @Override
-            public V call() throws Exception {
-                try (ACLContext ctxt = ACL.as(authentication)) {
-                    return r.call();
-                }
-            }
-        };
+        return () -> {
+		    try (ACLContext ctxt = ACL.as(authentication)) {
+		        return r.call();
+		    }
+		};
     }
 
 }

@@ -85,8 +85,9 @@ public class LinesStream implements Closeable, Iterable<String> {
 
     @Override
     public Iterator<String> iterator() {
-        if (iterator!=null)
-            throw new IllegalStateException("Only one Iterator can be created.");
+        if (iterator!=null) {
+			throw new IllegalStateException("Only one Iterator can be created.");
+		}
 
         iterator = new AbstractIterator<String>() {
             @Override

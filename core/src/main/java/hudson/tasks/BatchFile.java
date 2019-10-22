@@ -46,54 +46,58 @@ import javax.annotation.CheckForNull;
  * @author Kohsuke Kawaguchi
  */
 public class BatchFile extends CommandInterpreter {
-    @DataBoundConstructor
+    private Integer unstableReturn;
+
+	@DataBoundConstructor
     public BatchFile(String command) {
         super(LineEndingConversion.convertEOL(command, LineEndingConversion.EOLType.Windows));
     }
 
-    private Integer unstableReturn;
-
-    public String[] buildCommandLine(FilePath script) {
+	@Override
+	public String[] buildCommandLine(FilePath script) {
         return new String[] {"cmd","/c","call",script.getRemote()};
     }
 
-    protected String getContents() {
+	@Override
+	protected String getContents() {
         return LineEndingConversion.convertEOL(command+"\r\nexit %ERRORLEVEL%",LineEndingConversion.EOLType.Windows);
     }
 
-    protected String getFileExtension() {
+	@Override
+	protected String getFileExtension() {
         return ".bat";
     }
 
-    @CheckForNull
+	@CheckForNull
     public final Integer getUnstableReturn() {
         return Integer.valueOf(0).equals(unstableReturn) ? null : unstableReturn;
     }
 
-    @DataBoundSetter
+	@DataBoundSetter
     public void setUnstableReturn(Integer unstableReturn) {
         this.unstableReturn = unstableReturn;
     }
 
-    @Override
+	@Override
     protected boolean isErrorlevelForUnstableBuild(int exitCode) {
         return this.unstableReturn != null && exitCode != 0 && this.unstableReturn.equals(exitCode);
     }
 
-    private Object readResolve() throws ObjectStreamException {
+	private Object readResolve() throws ObjectStreamException {
         BatchFile batch = new BatchFile(command);
         batch.setUnstableReturn(unstableReturn);
         return batch;
     }
 
-    @Extension @Symbol("batchFile")
+	@Extension @Symbol("batchFile")
     public static final class DescriptorImpl extends BuildStepDescriptor<Builder> {
         @Override
         public String getHelpFile() {
             return "/help/project-config/batch.html";
         }
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.BatchFile_DisplayName();
         }
 
@@ -121,7 +125,8 @@ public class BatchFile extends CommandInterpreter {
             return FormValidation.ok();
         }
 
-        public boolean isApplicable(Class<? extends AbstractProject> jobType) {
+        @Override
+		public boolean isApplicable(Class<? extends AbstractProject> jobType) {
             return true;
         }
     }

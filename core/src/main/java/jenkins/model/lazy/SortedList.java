@@ -58,7 +58,8 @@ class SortedList<T extends Comparable<T>> extends AbstractList<T> {
         return find((T)o)>=0;
     }
 
-    public T get(int idx) {
+    @Override
+	public T get(int idx) {
         return data.get(idx);
     }
 

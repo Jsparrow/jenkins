@@ -35,28 +35,27 @@ import java.util.logging.Level;
  * @author Kohsuke Kawaguchi
  */
 public class BindAuthenticator2 extends BindAuthenticator {
-    /**
+    private static final Logger LOGGER = Logger.getLogger(BindAuthenticator2.class.getName());
+	/**
      * If we ever had a successful authentication, 
      */
     private boolean hadSuccessfulAuthentication;
 
-    public BindAuthenticator2(InitialDirContextFactory initialDirContextFactory) {
+	public BindAuthenticator2(InitialDirContextFactory initialDirContextFactory) {
         super(initialDirContextFactory);
     }
 
-    @Override
+	@Override
     public LdapUserDetails authenticate(String username, String password) {
         LdapUserDetails user = super.authenticate(username, password);
         hadSuccessfulAuthentication = true;
         return user;
     }
 
-    @Override
+	@Override
     void handleBindException(String userDn, String username, Throwable cause) {
         LOGGER.log(hadSuccessfulAuthentication? Level.FINE : Level.WARNING,
-            "Failed to bind to LDAP: userDn"+userDn+"  username="+username,cause);
+            new StringBuilder().append("Failed to bind to LDAP: userDn").append(userDn).append("  username=").append(username).toString(),cause);
         super.handleBindException(userDn, username, cause);
     }
-
-    private static final Logger LOGGER = Logger.getLogger(BindAuthenticator2.class.getName());
 }

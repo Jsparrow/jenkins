@@ -54,55 +54,61 @@ import java.util.Arrays;
  */
 public class TableNestChecker extends XMLFilterImpl {
 
-    private final Stack<Checker> elements = new Stack<>();
-    private final Stack<String> tagNames = new Stack<>();
+    private static final Checker ALL_ALLOWED = (String childTag) -> true;
+	private static final Map<String,Checker> CHECKERS = new HashMap<>();
 
-    public static void applyTo(XMLOutput xo) {
-        xo.setContentHandler(new TableNestChecker(xo.getContentHandler()));
+	static {
+        CHECKERS.put("TABLE",new InList("TR","THEAD","TBODY"));
+        InList rows = new InList("TR");
+        CHECKERS.put("THEAD",rows);
+        CHECKERS.put("TR",   new InList("TD","TH"));
     }
 
-    public TableNestChecker() {
+	private final Stack<Checker> elements = new Stack<>();
+	private final Stack<String> tagNames = new Stack<>();
+
+	public TableNestChecker() {
         elements.push(ALL_ALLOWED);
     }
 
-    public TableNestChecker(ContentHandler target) {
+	public TableNestChecker(ContentHandler target) {
         this();
         setContentHandler(target);
     }
 
-    @Override
+	public static void applyTo(XMLOutput xo) {
+        xo.setContentHandler(new TableNestChecker(xo.getContentHandler()));
+    }
+
+	@Override
     public void startElement(String uri, String localName, String qName, Attributes atts) throws SAXException {
         String tagName = localName.toUpperCase(Locale.ENGLISH);
 
         // make sure that this tag occurs in the proper context
-        if(!elements.peek().isAllowed(tagName))
-            throw new SAXException(tagName+" is not allowed inside "+tagNames.peek());
+        if(!elements.peek().isAllowed(tagName)) {
+			throw new SAXException(new StringBuilder().append(tagName).append(" is not allowed inside ").append(tagNames.peek()).toString());
+		}
 
         Checker next = CHECKERS.get(tagName);
-        if(next==null)  next = ALL_ALLOWED;
+        if(next==null) {
+			next = ALL_ALLOWED;
+		}
         elements.push(next);
         tagNames.push(tagName);
 
         super.startElement(uri, localName, qName, atts);
     }
 
-    @Override
+	@Override
     public void endElement(String uri, String localName, String qName) throws SAXException {
         elements.pop();
         tagNames.pop();
         super.endElement(uri, localName, qName);
     }
 
-
-    private interface Checker {
+	private interface Checker {
         boolean isAllowed(String childTag);
     }
-
-    private static final Checker ALL_ALLOWED = new Checker() {
-        public boolean isAllowed(String childTag) {
-            return true;
-        }
-    };
 
     private static final class InList implements Checker {
         private final Set<String> tags;
@@ -111,17 +117,9 @@ public class TableNestChecker extends XMLFilterImpl {
             this.tags = new HashSet<>(Arrays.asList(tags));
         }
 
-        public boolean isAllowed(String childTag) {
+        @Override
+		public boolean isAllowed(String childTag) {
             return tags.contains(childTag);
         }
-    }
-
-    private static final Map<String,Checker> CHECKERS = new HashMap<>();
-
-    static {
-        CHECKERS.put("TABLE",new InList("TR","THEAD","TBODY"));
-        InList rows = new InList("TR");
-        CHECKERS.put("THEAD",rows);
-        CHECKERS.put("TR",   new InList("TD","TH"));
     }
 }

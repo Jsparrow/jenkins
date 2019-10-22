@@ -50,17 +50,17 @@ public class HttpSessionContextIntegrationFilter2 extends HttpSessionContextInte
         setContext(NonSerializableSecurityContext.class);
     }
 
-    public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain) throws IOException, ServletException {
+    @Override
+	public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain) throws IOException, ServletException {
         HttpSession session = ((HttpServletRequest) req).getSession(false);
         if (session != null) {
             SecurityContext o = (SecurityContext) session.getAttribute(ACEGI_SECURITY_CONTEXT_KEY);
             if (o != null) {
                 Authentication a = o.getAuthentication();
-                if (a != null) {
-                    if (isAuthInvalidated(a) || hasInvalidSessionSeed(a, session)) {
-                        session.setAttribute(ACEGI_SECURITY_CONTEXT_KEY, null);
-                    }
-                }
+                boolean condition = a != null && (isAuthInvalidated(a) || hasInvalidSessionSeed(a, session));
+				if (condition) {
+				    session.setAttribute(ACEGI_SECURITY_CONTEXT_KEY, null);
+				}
             }
         }
 

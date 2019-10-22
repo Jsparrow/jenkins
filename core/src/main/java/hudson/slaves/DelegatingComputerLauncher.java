@@ -74,7 +74,7 @@ public abstract class DelegatingComputerLauncher extends ComputerLauncher {
         getLauncher().beforeDisconnect(computer, listener);
     }
 
-    public static abstract class DescriptorImpl extends Descriptor<ComputerLauncher> {
+    public abstract static class DescriptorImpl extends Descriptor<ComputerLauncher> {
         /**
          * Returns the applicable nested computer launcher types.
          * The default implementation avoids all delegating descriptors, as that creates infinite recursion.
@@ -84,7 +84,9 @@ public abstract class DelegatingComputerLauncher extends ComputerLauncher {
                                                                         @Nonnull Slave.SlaveDescriptor itDescriptor) {
             List<Descriptor<ComputerLauncher>> r = new ArrayList<>();
             for (Descriptor<ComputerLauncher> d : itDescriptor.computerLauncherDescriptors(it)) {
-                if (DelegatingComputerLauncher.class.isAssignableFrom(d.getKlass().toJavaClass()))  continue;
+                if (DelegatingComputerLauncher.class.isAssignableFrom(d.getKlass().toJavaClass())) {
+					continue;
+				}
                 r.add(d);
             }
             return r;
@@ -101,7 +103,9 @@ public abstract class DelegatingComputerLauncher extends ComputerLauncher {
             List<Descriptor<ComputerLauncher>> r = new ArrayList<>();
             for (Descriptor<ComputerLauncher> d :
                     Jenkins.get().getDescriptorList(ComputerLauncher.class)) {
-                if (DelegatingComputerLauncher.class.isAssignableFrom(d.getKlass().toJavaClass()))  continue;
+                if (DelegatingComputerLauncher.class.isAssignableFrom(d.getKlass().toJavaClass())) {
+					continue;
+				}
                 r.add(d);
             }
             return r;

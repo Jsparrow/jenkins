@@ -99,7 +99,25 @@ public class XStream2 extends XStream {
      */
     private MapperInjectionPoint mapperInjectionPoint;
 
-    /**
+    public XStream2() {
+        super(getDefaultDriver());
+        init();
+        classOwnership = null;
+    }
+
+	public XStream2(HierarchicalStreamDriver hierarchicalStreamDriver) {
+        super(hierarchicalStreamDriver);
+        init();
+        classOwnership = null;
+    }
+
+	XStream2(ClassOwnership classOwnership) {
+        super(getDefaultDriver());
+        init();
+        this.classOwnership = classOwnership;
+    }
+
+	/**
      * Convenience method so we only have to change the driver in one place
      * if we switch to something new in the future
      *
@@ -109,30 +127,12 @@ public class XStream2 extends XStream {
         return new KXml2Driver();
     }
 
-    public XStream2() {
-        super(getDefaultDriver());
-        init();
-        classOwnership = null;
-    }
-
-    public XStream2(HierarchicalStreamDriver hierarchicalStreamDriver) {
-        super(hierarchicalStreamDriver);
-        init();
-        classOwnership = null;
-    }
-
-    XStream2(ClassOwnership classOwnership) {
-        super(getDefaultDriver());
-        init();
-        this.classOwnership = classOwnership;
-    }
-
-    @Override
+	@Override
     public Object unmarshal(HierarchicalStreamReader reader, Object root, DataHolder dataHolder) {
         return unmarshal(reader, root, dataHolder, false);
     }
 
-    /**
+	/**
      * Variant of {@link #unmarshal(HierarchicalStreamReader, Object, DataHolder)} that nulls out non-{@code transient} instance fields not defined in the source when unmarshaling into an existing object.
      * <p>Typically useful when loading user-supplied XML files in place (non-null {@code root})
      * where some reference-valued fields of the root object may have legitimate reasons for being null.
@@ -206,19 +206,21 @@ public class XStream2 extends XStream {
 
         if (oldData.get()!=null) {
             oldData.remove();
-            if (o instanceof Saveable) OldDataMonitor.report((Saveable)o, "1.106");
+            if (o instanceof Saveable) {
+				OldDataMonitor.report((Saveable)o, "1.106");
+			}
         }
         return o;
     }
 
-    @Override
+	@Override
     protected Converter createDefaultConverter() {
         // replace default reflection converter
         reflectionConverter = new RobustReflectionConverter(getMapper(),new JVM().bestReflectionProvider(), new PluginClassOwnership());
         return reflectionConverter;
     }
 
-    /**
+	/**
      * Specifies that a given field of a given class should not be treated with laxity by {@link RobustCollectionConverter}.
      * @param clazz a class which we expect to hold a non-{@code transient} field
      * @param field a field name in that class
@@ -228,12 +230,12 @@ public class XStream2 extends XStream {
         reflectionConverter.addCriticalField(clazz, field);
     }
 
-    static String trimVersion(String version) {
+	static String trimVersion(String version) {
         // TODO seems like there should be some trick with VersionNumber to do this
         return version.replaceFirst(" .+$", "");
     }
 
-    private void init() {
+	private void init() {
         // list up types that should be marshalled out like a value, without referential integrity tracking.
         addImmutableType(Result.class);
 
@@ -268,17 +270,18 @@ public class XStream2 extends XStream {
         }, PRIORITY_VERY_HIGH);
     }
 
-    @Override
+	@Override
     protected MapperWrapper wrapMapper(MapperWrapper next) {
         Mapper m = new CompatibilityMapper(new MapperWrapper(next) {
             @Override
             public String serializedClass(Class type) {
-                if (type != null && ImmutableMap.class.isAssignableFrom(type))
-                    return super.serializedClass(ImmutableMap.class);
-                else if (type != null && ImmutableList.class.isAssignableFrom(type))
-                    return super.serializedClass(ImmutableList.class);
-                else
-                    return super.serializedClass(type);
+                if (type != null && ImmutableMap.class.isAssignableFrom(type)) {
+					return super.serializedClass(ImmutableMap.class);
+				} else if (type != null && ImmutableList.class.isAssignableFrom(type)) {
+					return super.serializedClass(ImmutableList.class);
+				} else {
+					return super.serializedClass(type);
+				}
             }
         });
         AnnotationMapper a = new AnnotationMapper(m, getConverterRegistry(), getConverterLookup(), getClassLoader(), getReflectionProvider(), getJvm());
@@ -290,11 +293,11 @@ public class XStream2 extends XStream {
         return mapperInjectionPoint;
     }
 
-    public Mapper getMapperInjectionPoint() {
+	public Mapper getMapperInjectionPoint() {
         return mapperInjectionPoint.getDelegate();
     }
 
-    /**
+	/**
      * @deprecated Uses default encoding yet fails to write an encoding header. Prefer {@link #toXMLUTF8}.
      */
     @Deprecated
@@ -302,7 +305,7 @@ public class XStream2 extends XStream {
         super.toXML(obj, out);
     }
 
-    /**
+	/**
      * Serializes to a byte stream.
      * Uses UTF-8 encoding and specifies that in the XML encoding declaration.
      * @since 1.504
@@ -313,7 +316,7 @@ public class XStream2 extends XStream {
         toXML(obj, w);
     }
 
-    /**
+	/**
      * This method allows one to insert additional mappers after {@link XStream2} was created,
      * but because of the way XStream works internally, this needs to be done carefully.
      * Namely,
@@ -327,21 +330,7 @@ public class XStream2 extends XStream {
         mapperInjectionPoint.setDelegate(m);
     }
 
-    final class MapperInjectionPoint extends MapperDelegate {
-        public MapperInjectionPoint(Mapper wrapped) {
-            super(wrapped);
-        }
-
-        public Mapper getDelegate() {
-            return delegate;
-        }
-
-        public void setDelegate(Mapper m) {
-            delegate = m;
-        }
-    }
-
-    /**
+	/**
      * Adds an alias in case class names change.
      *
      * Unlike {@link #alias(String, Class)}, which uses the registered alias name for writing XML,
@@ -356,6 +345,20 @@ public class XStream2 extends XStream {
      */
     public void addCompatibilityAlias(String oldClassName, Class newClass) {
         compatibilityAliases.put(oldClassName,newClass);
+    }
+
+	final class MapperInjectionPoint extends MapperDelegate {
+        public MapperInjectionPoint(Mapper wrapped) {
+            super(wrapped);
+        }
+
+        public Mapper getDelegate() {
+            return delegate;
+        }
+
+        public void setDelegate(Mapper m) {
+            delegate = m;
+        }
     }
 
     /**
@@ -373,17 +376,21 @@ public class XStream2 extends XStream {
         @Override
         public Class realClass(String elementName) {
             Class s = compatibilityAliases.get(elementName);
-            if (s!=null)    return s;
+            if (s!=null) {
+				return s;
+			}
 
             try {
                 return super.realClass(elementName);
             } catch (CannotResolveClassException e) {
                 // If a "-" is found, retry with mapping this to "$"
-                if (elementName.indexOf('-') >= 0) try {
-                    Class c = super.realClass(elementName.replace('-', '$'));
-                    oldData.set(Boolean.TRUE);
-                    return c;
-                } catch (CannotResolveClassException e2) { }
+                if (elementName.indexOf('-') >= 0) {
+					try {
+					    Class c = super.realClass(elementName.replace('-', '$'));
+					    oldData.set(Boolean.TRUE);
+					    return c;
+					} catch (CannotResolveClassException e2) { }
+				}
                 // Throw original exception
                 throw e;
             }
@@ -410,9 +417,10 @@ public class XStream2 extends XStream {
             }
             
             Converter result = cache.get(t);
-            if (result != null)
-                // ConcurrentHashMap does not allow null, so use this object to represent null
+            if (result != null) {
+				// ConcurrentHashMap does not allow null, so use this object to represent null
                 return result == this ? null : result;
+			}
             try {
                 final ClassLoader classLoader = t.getClassLoader();
                 if(classLoader == null) {
@@ -424,12 +432,13 @@ public class XStream2 extends XStream {
                 Class<?>[] p = c.getParameterTypes();
                 Object[] args = new Object[p.length];
                 for (int i = 0; i < p.length; i++) {
-                    if(p[i]==XStream.class || p[i]==XStream2.class)
-                        args[i] = xstream;
-                    else if(p[i]== Mapper.class)
-                        args[i] = xstream.getMapper();
-                    else
-                        throw new InstantiationError("Unrecognized constructor parameter: "+p[i]);
+                    if(p[i]==XStream.class || p[i]==XStream2.class) {
+						args[i] = xstream;
+					} else if(p[i]== Mapper.class) {
+						args[i] = xstream.getMapper();
+					} else {
+						throw new InstantiationError("Unrecognized constructor parameter: "+p[i]);
+					}
 
                 }
                 ConverterMatcher cm = (ConverterMatcher)c.newInstance(args);
@@ -452,15 +461,18 @@ public class XStream2 extends XStream {
             }
         }
 
-        public boolean canConvert(Class type) {
+        @Override
+		public boolean canConvert(Class type) {
             return findConverter(type)!=null;
         }
 
-        public void marshal(Object source, HierarchicalStreamWriter writer, MarshallingContext context) {
+        @Override
+		public void marshal(Object source, HierarchicalStreamWriter writer, MarshallingContext context) {
             findConverter(source.getClass()).marshal(source,writer,context);
         }
 
-        public Object unmarshal(HierarchicalStreamReader reader, UnmarshallingContext context) {
+        @Override
+		public Object unmarshal(HierarchicalStreamReader reader, UnmarshallingContext context) {
             return findConverter(context.getRequiredType()).unmarshal(reader,context);
         }
     }
@@ -474,23 +486,26 @@ public class XStream2 extends XStream {
      *     ...
      * </pre>
      */
-    public static abstract class PassthruConverter<T> implements Converter {
+    public abstract static class PassthruConverter<T> implements Converter {
         private Converter converter;
 
         public PassthruConverter(XStream2 xstream) {
             converter = xstream.reflectionConverter;
         }
 
-        public boolean canConvert(Class type) {
+        @Override
+		public boolean canConvert(Class type) {
             // marshal/unmarshal called directly from AssociatedConverterImpl
             return false;
         }
 
-        public void marshal(Object source, HierarchicalStreamWriter writer, MarshallingContext context) {
+        @Override
+		public void marshal(Object source, HierarchicalStreamWriter writer, MarshallingContext context) {
             converter.marshal(source, writer, context);
         }
 
-        public Object unmarshal(HierarchicalStreamReader reader, UnmarshallingContext context) {
+        @Override
+		public Object unmarshal(HierarchicalStreamReader reader, UnmarshallingContext context) {
             Object obj = converter.unmarshal(reader, context);
             callback((T)obj, context);
             return obj;
@@ -531,26 +546,26 @@ public class XStream2 extends XStream {
             }
             // TODO: possibly recursively scan super class to discover dependencies
             PluginWrapper p = pm.whichPlugin(clazz);
-            return p != null ? p.getShortName() + '@' + trimVersion(p.getVersion()) : null;
+            return p != null ? new StringBuilder().append(p.getShortName()).append('@').append(trimVersion(p.getVersion())).toString() : null;
         }
 
     }
 
     private static class BlacklistedTypesConverter implements Converter {
-        @Override
-        public void marshal(Object source, HierarchicalStreamWriter writer, MarshallingContext context) {
-            throw new UnsupportedOperationException("Refusing to marshal " + source.getClass().getName() + " for security reasons; see https://jenkins.io/redirect/class-filter/");
-        }
-
-        @Override
-        public Object unmarshal(HierarchicalStreamReader reader, UnmarshallingContext context) {
-            throw new ConversionException("Refusing to unmarshal " + reader.getNodeName() + " for security reasons; see https://jenkins.io/redirect/class-filter/");
-        }
-
         /** TODO see comment in {@code whitelisted-classes.txt} */
         private static final Pattern JRUBY_PROXY = Pattern.compile("org[.]jruby[.]proxy[.].+[$]Proxy\\d+");
 
-        @Override
+		@Override
+        public void marshal(Object source, HierarchicalStreamWriter writer, MarshallingContext context) {
+            throw new UnsupportedOperationException(new StringBuilder().append("Refusing to marshal ").append(source.getClass().getName()).append(" for security reasons; see https://jenkins.io/redirect/class-filter/").toString());
+        }
+
+		@Override
+        public Object unmarshal(HierarchicalStreamReader reader, UnmarshallingContext context) {
+            throw new ConversionException(new StringBuilder().append("Refusing to unmarshal ").append(reader.getNodeName()).append(" for security reasons; see https://jenkins.io/redirect/class-filter/").toString());
+        }
+
+		@Override
         public boolean canConvert(Class type) {
             if (type == null) {
                 return false;

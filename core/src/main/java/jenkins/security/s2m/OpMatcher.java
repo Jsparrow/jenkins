@@ -10,12 +10,7 @@ import java.io.File;
  * @author Kohsuke Kawaguchi
  */
 interface OpMatcher {
-    boolean matches(String op);
+    OpMatcher ALL = (String op) -> true;
 
-    OpMatcher ALL = new OpMatcher() {
-        @Override
-        public boolean matches(String op) {
-            return true;
-        }
-    };
+	boolean matches(String op);
 }

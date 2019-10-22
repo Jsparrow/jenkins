@@ -23,14 +23,16 @@ public class CompoundEnumeration<T> implements Enumeration<T> {
         this.base = e.iterator();
     }
 
-    public boolean hasMoreElements() {
+    @Override
+	public boolean hasMoreElements() {
         while (!cur.hasMoreElements() && base.hasNext()) {
             cur = base.next();
         }
         return cur.hasMoreElements();
     }
 
-    public T nextElement() throws NoSuchElementException {
+    @Override
+	public T nextElement() {
         return cur.nextElement();
     }
 }

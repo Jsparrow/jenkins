@@ -48,13 +48,13 @@ public class ClassFilterImplSanityTest {
         try (InputStream is = ClassFilterImpl.class.getResourceAsStream("whitelisted-classes.txt")) {
             List<String> lines = IOUtils.readLines(is, StandardCharsets.UTF_8).stream().filter(line -> !line.matches("#.*|\\s*")).collect(Collectors.toList());
             assertThat("whitelist is NOT ordered", new TreeSet<>(lines), contains(lines.toArray(MemoryReductionUtil.EMPTY_STRING_ARRAY)));
-            for (String line : lines) {
+            lines.forEach(line -> {
                 try {
                     Class.forName(line);
                 } catch (ClassNotFoundException x) {
                     System.err.println("skipping checks of unknown class " + line);
                 }
-            }
+            });
         }
     }
 

@@ -87,49 +87,58 @@ public final class ProxyConfiguration extends AbstractDescribableImpl<ProxyConfi
      * note this is value is in milliseconds, it's passed directly to {@link URLConnection#setConnectTimeout(int)}
      */
     private static final int DEFAULT_CONNECT_TIMEOUT_MILLIS = SystemProperties.getInteger("hudson.ProxyConfiguration.DEFAULT_CONNECT_TIMEOUT_MILLIS", (int)TimeUnit.SECONDS.toMillis(20));
-    
-    public final String name;
-    public final int port;
 
-    /**
+	private static final XStream XSTREAM = new XStream2();
+
+	private static final long serialVersionUID = 1L;
+
+	static {
+        XSTREAM.alias("proxy", ProxyConfiguration.class);
+    }
+
+	public final String name;
+
+	public final int port;
+
+	/**
      * Possibly null proxy user name.
      */
     private final String userName;
 
-    /**
+	/**
      * List of host names that shouldn't use proxy, as typed by users.
      *
      * @see #getNoProxyHostPatterns()
      */
     public final String noProxyHost;
 
-    @Deprecated
+	@Deprecated
     private String password;
 
-    /**
+	/**
      * encrypted password
      */
     private Secret secretPassword;
-    
-    private String testUrl;
 
-    private transient Authenticator authenticator;
+	private String testUrl;
 
-    private transient boolean authCacheSeeded;
+	private transient Authenticator authenticator;
 
-    public ProxyConfiguration(String name, int port) {
+	private transient boolean authCacheSeeded;
+
+	public ProxyConfiguration(String name, int port) {
         this(name,port,null,null);
     }
 
-    public ProxyConfiguration(String name, int port, String userName, String password) {
+	public ProxyConfiguration(String name, int port, String userName, String password) {
         this(name,port,userName,password,null);
     }
 
-    public ProxyConfiguration(String name, int port, String userName, String password, String noProxyHost) {
+	public ProxyConfiguration(String name, int port, String userName, String password, String noProxyHost) {
         this(name,port,userName,password,noProxyHost,null);
     }
 
-    @DataBoundConstructor
+	@DataBoundConstructor
     public ProxyConfiguration(String name, int port, String userName, String password, String noProxyHost, String testUrl) {
         this.name = Util.fixEmptyAndTrim(name);
         this.port = port;
@@ -140,7 +149,7 @@ public final class ProxyConfiguration extends AbstractDescribableImpl<ProxyConfi
         this.authenticator = newAuthenticator();
     }
 
-    private Authenticator newAuthenticator() {
+	private Authenticator newAuthenticator() {
         return new Authenticator() {
             @Override
             public PasswordAuthentication getPasswordAuthentication() {
@@ -153,49 +162,53 @@ public final class ProxyConfiguration extends AbstractDescribableImpl<ProxyConfi
         };
     }
 
-    public String getUserName() {
+	public String getUserName() {
         return userName;
     }
 
-//    This method is public, if it was public only for jelly, then should make it private (or inline contents)
-//    Have left public, as can't tell if anyone else is using from plugins
-    /**
-     * @return the password in plain text
-     */
-    public String getPassword() {
-        return Secret.toString(secretPassword);
-    }
+	//    This method is public, if it was public only for jelly, then should make it private (or inline contents)
+	//    Have left public, as can't tell if anyone else is using from plugins
+	    /**
+	     * @return the password in plain text
+	     */
+	    public String getPassword() {
+	        return Secret.toString(secretPassword);
+	    }
 
-    public String getEncryptedPassword() {
+	public String getEncryptedPassword() {
         return (secretPassword == null) ? null : secretPassword.getEncryptedValue();
     }
 
-    public String getTestUrl() {
+	public String getTestUrl() {
         return testUrl;
     }
 
-    /**
+	/**
      * Returns the list of properly formatted no proxy host names.
      */
     public List<Pattern> getNoProxyHostPatterns() {
         return getNoProxyHostPatterns(noProxyHost);
     }
 
-    /**
+	/**
      * Returns the list of properly formatted no proxy host names.
      */
     public static List<Pattern> getNoProxyHostPatterns(String noProxyHost) {
-        if (noProxyHost==null)  return Collections.emptyList();
+        if (noProxyHost==null) {
+			return Collections.emptyList();
+		}
 
         List<Pattern> r = Lists.newArrayList();
         for (String s : noProxyHost.split("[ \t\n,|]+")) {
-            if (s.length()==0)  continue;
+            if (s.isEmpty()) {
+				continue;
+			}
             r.add(Pattern.compile(s.replace(".", "\\.").replace("*", ".*")));
         }
         return r;
     }
 
-    /**
+	/**
      * @deprecated
      *      Use {@link #createProxy(String)}
      */
@@ -204,49 +217,55 @@ public final class ProxyConfiguration extends AbstractDescribableImpl<ProxyConfi
         return createProxy(null);
     }
 
-    public Proxy createProxy(String host) {
+	public Proxy createProxy(String host) {
         return createProxy(host, name, port, noProxyHost);
     }
 
-    public static Proxy createProxy(String host, String name, int port, String noProxyHost) {
+	public static Proxy createProxy(String host, String name, int port, String noProxyHost) {
         if (host!=null && noProxyHost!=null) {
             for (Pattern p : getNoProxyHostPatterns(noProxyHost)) {
-                if (p.matcher(host).matches())
-                    return Proxy.NO_PROXY;
+                if (p.matcher(host).matches()) {
+					return Proxy.NO_PROXY;
+				}
             }
         }
         return new Proxy(Proxy.Type.HTTP, new InetSocketAddress(name,port));
     }
 
-    public void save() throws IOException {
-        if(BulkChange.contains(this))   return;
+	@Override
+	public void save() throws IOException {
+        if(BulkChange.contains(this)) {
+			return;
+		}
         XmlFile config = getXmlFile();
         config.write(this);
         SaveableListener.fireOnChange(this, config);
     }
 
-    private Object readResolve() {
-        if (secretPassword == null)
-            // backward compatibility : get scrambled password and store it encrypted
+	private Object readResolve() {
+        if (secretPassword == null) {
+			// backward compatibility : get scrambled password and store it encrypted
             secretPassword = Secret.fromString(Scrambler.descramble(password));
+		}
         password = null;
         authenticator = newAuthenticator();
         return this;
     }
 
-    public static XmlFile getXmlFile() {
+	public static XmlFile getXmlFile() {
         return new XmlFile(XSTREAM, new File(Jenkins.get().getRootDir(), "proxy.xml"));
     }
 
-    public static ProxyConfiguration load() throws IOException {
+	public static ProxyConfiguration load() throws IOException {
         XmlFile f = getXmlFile();
-        if(f.exists())
-            return (ProxyConfiguration) f.read();
-        else
-            return null;
+        if(f.exists()) {
+			return (ProxyConfiguration) f.read();
+		} else {
+			return null;
+		}
     }
 
-    /**
+	/**
      * This method should be used wherever {@link URL#openConnection()} to internet URLs is invoked directly.
      */
     public static URLConnection open(URL url) throws IOException {
@@ -276,10 +295,11 @@ public final class ProxyConfiguration extends AbstractDescribableImpl<ProxyConfi
         return con;
     }
 
-    public static InputStream getInputStream(URL url) throws IOException {
+	public static InputStream getInputStream(URL url) throws IOException {
         final ProxyConfiguration p = get();
-        if (p == null)
-            return new RetryableHttpStream(url);
+        if (p == null) {
+			return new RetryableHttpStream(url);
+		}
 
         Proxy proxy = p.createProxy(url.getHost());
         InputStream is = new RetryableHttpStream(url, proxy);
@@ -292,7 +312,7 @@ public final class ProxyConfiguration extends AbstractDescribableImpl<ProxyConfi
         return is;
     }
 
-    /**
+	/**
      * If the first URL we try to access with a HTTP proxy is HTTPS then the authentication cache will not have been
      * pre-populated, so we try to access at least one HTTP URL before the very first HTTPS url.
      * @param proxy
@@ -320,7 +340,7 @@ public final class ProxyConfiguration extends AbstractDescribableImpl<ProxyConfi
         }
     }
 
-    @CheckForNull
+	@CheckForNull
     private static ProxyConfiguration get() {
         if (JenkinsJVM.isJenkinsJVM()) {
             return _get();
@@ -328,7 +348,7 @@ public final class ProxyConfiguration extends AbstractDescribableImpl<ProxyConfi
         return null;
     }
 
-    @CheckForNull
+	@CheckForNull
     private static ProxyConfiguration _get() {
         JenkinsJVM.checkJenkinsJVM();
         // this code could be called between the JVM flag being set and theInstance initialized
@@ -336,19 +356,12 @@ public final class ProxyConfiguration extends AbstractDescribableImpl<ProxyConfi
         return jenkins == null ? null : jenkins.proxy;
     }
 
-    private static void decorate(URLConnection con) throws IOException {
-        for (URLConnectionDecorator d : URLConnectionDecorator.all())
-            d.decorate(con);
+	private static void decorate(URLConnection con) throws IOException {
+        for (URLConnectionDecorator d : URLConnectionDecorator.all()) {
+			d.decorate(con);
+		}
     }
-
-    private static final XStream XSTREAM = new XStream2();
-
-    private static final long serialVersionUID = 1L;
-
-    static {
-        XSTREAM.alias("proxy", ProxyConfiguration.class);
-    }
-
+    
     @Extension @Symbol("proxy")
     public static class DescriptorImpl extends Descriptor<ProxyConfiguration> {
         @Override
@@ -433,13 +446,12 @@ public final class ProxyConfiguration extends AbstractDescribableImpl<ProxyConfi
         }
 
         private Credentials createCredentials(String userName, String password) {
-            if (userName.indexOf('\\') >= 0){
-                final String domain = userName.substring(0, userName.indexOf('\\'));
-                final String user = userName.substring(userName.indexOf('\\') + 1);
-                return new NTCredentials(user, Secret.fromString(password).getPlainText(), "", domain);
-            } else {
-                return new UsernamePasswordCredentials(userName, Secret.fromString(password).getPlainText());
-            }
+            if (userName.indexOf('\\') < 0) {
+				return new UsernamePasswordCredentials(userName, Secret.fromString(password).getPlainText());
+			}
+			final String domain = userName.substring(0, userName.indexOf('\\'));
+			final String user = userName.substring(userName.indexOf('\\') + 1);
+			return new NTCredentials(user, Secret.fromString(password).getPlainText(), "", domain);
         }
     }
 }

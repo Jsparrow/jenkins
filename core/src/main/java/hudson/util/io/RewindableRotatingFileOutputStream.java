@@ -44,8 +44,10 @@ public class RewindableRotatingFileOutputStream extends RewindableFileOutputStre
     }
 
     protected File getNumberedFileName(int n) {
-        if (n==0)   return out;
-        return new File(out.getPath()+"."+n);
+        if (n==0) {
+			return out;
+		}
+        return new File(new StringBuilder().append(out.getPath()).append(".").append(n).toString());
     }
 
     @Override

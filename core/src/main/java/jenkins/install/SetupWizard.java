@@ -82,18 +82,55 @@ import org.kohsuke.stapler.verb.POST;
 @Restricted(NoExternalUse.class)
 @Extension
 public class SetupWizard extends PageDecorator {
-    public SetupWizard() {
-        checkFilter();
-    }
-
     /**
      * The security token parameter name
      */
     public static String initialSetupAdminUserName = "admin";
 
-    private static final Logger LOGGER = Logger.getLogger(SetupWizard.class.getName());
-    
-    /**
+	private static final Logger LOGGER = Logger.getLogger(SetupWizard.class.getName());
+
+	/**
+     * This filter will validate that the security token is provided
+     */
+    private final Filter FORCE_SETUP_WIZARD_FILTER = new Filter() {
+        @Override
+        public void init(FilterConfig cfg) throws ServletException {
+        }
+
+        @Override
+        public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+            // Force root requests to the setup wizard
+            if (request instanceof HttpServletRequest && !Jenkins.get().getInstallState().isSetupComplete()) {
+                HttpServletRequest req = (HttpServletRequest) request;
+                String requestURI = req.getRequestURI();
+                if (requestURI.equals(req.getContextPath()) && !requestURI.endsWith("/")) {
+                    ((HttpServletResponse) response).sendRedirect(req.getContextPath() + "/");
+                    return;
+                } else if (req.getRequestURI().equals(req.getContextPath() + "/")) {
+                    Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+                    chain.doFilter(new HttpServletRequestWrapper(req) {
+                        @Override
+						public String getRequestURI() {
+                            return getContextPath() + "/setupWizard/";
+                        }
+                    }, response);
+                    return;
+                }
+                // fall through to handling the request normally
+            }
+            chain.doFilter(request, response);
+        }
+
+        @Override
+        public void destroy() {
+        }
+    };
+
+	public SetupWizard() {
+        checkFilter();
+    }
+
+	/**
      * Initialize the setup wizard, this will process any current state initializations
      */
     /*package*/ void init(boolean newInstall) throws IOException, InterruptedException {
@@ -146,21 +183,11 @@ public class SetupWizard extends PageDecorator {
             if(iapf.exists()) {
                 String setupKey = iapf.readToString().trim();
                 String ls = System.lineSeparator();
-                LOGGER.info(ls + ls + "*************************************************************" + ls
-                        + "*************************************************************" + ls
-                        + "*************************************************************" + ls
-                        + ls
-                        + "Jenkins initial setup is required. An admin user has been created and "
-                        + "a password generated." + ls
-                        + "Please use the following password to proceed to installation:" + ls
-                        + ls
-                        + setupKey + ls
-                        + ls
-                        + "This may also be found at: " + iapf.getRemote() + ls
-                        + ls
-                        + "*************************************************************" + ls
-                        + "*************************************************************" + ls
-                        + "*************************************************************" + ls);
+                LOGGER.info(new StringBuilder().append(ls).append(ls).append("*************************************************************").append(ls).append("*************************************************************")
+						.append(ls).append("*************************************************************").append(ls).append(ls).append("Jenkins initial setup is required. An admin user has been created and ").append("a password generated.")
+						.append(ls).append("Please use the following password to proceed to installation:").append(ls).append(ls).append(setupKey).append(ls)
+						.append(ls).append("This may also be found at: ").append(iapf.getRemote()).append(ls).append(ls).append("*************************************************************")
+						.append(ls).append("*************************************************************").append(ls).append("*************************************************************").append(ls).toString());
             }
         }
 
@@ -172,7 +199,7 @@ public class SetupWizard extends PageDecorator {
         }
     }
 
-    private void setUpFilter() {
+	private void setUpFilter() {
         try {
             if (!PluginServletFilter.hasFilter(FORCE_SETUP_WIZARD_FILTER)) {
                 PluginServletFilter.addFilter(FORCE_SETUP_WIZARD_FILTER);
@@ -182,7 +209,7 @@ public class SetupWizard extends PageDecorator {
         }
     }
 
-    private void tearDownFilter() {
+	private void tearDownFilter() {
         try {
             if (PluginServletFilter.hasFilter(FORCE_SETUP_WIZARD_FILTER)) {
                 PluginServletFilter.removeFilter(FORCE_SETUP_WIZARD_FILTER);
@@ -191,8 +218,8 @@ public class SetupWizard extends PageDecorator {
             throw new RuntimeException("Unable to remove PluginServletFilter for the SetupWizard", e);
         }
     }
- 
-    /**
+
+	/**
      * Indicates a generated password should be used - e.g. this is a new install, no security realm set up
      */
     @SuppressWarnings("unused") // used by jelly
@@ -206,7 +233,7 @@ public class SetupWizard extends PageDecorator {
         return false;
     }
 
-    /**
+	/**
      * Determines if the security settings seem to match the defaults. Here, we only
      * really care about and test for HudsonPrivateSecurityRealm and the user setup.
      * Other settings are irrelevant.
@@ -219,11 +246,9 @@ public class SetupWizard extends PageDecorator {
                 if(securityRealm.getAllUsers().size() == 1) {
                     HudsonPrivateSecurityRealm.Details details = securityRealm.loadUserByUsername(SetupWizard.initialSetupAdminUserName);
                     FilePath iapf = getInitialAdminPasswordFile();
-                    if (iapf.exists()) {
-                        if (details.isPasswordCorrect(iapf.readToString().trim())) {
-                            return true;
-                        }
-                    }
+                    if (iapf.exists() && details.isPasswordCorrect(iapf.readToString().trim())) {
+					    return true;
+					}
                 }
             } catch(UsernameNotFoundException | IOException | InterruptedException e) {
                 return false; // Not initial security setup if no transitional admin user / password found
@@ -232,7 +257,7 @@ public class SetupWizard extends PageDecorator {
         return false;
     }
 
-    /**
+	/**
      * Called during the initial setup to create an admin user
      */
     @POST
@@ -301,9 +326,9 @@ public class SetupWizard extends PageDecorator {
                 admin.save(); // recreate this initial user if something failed
             }
         }
-    }    
-    
-    @POST
+    }
+
+	@POST
     @Restricted(NoExternalUse.class)
     public HttpResponse doConfigureInstance(StaplerRequest req, @QueryParameter String rootUrl) {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
@@ -317,7 +342,7 @@ public class SetupWizard extends PageDecorator {
         }
         
         // use the parameters to configure the instance
-        useRootUrl(errors, rootUrl);
+        useRootUrl(rootUrl);
         
         if(!errors.isEmpty()){
             return HttpResponses.errorJSON(Messages.SetupWizard_ConfigureInstance_ValidationErrors(), errors);
@@ -332,8 +357,8 @@ public class SetupWizard extends PageDecorator {
         }
         return HttpResponses.okJSON(data);
     }
-    
-    private void checkRootUrl(Map<String, String> errors, @CheckForNull String rootUrl){
+
+	private void checkRootUrl(Map<String, String> errors, @CheckForNull String rootUrl){
         if(rootUrl == null){
             errors.put("rootUrl", Messages.SetupWizard_ConfigureInstance_RootUrl_Empty());
             return;
@@ -342,17 +367,17 @@ public class SetupWizard extends PageDecorator {
             errors.put("rootUrl", Messages.SetupWizard_ConfigureInstance_RootUrl_Invalid());
         }
     }
-    
-    private void useRootUrl(Map<String, String> errors, @CheckForNull String rootUrl){
+
+	private void useRootUrl(@CheckForNull String rootUrl){
         LOGGER.log(Level.FINE, "Root URL set during SetupWizard to {0}", new Object[]{ rootUrl });
         JenkinsLocationConfiguration.getOrDie().setUrl(rootUrl);
     }
 
-    /*package*/ void setCurrentLevel(VersionNumber v) throws IOException {
+	/*package*/ void setCurrentLevel(VersionNumber v) throws IOException {
         FileUtils.writeStringToFile(getUpdateStateFile(), v.toString());
     }
-    
-    /**
+
+	/**
      * File that captures the state of upgrade.
      *
      * This file records the version number that the installation has upgraded to.
@@ -360,8 +385,8 @@ public class SetupWizard extends PageDecorator {
     /*package*/ static File getUpdateStateFile() {
         return new File(Jenkins.get().getRootDir(),"jenkins.install.UpgradeWizard.state");
     }
-    
-    /**
+
+	/**
      * What is the version the upgrade wizard has run the last time and upgraded to?.
      * If {@link #getUpdateStateFile()} is missing, presumes the baseline is 1.0
      * @return Current baseline. {@code null} if it cannot be retrieved.
@@ -381,8 +406,8 @@ public class SetupWizard extends PageDecorator {
         }
         return from;
     }
-    
-    /**
+
+	/**
      * Returns the initial plugin list in JSON format
      */
     @Restricted(DoNotUse.class) // WebOnly
@@ -403,8 +428,8 @@ public class SetupWizard extends PageDecorator {
         }
         return HttpResponses.okJSON();
     }
-    
-    /**
+
+	/**
      * Returns whether the system needs a restart, and if it is supported
      * e.g. { restartRequired: true, restartSupported: false }
      */
@@ -417,7 +442,7 @@ public class SetupWizard extends PageDecorator {
         return HttpResponses.okJSON(response);
     }
 
-    /**
+	/**
      * Provides the list of platform plugin updates from the last time
      * the upgrade was run.
      * @return {@code null} if the version range cannot be retrieved.
@@ -430,8 +455,8 @@ public class SetupWizard extends PageDecorator {
         }
         return getPlatformPluginsForUpdate(version, Jenkins.getVersion());
     }
-    
-    /**
+
+	/**
      * Gets the suggested plugin list from the update sites, falling back to a local version
      * @return JSON array with the categorized plugin list
      */
@@ -449,7 +474,7 @@ public class SetupWizard extends PageDecorator {
                     if(connection instanceof HttpURLConnection) {
                         int responseCode = ((HttpURLConnection)connection).getResponseCode();
                         if(HttpURLConnection.HTTP_OK != responseCode) {
-                            throw new HttpRetryException("Invalid response code (" + responseCode + ") from URL: " + suggestedPluginUrl, responseCode);
+                            throw new HttpRetryException(new StringBuilder().append("Invalid response code (").append(responseCode).append(") from URL: ").append(suggestedPluginUrl).toString(), responseCode);
                         }
                     }
                     
@@ -479,7 +504,7 @@ public class SetupWizard extends PageDecorator {
         return initialPluginList;
     }
 
-    /**
+	/**
      * Get the platform plugins added in the version range
      */
     /*package*/ JSONArray getPlatformPluginsForUpdate(VersionNumber from, VersionNumber to) {
@@ -536,14 +561,14 @@ public class SetupWizard extends PageDecorator {
         return pluginCategories;
     }
 
-    /**
+	/**
      * Gets the file used to store the initial admin password
      */
     public FilePath getInitialAdminPasswordFile() {
         return Jenkins.get().getRootPath().child("secrets/initialAdminPassword");
     }
 
-    /**
+	/**
      * Remove the setupWizard filter, ensure all updates are written to disk, etc
      */
     @RequirePOST
@@ -551,22 +576,22 @@ public class SetupWizard extends PageDecorator {
         completeSetup();
         return HttpResponses.okJSON();
     }
-    
-    /*package*/ void completeSetup() throws IOException, ServletException {
+
+	/*package*/ void completeSetup() throws IOException, ServletException {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
         InstallUtil.saveLastExecVersion();
         setCurrentLevel(Jenkins.getVersion());
         InstallUtil.proceedToNextStateFrom(InstallState.INITIAL_SETUP_COMPLETED);
     }
-    
-    /**
+
+	/**
      * Gets all the install states
      */
     public List<InstallState> getInstallStates() {
         return InstallState.all();
     }
-    
-    /**
+
+	/**
      * Returns an installState by name
      */
     public InstallState getInstallState(String name) {
@@ -576,7 +601,7 @@ public class SetupWizard extends PageDecorator {
         return InstallState.valueOf(name);
     }
 
-    /**
+	/**
      * Called upon install state update.
      * @param state the new install state.
      * @since 2.94
@@ -589,7 +614,7 @@ public class SetupWizard extends PageDecorator {
         }
     }
 
-    /**
+	/**
      * Returns whether the setup wizard filter is currently registered.
      * @since 2.94
      */
@@ -597,43 +622,7 @@ public class SetupWizard extends PageDecorator {
         return PluginServletFilter.hasFilter(FORCE_SETUP_WIZARD_FILTER);
     }
 
-    /**
-     * This filter will validate that the security token is provided
-     */
-    private final Filter FORCE_SETUP_WIZARD_FILTER = new Filter() {
-        @Override
-        public void init(FilterConfig cfg) throws ServletException {
-        }
-
-        @Override
-        public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
-            // Force root requests to the setup wizard
-            if (request instanceof HttpServletRequest && !Jenkins.get().getInstallState().isSetupComplete()) {
-                HttpServletRequest req = (HttpServletRequest) request;
-                String requestURI = req.getRequestURI();
-                if (requestURI.equals(req.getContextPath()) && !requestURI.endsWith("/")) {
-                    ((HttpServletResponse) response).sendRedirect(req.getContextPath() + "/");
-                    return;
-                } else if (req.getRequestURI().equals(req.getContextPath() + "/")) {
-                    Jenkins.get().checkPermission(Jenkins.ADMINISTER);
-                    chain.doFilter(new HttpServletRequestWrapper(req) {
-                        public String getRequestURI() {
-                            return getContextPath() + "/setupWizard/";
-                        }
-                    }, response);
-                    return;
-                }
-                // fall through to handling the request normally
-            }
-            chain.doFilter(request, response);
-        }
-
-        @Override
-        public void destroy() {
-        }
-    };
-
-    /**
+	/**
      * Sets up the Setup Wizard filter if the current state requires it.
      */
     private void checkFilter() {

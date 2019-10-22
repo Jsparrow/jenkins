@@ -88,7 +88,664 @@ import org.xmlpull.v1.XmlPullParserException;
  */
 @ExportedBean
 public class Fingerprint implements ModelObject, Saveable {
-    /**
+    private static final DateConverter DATE_CONVERTER = new DateConverter();
+
+	private static final XStream2 XSTREAM = new XStream2();
+
+	static {
+        XSTREAM.alias("fingerprint",Fingerprint.class);
+        XSTREAM.alias("range",Range.class);
+        XSTREAM.alias("ranges",RangeSet.class);
+        XSTREAM.registerConverter(new HexBinaryConverter(),10);
+        XSTREAM.registerConverter(new RangeSet.ConverterImpl(
+            new CollectionConverter(XSTREAM.getMapper()) {
+                @Override
+                protected Object createCollection(Class type) {
+                    return new ArrayList();
+                }
+            }
+        ),10);
+    }
+
+	private static final Logger logger = Logger.getLogger(Fingerprint.class.getName());
+
+	/**
+     * Time when the fingerprint has been captured.
+     */
+    private final @Nonnull Date timestamp;
+
+	/**
+     * Null if this fingerprint is for a file that's
+     * apparently produced outside.
+     */
+    private final @CheckForNull BuildPtr original;
+
+	private final byte[] md5sum;
+
+	private final String fileName;
+
+	/**
+     * Range of builds that use this file keyed by a job full name.
+     */
+    private Hashtable<String,RangeSet> usages = new Hashtable<>();
+
+	PersistedList<FingerprintFacet> facets = new PersistedList<>(this);
+
+	/**
+     * Lazily computed immutable {@link FingerprintFacet}s created from {@link TransientFingerprintFacetFactory}.
+     */
+    private transient volatile List<FingerprintFacet> transientFacets = null;
+
+	public Fingerprint(@CheckForNull Run build, @Nonnull String fileName, @Nonnull byte[] md5sum) throws IOException {
+        this(build==null ? null : new BuildPtr(build), fileName, md5sum);
+        save();
+    }
+
+	Fingerprint(@CheckForNull BuildPtr original, @Nonnull String fileName, @Nonnull byte[] md5sum) {
+        this.original = original;
+        this.md5sum = md5sum;
+        this.fileName = fileName;
+        this.timestamp = new Date();
+    }
+
+	/**
+     * The first build in which this file showed up,
+     * if the file looked like it's created there.
+     * <p>
+     * This is considered as the "source" of this file,
+     * or the owner, in the sense that this project "owns"
+     * this file.
+     *
+     * @return null
+     *      if the file is apparently created outside Hudson or if the current
+     *      user has no permission to discover the job.
+     */
+    @Exported
+    public @CheckForNull BuildPtr getOriginal() {
+        if (original != null && original.hasPermissionToDiscoverBuild()) {
+            return original;
+        }
+        return null;
+    }
+
+	@Override
+	public @Nonnull String getDisplayName() {
+        return fileName;
+    }
+
+	/**
+     * The file name (like "foo.jar" without path).
+     */
+    @Exported
+    public @Nonnull String getFileName() {
+        return fileName;
+    }
+
+	/**
+     * Gets the MD5 hash string.
+     */
+    @Exported(name="hash")
+    public @Nonnull String getHashString() {
+        return Util.toHexString(md5sum);
+    }
+
+	/**
+     * Gets the timestamp when this record is created.
+     */
+    @Exported
+    public @Nonnull Date getTimestamp() {
+        return timestamp;
+    }
+
+	/**
+     * Gets the string that says how long since this build has scheduled.
+     *
+     * @return
+     *      string like "3 minutes" "1 day" etc.
+     */
+    public @Nonnull String getTimestampString() {
+        long duration = System.currentTimeMillis()-timestamp.getTime();
+        return Util.getTimeSpanString(duration);
+    }
+
+	/**
+     * Gets the build range set for the given job name.
+     *
+     * <p>
+     * These builds of this job has used this file.
+     * @return may be empty but not null.
+     */
+    public @Nonnull RangeSet getRangeSet(String jobFullName) {
+        RangeSet r = usages.getOrDefault(jobFullName, new RangeSet());
+        return r;
+    }
+
+	public RangeSet getRangeSet(Job job) {
+        return getRangeSet(job.getFullName());
+    }
+
+	/**
+     * Gets the sorted list of job names where this jar is used.
+     */
+    public @Nonnull List<String> getJobs() {
+        List<String> r = new ArrayList<>(usages.keySet());
+        Collections.sort(r);
+        return r;
+    }
+
+	public @CheckForNull Hashtable<String,RangeSet> getUsages() {
+        return usages;
+    }
+
+	// this is for remote API
+    @Exported(name="usage")
+    public @Nonnull List<RangeItem> _getUsages() {
+        List<RangeItem> r = new ArrayList<>();
+        final Jenkins instance = Jenkins.get();
+        usages.entrySet().forEach(e -> {
+            final String itemName = e.getKey();
+            if (instance.hasPermission(Jenkins.ADMINISTER) || canDiscoverItem(itemName)) {
+                r.add(new RangeItem(itemName, e.getValue()));
+            }
+        });
+        return r;
+    }
+
+	/**
+     * @deprecated Use {@link #addFor(hudson.model.Run)}
+     */
+    @Deprecated
+    public synchronized void add(@Nonnull AbstractBuild b) throws IOException {
+        addFor(b);
+    }
+
+	/**
+     * Adds a usage reference to the build.
+     * @param b {@link Run} to be referenced in {@link #usages}
+     * @since 1.577
+     */
+    public synchronized void addFor(@Nonnull Run b) throws IOException {
+        add(b.getParent().getFullName(), b.getNumber());
+    }
+
+	/**
+     * Records that a build of a job has used this file.
+     */
+    public synchronized void add(@Nonnull String jobFullName, int n) throws IOException {
+        addWithoutSaving(jobFullName, n);
+        save();
+    }
+
+	// JENKINS-49588
+    protected Object readResolve() {
+        if (usages == null) {
+            usages = new Hashtable<>();
+        }
+        return this;
+    }
+
+	void addWithoutSaving(@Nonnull String jobFullName, int n) {
+        synchronized(usages) { // TODO why not synchronized (this) like some, though not all, other accesses?
+            RangeSet r = usages.get(jobFullName);
+            if(r==null) {
+                r = new RangeSet();
+                usages.put(jobFullName,r);
+            }
+            r.add(n);
+        }
+    }
+
+	/**
+     * Returns true if any of the builds recorded in this fingerprint
+     * is still retained.
+     *
+     * <p>
+     * This is used to find out old fingerprint records that can be removed
+     * without losing too much information.
+     */
+    public synchronized boolean isAlive() {
+        if(original!=null && original.isAlive()) {
+			return true;
+		}
+
+        for (Entry<String,RangeSet> e : usages.entrySet()) {
+            Job j = Jenkins.get().getItemByFullName(e.getKey(),Job.class);
+            if(j==null) {
+				continue;
+			}
+
+            Run firstBuild = j.getFirstBuild();
+            if(firstBuild==null) {
+				continue;
+			}
+
+            int oldest = firstBuild.getNumber();
+            if(!e.getValue().isSmallerThan(oldest)) {
+				return true;
+			}
+        }
+        return false;
+    }
+
+	/**
+     * Trim off references to non-existent builds and jobs, thereby making the fingerprint smaller.
+     *
+     * @return true
+     *      if this record was modified.
+     * 
+     * @throws IOException Save failure
+     */
+    public synchronized boolean trim() throws IOException {
+        boolean modified = false;
+
+        for (Entry<String,RangeSet> e : new Hashtable<>(usages).entrySet()) {// copy because we mutate
+            Job j = Jenkins.get().getItemByFullName(e.getKey(),Job.class);
+            if(j==null) {// no such job any more. recycle the record
+                modified = true;
+                usages.remove(e.getKey());
+                continue;
+            }
+
+            Run firstBuild = j.getFirstBuild();
+            if(firstBuild==null) {// no builds. recycle the whole record
+                modified = true;
+                usages.remove(e.getKey());
+                continue;
+            }
+
+            RangeSet cur = e.getValue();
+
+            // builds that are around without the keepLog flag on are normally clustered together (in terms of build #)
+            // so our basic strategy is to discard everything up to the first ephemeral build, except those builds
+            // that are marked as kept
+            RangeSet kept = new RangeSet();
+            Run r = firstBuild;
+            while (r!=null && r.isKeepLog()) {
+                kept.add(r.getNumber());
+                r = r.getNextBuild();
+            }
+
+            if (r==null) {
+                // all the build records are permanently kept ones, so we'll just have to keep 'kept' out of whatever currently in 'cur'
+                modified |= cur.retainAll(kept);
+            } else {
+                // otherwise we are ready to discard [0,r.number) except those marked as 'kept'
+                RangeSet discarding =  new RangeSet(new Range(-1,r.getNumber()));
+                discarding.removeAll(kept);
+                modified |= cur.removeAll(discarding);
+            }
+
+            if (cur.isEmpty()) {
+                usages.remove(e.getKey());
+                modified = true;
+            }
+        }
+
+        if (modified) {
+            if (logger.isLoggable(Level.FINE)) {
+                logger.log(Level.FINE, "Saving trimmed {0}", getFingerprintFile(md5sum));
+            }
+            save();
+        }
+
+        return modified;
+    }
+
+	/**
+     * Gets the associated {@link FingerprintFacet}s.
+     *
+     * <p>
+     * This method always return a non-empty collection, which is a synthetic collection.
+     * It contains persisted {@link FingerprintFacet}s (those that are added explicitly, like
+     * {@code fingerprint.getFacets().add(x)}), as well those {@linkplain TransientFingerprintFacetFactory that are transient}.
+     *
+     * <p>
+     * Mutation to this collection will manipulate persisted set of {@link FingerprintFacet}s, and therefore regardless
+     * of what you do, this collection will always contain a set of {@link FingerprintFacet}s that are added
+     * by {@link TransientFingerprintFacetFactory}s.
+     *
+     * @since 1.421
+     */
+    public @Nonnull Collection<FingerprintFacet> getFacets() {
+        if (transientFacets==null) {
+            List<FingerprintFacet> transientFacets = new ArrayList<>();
+            TransientFingerprintFacetFactory.all().forEach(fff -> fff.createFor(this, transientFacets));
+            this.transientFacets = ImmutableList.copyOf(transientFacets);
+        }
+
+        return new AbstractCollection<FingerprintFacet>() {
+            @Override
+            public Iterator<FingerprintFacet> iterator() {
+                return Iterators.sequence(facets.iterator(), transientFacets.iterator());
+            }
+
+            @Override
+            public boolean add(FingerprintFacet e) {
+                facets.add(e);
+                return true;
+            }
+
+            @Override
+            public boolean remove(Object o) {
+                return facets.remove(o);
+            }
+
+            @Override
+            public boolean contains(Object o) {
+                return facets.contains(o) || transientFacets.contains(o);
+            }
+
+            @Override
+            public int size() {
+                return facets.size()+transientFacets.size();
+            }
+        };
+    }
+
+	/**
+     * Sorts {@link FingerprintFacet}s by their timestamps.
+     * @return Sorted list of {@link FingerprintFacet}s 
+     */
+    public @Nonnull Collection<FingerprintFacet> getSortedFacets() {
+        List<FingerprintFacet> r = new ArrayList<>(getFacets());
+        r.sort(new Comparator<FingerprintFacet>() {
+            @Override
+			public int compare(FingerprintFacet o1, FingerprintFacet o2) {
+                long a = o1.getTimestamp();
+                long b = o2.getTimestamp();
+                if (a < b) {
+					return -1;
+				}
+                if (a == b) {
+					return 0;
+				}
+                return 1;
+            }
+        });
+        return r;
+    }
+
+	/**
+     * Finds a facet of the specific type (including subtypes.)
+     * @param <T> Class of the {@link FingerprintFacet}
+     * @return First matching facet of the specified class
+     * @since 1.556
+     */
+    public @CheckForNull <T extends FingerprintFacet> T getFacet(Class<T> type) {
+        return getFacets().stream().filter(type::isInstance).findFirst().map(type::cast).orElse(null);
+    }
+
+	/**
+     * Returns the actions contributed from {@link #getFacets()}
+     */
+    public @Nonnull List<Action> getActions() {
+        List<Action> r = new ArrayList<>();
+        getFacets().forEach(ff -> ff.createActions(r));
+        return Collections.unmodifiableList(r);
+    }
+
+	/**
+     * Save the settings to a file.
+     * @throws IOException Save error
+     */
+    @Override
+	public synchronized void save() throws IOException {
+        if(BulkChange.contains(this)) {
+			return;
+		}
+
+        long start=0;
+        if(logger.isLoggable(Level.FINE)) {
+			start = System.currentTimeMillis();
+		}
+
+        File file = getFingerprintFile(md5sum);
+        save(file);
+        SaveableListener.fireOnChange(this, getConfigFile(file));
+
+        if(logger.isLoggable(Level.FINE)) {
+			logger.fine(new StringBuilder().append("Saving fingerprint ").append(file).append(" took ").append(System.currentTimeMillis()-start).append("ms").toString());
+		}
+    }
+
+	void save(File file) throws IOException {
+        if (facets.isEmpty()) {
+            file.getParentFile().mkdirs();
+            // JENKINS-16301: fast path for the common case.
+            AtomicFileWriter afw = new AtomicFileWriter(file);
+            try {
+                PrintWriter w = new PrintWriter(afw);
+                w.println("<?xml version='1.1' encoding='UTF-8'?>");
+                w.println("<fingerprint>");
+                w.print("  <timestamp>");
+                w.print(DATE_CONVERTER.toString(timestamp));
+                w.println("</timestamp>");
+                if (original != null) {
+                    w.println("  <original>");
+                    w.print("    <name>");
+                    w.print(Util.xmlEscape(original.name));
+                    w.println("</name>");
+                    w.print("    <number>");
+                    w.print(original.number);
+                    w.println("</number>");
+                    w.println("  </original>");
+                }
+                w.print("  <md5sum>");
+                w.print(Util.toHexString(md5sum));
+                w.println("</md5sum>");
+                w.print("  <fileName>");
+                w.print(Util.xmlEscape(fileName));
+                w.println("</fileName>");
+                w.println("  <usages>");
+                usages.entrySet().forEach(e -> {
+                    w.println("    <entry>");
+                    w.print("      <string>");
+                    w.print(Util.xmlEscape(e.getKey()));
+                    w.println("</string>");
+                    w.print("      <ranges>");
+                    w.print(RangeSet.ConverterImpl.serialize(e.getValue()));
+                    w.println("</ranges>");
+                    w.println("    </entry>");
+                });
+                w.println("  </usages>");
+                w.println("  <facets/>");
+                w.print("</fingerprint>");
+                w.flush();
+                afw.commit();
+            } finally {
+                afw.abort();
+            }
+        } else {
+            // Slower fallback that can persist facets.
+            getConfigFile(file).write(this);
+        }
+    }
+
+	/**
+     * Update references to a renamed job in the fingerprint
+     */
+    public synchronized void rename(String oldName, String newName) throws IOException {
+        boolean touched = false;
+        boolean condition = original != null && original.getName().equals(oldName);
+		if (condition) {
+		    original.setName(newName);
+		    touched = true;
+		}
+        
+        if (usages != null) {
+            RangeSet r = usages.get(oldName);
+            if (r != null) {
+                usages.put(newName, r);
+                usages.remove(oldName);
+                touched = true;
+            }
+        }
+        
+        if (touched) {
+            save();
+        }
+    }
+
+	public Api getApi() {
+        return new Api(this);
+    }
+
+	/**
+     * The file we save our configuration.
+     */
+    private static @Nonnull XmlFile getConfigFile(@Nonnull File file) {
+        return new XmlFile(XSTREAM,file);
+    }
+
+	/**
+     * Determines the file name from md5sum.
+     */
+    private static @Nonnull File getFingerprintFile(@Nonnull byte[] md5sum) {
+        assert md5sum.length==16;
+        return new File( Jenkins.get().getRootDir(),
+            new StringBuilder().append("fingerprints/").append(Util.toHexString(md5sum,0,1)).append('/').append(Util.toHexString(md5sum,1,1)).append('/').append(Util.toHexString(md5sum,2,md5sum.length-2))
+					.append(".xml").toString());
+    }
+
+	/**
+     * Loads a {@link Fingerprint} from a file in the image.
+     * @return Loaded {@link Fingerprint}. Null if the config file does not exist or
+     * malformed.
+     */
+    /*package*/ static @CheckForNull Fingerprint load(@Nonnull byte[] md5sum) throws IOException {
+        return load(getFingerprintFile(md5sum));
+    }
+
+	/*package*/ static @CheckForNull Fingerprint load(@Nonnull File file) throws IOException {
+        XmlFile configFile = getConfigFile(file);
+        if(!configFile.exists()) {
+			return null;
+		}
+
+        long start=0;
+        if(logger.isLoggable(Level.FINE)) {
+			start = System.currentTimeMillis();
+		}
+
+        try {
+            Object loaded = configFile.read();
+            if (!(loaded instanceof Fingerprint)) {
+                throw new IOException(new StringBuilder().append("Unexpected Fingerprint type. Expected ").append(Fingerprint.class).append(" or subclass but got ").append(loaded != null ? loaded.getClass() : "null")
+						.toString());
+            }
+            Fingerprint f = (Fingerprint) loaded;
+            if(logger.isLoggable(Level.FINE)) {
+				logger.fine(new StringBuilder().append("Loading fingerprint ").append(file).append(" took ").append(System.currentTimeMillis()-start).append("ms")
+						.toString());
+			}
+            if (f.facets==null) {
+				f.facets = new PersistedList<>(f);
+			}
+            f.facets.forEach(facet -> facet._setOwner(f));
+            return f;
+        } catch (IOException e) {
+            if(file.exists() && file.length()==0) {
+                // Despite the use of AtomicFile, there are reports indicating that people often see
+                // empty XML file, presumably either due to file system corruption (perhaps by sudden
+                // power loss, etc.) or abnormal program termination.
+                // generally we don't want to wipe out user data just because we can't load it,
+                // but if the file size is 0, which is what's reported in HUDSON-2012, then it seems
+                // like recovering it silently by deleting the file is not a bad idea.
+                logger.log(Level.WARNING, "Size zero fingerprint. Disk corruption? {0}", configFile);
+                file.delete();
+                return null;
+            }
+            String parseError = messageOfParseException(e);
+            if (parseError != null) {
+                logger.log(Level.WARNING, "Malformed XML in {0}: {1}", new Object[] {configFile, parseError});
+                file.delete();
+                return null;
+            }
+            logger.log(Level.WARNING, "Failed to load "+configFile,e);
+            throw e;
+        }
+    }
+
+	private static String messageOfParseException(Throwable t) {
+        if (t instanceof XmlPullParserException || t instanceof EOFException) {
+            return t.getMessage();
+        }
+        Throwable t2 = t.getCause();
+        if (t2 != null) {
+            return messageOfParseException(t2);
+        } else {
+            return null;
+        }
+    }
+
+	@Override public String toString() {
+        return new StringBuilder().append("Fingerprint[original=").append(original).append(",hash=").append(getHashString()).append(",fileName=").append(fileName)
+				.append(",timestamp=").append(DATE_CONVERTER.toString(timestamp)).append(",usages=").append((usages == null) ? "null" : new TreeMap<>(getUsages())).append(",facets=").append(facets)
+				.append("]").toString();
+    }
+
+	/**
+     * Checks if the current user can Discover the item.
+     * If yes, it may be displayed as a text in Fingerprint UIs.
+     * @param fullName Full name of the job
+     * @return {@code true} if the user can discover the item
+     */
+    private static boolean canDiscoverItem(@Nonnull final String fullName) {
+        final Jenkins jenkins = Jenkins.get();
+
+        // Fast check to avoid security context switches
+        Item item = null;
+        try {
+            item = jenkins.getItemByFullName(fullName);
+        } catch (AccessDeniedException ex) {
+            // ignore, we will fall-back later
+        }
+        if (item != null) {
+            return true;
+        }
+          
+        // Probably it failed due to the missing Item.DISCOVER
+        // We try to retrieve the job using SYSTEM user and to check permissions manually.
+        final Authentication userAuth = Jenkins.getAuthentication();
+        try (ACLContext acl = ACL.as(ACL.SYSTEM)) {
+            final Item itemBySystemUser = jenkins.getItemByFullName(fullName);
+            if (itemBySystemUser == null) {
+                return false;
+            }
+
+            // To get the item existence fact, a user needs Item.DISCOVER for the item
+            // and Item.READ for all container folders.
+            boolean canDiscoverTheItem = itemBySystemUser.hasPermission(userAuth, Item.DISCOVER);
+            if (canDiscoverTheItem) {
+                ItemGroup<?> current = itemBySystemUser.getParent();
+                do {
+                    if (current instanceof Item) {
+                        final Item i = (Item) current;
+                        current = i.getParent();
+                        if (!i.hasPermission(userAuth, Item.READ)) {
+                            canDiscoverTheItem = false;
+                        }
+                    } else {
+                        current = null;
+                    }
+                } while (canDiscoverTheItem && current != null);
+            }
+            return canDiscoverTheItem;
+        }
+    }
+
+	/**
+     * Provides the XStream instance this class is using for serialization.
+     *
+     * @return the XStream instance
+     * @since 1.655
+     */
+    @Nonnull
+    public static XStream2 getXStream() {
+        return XSTREAM;
+    }
+
+	/**
      * Pointer to a {@link Build}.
      */
     @ExportedBean(defaultVisibility=2)
@@ -170,7 +827,9 @@ public class Fingerprint implements ModelObject, Saveable {
          */
         public Run getRun() {
             Job j = getJob();
-            if(j==null)     return null;
+            if(j==null) {
+				return null;
+			}
             return j.getBuildByNumber(number);
         }
 
@@ -203,8 +862,9 @@ public class Fingerprint implements ModelObject, Saveable {
         public boolean belongsTo(Job job) {
             Item p = Jenkins.get().getItemByFullName(name);
             while(p!=null) {
-                if(p==job)
-                    return true;
+                if(p==job) {
+					return true;
+				}
 
                 // go up the chain while we
                 ItemGroup<? extends Item> parent = p.getParent();
@@ -219,7 +879,7 @@ public class Fingerprint implements ModelObject, Saveable {
         }
 
         @Override public String toString() {
-            return name + " #" + number;
+            return new StringBuilder().append(name).append(" #").append(number).toString();
         }
     }
 
@@ -273,7 +933,7 @@ public class Fingerprint implements ModelObject, Saveable {
 
         @Override
         public String toString() {
-            return "["+start+","+end+")";
+            return new StringBuilder().append("[").append(start).append(",").append(end).append(")").toString();
         }
 
         /**
@@ -326,8 +986,12 @@ public class Fingerprint implements ModelObject, Saveable {
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (this == o) {
+				return true;
+			}
+            if (o == null || getClass() != o.getClass()) {
+				return false;
+			}
 
             Range that = (Range) o;
             return start == that.start && end == that.end;
@@ -366,15 +1030,12 @@ public class Fingerprint implements ModelObject, Saveable {
          */
         public Iterable<Integer> listNumbers() {
             final List<Range> ranges = getRanges();
-            return new Iterable<Integer>() {
-                public Iterator<Integer> iterator() {
-                    return new Iterators.FlattenIterator<Integer,Range>(ranges) {
-                        protected Iterator<Integer> expand(Range range) {
-                            return Iterators.sequence(range.start,range.end).iterator();
-                        }
-                    };
-                }
-            };
+            return () -> new Iterators.FlattenIterator<Integer, Range>(ranges) {
+				@Override
+				protected Iterator<Integer> expand(Range range) {
+					return Iterators.sequence(range.start, range.end).iterator();
+				}
+			};
         }
 
 //        /**
@@ -401,15 +1062,12 @@ public class Fingerprint implements ModelObject, Saveable {
          */
         public Iterable<Integer> listNumbersReverse() {
             final List<Range> ranges = getRanges();
-            return new Iterable<Integer>() {
-                public Iterator<Integer> iterator() {
-                    return new Iterators.FlattenIterator<Integer,Range>(Iterators.reverse(ranges)) {
-                        protected Iterator<Integer> expand(Range range) {
-                            return Iterators.reverseSequence(range.start,range.end).iterator();
-                        }
-                    };
-                }
-            };
+            return () -> new Iterators.FlattenIterator<Integer, Range>(Iterators.reverse(ranges)) {
+				@Override
+				protected Iterator<Integer> expand(Range range) {
+					return Iterators.reverseSequence(range.start, range.end).iterator();
+				}
+			};
         }
 
         /**
@@ -427,7 +1085,10 @@ public class Fingerprint implements ModelObject, Saveable {
         public synchronized void add(int n) {
             for( int i=0; i<ranges.size(); i++ ) {
                 Range r = ranges.get(i);
-                if(r.includes(n))   return; // already included
+                if(r.includes(n))
+				 {
+					return; // already included
+				}
                 if(r.end==n) {
                     ranges.set(i,r.expandRight());
                     checkCollapse(i);
@@ -449,33 +1110,34 @@ public class Fingerprint implements ModelObject, Saveable {
         }
 
         public synchronized void addAll(int... n) {
-            for (int i : n)
-                add(i);
+            for (int i : n) {
+				add(i);
+			}
         }
 
 
         private void checkCollapse(int i) {
-            if(i<0 || i==ranges.size()-1)     return;
+            if(i<0 || i==ranges.size()-1) {
+				return;
+			}
             Range lhs = ranges.get(i);
             Range rhs = ranges.get(i+1);
-            if(lhs.isAdjacentTo(rhs)) {
-                // collapsed
-                Range r = new Range(lhs.start,rhs.end);
-                ranges.set(i,r);
-                ranges.remove(i+1);
-            }
+            if (!lhs.isAdjacentTo(rhs)) {
+				return;
+			}
+			// collapsed
+			Range r = new Range(lhs.start,rhs.end);
+			ranges.set(i,r);
+			ranges.remove(i+1);
         }
 
         public synchronized boolean includes(int i) {
-            for (Range r : ranges) {
-                if(r.includes(i))
-                    return true;
-            }
-            return false;
+            return ranges.stream().anyMatch(r -> r.includes(i));
         }
 
         public synchronized void add(RangeSet that) {
-            int lhs=0,rhs=0;
+            int lhs=0;
+			int rhs=0;
             while(lhs<this.ranges.size() && rhs<that.ranges.size()) {
                 Range lr = this.ranges.get(lhs);
                 Range rr = that.ranges.get(rhs);
@@ -517,7 +1179,8 @@ public class Fingerprint implements ModelObject, Saveable {
         public synchronized boolean retainAll(RangeSet that) {
             List<Range> intersection = new ArrayList<>();
 
-            int lhs=0,rhs=0;
+            int lhs=0;
+			int rhs=0;
             while(lhs<this.ranges.size() && rhs<that.ranges.size()) {
                 Range lr = this.ranges.get(lhs);
                 Range rr = that.ranges.get(rhs);
@@ -545,13 +1208,12 @@ public class Fingerprint implements ModelObject, Saveable {
 
             boolean same = this.ranges.equals(intersection);
 
-            if (!same) {
-                this.ranges.clear();
-                this.ranges.addAll(intersection);
-                return true;
-            } else {
-                return false;
-            }
+            if (same) {
+				return false;
+			}
+			this.ranges.clear();
+			this.ranges.addAll(intersection);
+			return true;
         }
 
         /**
@@ -563,7 +1225,8 @@ public class Fingerprint implements ModelObject, Saveable {
             boolean modified = false;
             List<Range> sub = new ArrayList<>();
 
-            int lhs=0,rhs=0;
+            int lhs=0;
+			int rhs=0;
             while(lhs<this.ranges.size() && rhs<that.ranges.size()) {
                 Range lr = this.ranges.get(lhs);
                 Range rr = that.ranges.get(rhs);
@@ -614,7 +1277,10 @@ public class Fingerprint implements ModelObject, Saveable {
                 }
             }
 
-            if (!modified)  return false;   // no changes
+            if (!modified)
+			 {
+				return false;   // no changes
+			}
 
             // whatever that remains in lhs will survive
             sub.addAll(this.ranges.subList(lhs,this.ranges.size()));
@@ -627,17 +1293,23 @@ public class Fingerprint implements ModelObject, Saveable {
         @Override
         public synchronized String toString() {
             StringBuilder buf = new StringBuilder();
-            for (Range r : ranges) {
-                if(buf.length()>0)  buf.append(',');
+            ranges.forEach(r -> {
+                if(buf.length()>0) {
+					buf.append(',');
+				}
                 buf.append(r);
-            }
+            });
             return buf.toString();
         }
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (this == o) {
+				return true;
+			}
+            if (o == null || getClass() != o.getClass()) {
+				return false;
+			}
 
             return ranges.equals(((RangeSet) o).ranges);
 
@@ -678,7 +1350,9 @@ public class Fingerprint implements ModelObject, Saveable {
          * Note that {} is smaller than any n.
          */
         public synchronized boolean isSmallerThan(int n) {
-            if(ranges.isEmpty())    return true;
+            if(ranges.isEmpty()) {
+				return true;
+			}
 
             return ranges.get(ranges.size() - 1).isSmallerThan(n);
         }
@@ -766,9 +1440,11 @@ public class Fingerprint implements ModelObject, Saveable {
                     }
                 } catch (NumberFormatException e) {
                     if (!skipError)
-                        throw new IllegalArgumentException(
+					 {
+						throw new IllegalArgumentException(
                                 String.format("Unable to parse '%s', expected number", list));
                     // ignore malformed text
+					}
                 }
             }
             return rs;
@@ -781,28 +1457,34 @@ public class Fingerprint implements ModelObject, Saveable {
                 this.collectionConv = collectionConv;
             }
 
-            public boolean canConvert(Class type) {
+            @Override
+			public boolean canConvert(Class type) {
                 return type==RangeSet.class;
             }
 
-            public void marshal(Object source, HierarchicalStreamWriter writer, MarshallingContext context) {
+            @Override
+			public void marshal(Object source, HierarchicalStreamWriter writer, MarshallingContext context) {
                 RangeSet src = (RangeSet) source;
                 writer.setValue(serialize(src));
             }
 
             static String serialize(RangeSet src) {
                 StringBuilder buf = new StringBuilder(src.ranges.size()*10);
-                for (Range r : src.ranges) {
-                    if(buf.length()>0)  buf.append(',');
-                    if(r.isSingle())
-                        buf.append(r.start);
-                    else
-                        buf.append(r.start).append('-').append(r.end-1);
-                }
+                src.ranges.forEach(r -> {
+                    if(buf.length()>0) {
+						buf.append(',');
+					}
+                    if(r.isSingle()) {
+						buf.append(r.start);
+					} else {
+						buf.append(r.start).append('-').append(r.end-1);
+					}
+                });
                 return buf.toString();
             }
 
-            public Object unmarshal(HierarchicalStreamReader reader, final UnmarshallingContext context) {
+            @Override
+			public Object unmarshal(HierarchicalStreamReader reader, final UnmarshallingContext context) {
                 if(reader.hasMoreChildren()) {
                     /* old format where <range> elements are nested like
                             <range>
@@ -827,153 +1509,25 @@ public class Fingerprint implements ModelObject, Saveable {
             }
         }
         private void locationChanged(Item item, String oldName, String newName) {
-            if (item instanceof Job) {
-                Job p = Jenkins.get().getItemByFullName(newName, Job.class);
-                if (p != null) {
-                    RunList<? extends Run> builds = p.getBuilds();
-                    for (Run build : builds) {
-                        Collection<Fingerprint> fingerprints = build.getBuildFingerprints();
-                        for (Fingerprint f : fingerprints) {
-                            try {
-                                f.rename(oldName, newName);
-                            } catch (IOException e) {
-                                logger.log(Level.WARNING, "Failed to update fingerprint record " + f.getFileName() + " when " + oldName + " was renamed to " + newName, e);
-                            }
-                        }
-                    }
-                }
-            }
+            if (!(item instanceof Job)) {
+				return;
+			}
+			Job p = Jenkins.get().getItemByFullName(newName, Job.class);
+			if (p != null) {
+			    RunList<? extends Run> builds = p.getBuilds();
+			    for (Run build : builds) {
+			        Collection<Fingerprint> fingerprints = build.getBuildFingerprints();
+			        fingerprints.forEach(f -> {
+			            try {
+			                f.rename(oldName, newName);
+			            } catch (IOException e) {
+			                logger.log(Level.WARNING, new StringBuilder().append("Failed to update fingerprint record ").append(f.getFileName()).append(" when ").append(oldName).append(" was renamed to ")
+									.append(newName).toString(), e);
+			            }
+			        });
+			    }
+			}
         }
-    }
-
-    private static final DateConverter DATE_CONVERTER = new DateConverter();
-    
-    /**
-     * Time when the fingerprint has been captured.
-     */
-    private final @Nonnull Date timestamp;
-
-    /**
-     * Null if this fingerprint is for a file that's
-     * apparently produced outside.
-     */
-    private final @CheckForNull BuildPtr original;
-
-    private final byte[] md5sum;
-
-    private final String fileName;
-
-    /**
-     * Range of builds that use this file keyed by a job full name.
-     */
-    private Hashtable<String,RangeSet> usages = new Hashtable<>();
-
-    PersistedList<FingerprintFacet> facets = new PersistedList<>(this);
-
-    /**
-     * Lazily computed immutable {@link FingerprintFacet}s created from {@link TransientFingerprintFacetFactory}.
-     */
-    private transient volatile List<FingerprintFacet> transientFacets = null;
-
-    public Fingerprint(@CheckForNull Run build, @Nonnull String fileName, @Nonnull byte[] md5sum) throws IOException {
-        this(build==null ? null : new BuildPtr(build), fileName, md5sum);
-        save();
-    }
-
-    Fingerprint(@CheckForNull BuildPtr original, @Nonnull String fileName, @Nonnull byte[] md5sum) {
-        this.original = original;
-        this.md5sum = md5sum;
-        this.fileName = fileName;
-        this.timestamp = new Date();
-    }
-
-    /**
-     * The first build in which this file showed up,
-     * if the file looked like it's created there.
-     * <p>
-     * This is considered as the "source" of this file,
-     * or the owner, in the sense that this project "owns"
-     * this file.
-     *
-     * @return null
-     *      if the file is apparently created outside Hudson or if the current
-     *      user has no permission to discover the job.
-     */
-    @Exported
-    public @CheckForNull BuildPtr getOriginal() {
-        if (original != null && original.hasPermissionToDiscoverBuild()) {
-            return original;
-        }
-        return null;
-    }
-
-    public @Nonnull String getDisplayName() {
-        return fileName;
-    }
-
-    /**
-     * The file name (like "foo.jar" without path).
-     */
-    @Exported
-    public @Nonnull String getFileName() {
-        return fileName;
-    }
-
-    /**
-     * Gets the MD5 hash string.
-     */
-    @Exported(name="hash")
-    public @Nonnull String getHashString() {
-        return Util.toHexString(md5sum);
-    }
-
-    /**
-     * Gets the timestamp when this record is created.
-     */
-    @Exported
-    public @Nonnull Date getTimestamp() {
-        return timestamp;
-    }
-
-    /**
-     * Gets the string that says how long since this build has scheduled.
-     *
-     * @return
-     *      string like "3 minutes" "1 day" etc.
-     */
-    public @Nonnull String getTimestampString() {
-        long duration = System.currentTimeMillis()-timestamp.getTime();
-        return Util.getTimeSpanString(duration);
-    }
-
-    /**
-     * Gets the build range set for the given job name.
-     *
-     * <p>
-     * These builds of this job has used this file.
-     * @return may be empty but not null.
-     */
-    public @Nonnull RangeSet getRangeSet(String jobFullName) {
-        RangeSet r = usages.get(jobFullName);
-        if(r==null) r = new RangeSet();
-        return r;
-    }
-
-    public RangeSet getRangeSet(Job job) {
-        return getRangeSet(job.getFullName());
-    }
-
-    /**
-     * Gets the sorted list of job names where this jar is used.
-     */
-    public @Nonnull List<String> getJobs() {
-        List<String> r = new ArrayList<>(usages.keySet());
-        Collections.sort(r);
-        return r;
-    }
-
-    public @CheckForNull Hashtable<String,RangeSet> getUsages() {
-        return usages;
     }
 
     @ExportedBean(defaultVisibility=2)
@@ -988,517 +1542,4 @@ public class Fingerprint implements ModelObject, Saveable {
             this.ranges = ranges;
         }
     }
-
-    // this is for remote API
-    @Exported(name="usage")
-    public @Nonnull List<RangeItem> _getUsages() {
-        List<RangeItem> r = new ArrayList<>();
-        final Jenkins instance = Jenkins.get();
-        for (Entry<String, RangeSet> e : usages.entrySet()) {
-            final String itemName = e.getKey();
-            if (instance.hasPermission(Jenkins.ADMINISTER) || canDiscoverItem(itemName)) {
-                r.add(new RangeItem(itemName, e.getValue()));
-            }
-        }
-        return r;
-    }
-
-    /**
-     * @deprecated Use {@link #addFor(hudson.model.Run)}
-     */
-    @Deprecated
-    public synchronized void add(@Nonnull AbstractBuild b) throws IOException {
-        addFor(b);
-    }
-
-    /**
-     * Adds a usage reference to the build.
-     * @param b {@link Run} to be referenced in {@link #usages}
-     * @since 1.577
-     */
-    public synchronized void addFor(@Nonnull Run b) throws IOException {
-        add(b.getParent().getFullName(), b.getNumber());
-    }
-
-    /**
-     * Records that a build of a job has used this file.
-     */
-    public synchronized void add(@Nonnull String jobFullName, int n) throws IOException {
-        addWithoutSaving(jobFullName, n);
-        save();
-    }
-
-    // JENKINS-49588
-    protected Object readResolve() {
-        if (usages == null) {
-            usages = new Hashtable<>();
-        }
-        return this;
-    }
-
-    void addWithoutSaving(@Nonnull String jobFullName, int n) {
-        synchronized(usages) { // TODO why not synchronized (this) like some, though not all, other accesses?
-            RangeSet r = usages.get(jobFullName);
-            if(r==null) {
-                r = new RangeSet();
-                usages.put(jobFullName,r);
-            }
-            r.add(n);
-        }
-    }
-
-    /**
-     * Returns true if any of the builds recorded in this fingerprint
-     * is still retained.
-     *
-     * <p>
-     * This is used to find out old fingerprint records that can be removed
-     * without losing too much information.
-     */
-    public synchronized boolean isAlive() {
-        if(original!=null && original.isAlive())
-            return true;
-
-        for (Entry<String,RangeSet> e : usages.entrySet()) {
-            Job j = Jenkins.get().getItemByFullName(e.getKey(),Job.class);
-            if(j==null)
-                continue;
-
-            Run firstBuild = j.getFirstBuild();
-            if(firstBuild==null)
-                continue;
-
-            int oldest = firstBuild.getNumber();
-            if(!e.getValue().isSmallerThan(oldest))
-                return true;
-        }
-        return false;
-    }
-
-    /**
-     * Trim off references to non-existent builds and jobs, thereby making the fingerprint smaller.
-     *
-     * @return true
-     *      if this record was modified.
-     * 
-     * @throws IOException Save failure
-     */
-    public synchronized boolean trim() throws IOException {
-        boolean modified = false;
-
-        for (Entry<String,RangeSet> e : new Hashtable<>(usages).entrySet()) {// copy because we mutate
-            Job j = Jenkins.get().getItemByFullName(e.getKey(),Job.class);
-            if(j==null) {// no such job any more. recycle the record
-                modified = true;
-                usages.remove(e.getKey());
-                continue;
-            }
-
-            Run firstBuild = j.getFirstBuild();
-            if(firstBuild==null) {// no builds. recycle the whole record
-                modified = true;
-                usages.remove(e.getKey());
-                continue;
-            }
-
-            RangeSet cur = e.getValue();
-
-            // builds that are around without the keepLog flag on are normally clustered together (in terms of build #)
-            // so our basic strategy is to discard everything up to the first ephemeral build, except those builds
-            // that are marked as kept
-            RangeSet kept = new RangeSet();
-            Run r = firstBuild;
-            while (r!=null && r.isKeepLog()) {
-                kept.add(r.getNumber());
-                r = r.getNextBuild();
-            }
-
-            if (r==null) {
-                // all the build records are permanently kept ones, so we'll just have to keep 'kept' out of whatever currently in 'cur'
-                modified |= cur.retainAll(kept);
-            } else {
-                // otherwise we are ready to discard [0,r.number) except those marked as 'kept'
-                RangeSet discarding =  new RangeSet(new Range(-1,r.getNumber()));
-                discarding.removeAll(kept);
-                modified |= cur.removeAll(discarding);
-            }
-
-            if (cur.isEmpty()) {
-                usages.remove(e.getKey());
-                modified = true;
-            }
-        }
-
-        if (modified) {
-            if (logger.isLoggable(Level.FINE)) {
-                logger.log(Level.FINE, "Saving trimmed {0}", getFingerprintFile(md5sum));
-            }
-            save();
-        }
-
-        return modified;
-    }
-
-
-    /**
-     * Gets the associated {@link FingerprintFacet}s.
-     *
-     * <p>
-     * This method always return a non-empty collection, which is a synthetic collection.
-     * It contains persisted {@link FingerprintFacet}s (those that are added explicitly, like
-     * {@code fingerprint.getFacets().add(x)}), as well those {@linkplain TransientFingerprintFacetFactory that are transient}.
-     *
-     * <p>
-     * Mutation to this collection will manipulate persisted set of {@link FingerprintFacet}s, and therefore regardless
-     * of what you do, this collection will always contain a set of {@link FingerprintFacet}s that are added
-     * by {@link TransientFingerprintFacetFactory}s.
-     *
-     * @since 1.421
-     */
-    public @Nonnull Collection<FingerprintFacet> getFacets() {
-        if (transientFacets==null) {
-            List<FingerprintFacet> transientFacets = new ArrayList<>();
-            for (TransientFingerprintFacetFactory fff : TransientFingerprintFacetFactory.all()) {
-                fff.createFor(this,transientFacets);
-            }
-            this.transientFacets = ImmutableList.copyOf(transientFacets);
-        }
-
-        return new AbstractCollection<FingerprintFacet>() {
-            @Override
-            public Iterator<FingerprintFacet> iterator() {
-                return Iterators.sequence(facets.iterator(), transientFacets.iterator());
-            }
-
-            @Override
-            public boolean add(FingerprintFacet e) {
-                facets.add(e);
-                return true;
-            }
-
-            @Override
-            public boolean remove(Object o) {
-                return facets.remove(o);
-            }
-
-            @Override
-            public boolean contains(Object o) {
-                return facets.contains(o) || transientFacets.contains(o);
-            }
-
-            @Override
-            public int size() {
-                return facets.size()+transientFacets.size();
-            }
-        };
-    }
-
-    /**
-     * Sorts {@link FingerprintFacet}s by their timestamps.
-     * @return Sorted list of {@link FingerprintFacet}s 
-     */
-    public @Nonnull Collection<FingerprintFacet> getSortedFacets() {
-        List<FingerprintFacet> r = new ArrayList<>(getFacets());
-        r.sort(new Comparator<FingerprintFacet>() {
-            public int compare(FingerprintFacet o1, FingerprintFacet o2) {
-                long a = o1.getTimestamp();
-                long b = o2.getTimestamp();
-                if (a < b) return -1;
-                if (a == b) return 0;
-                return 1;
-            }
-        });
-        return r;
-    }
-
-    /**
-     * Finds a facet of the specific type (including subtypes.)
-     * @param <T> Class of the {@link FingerprintFacet}
-     * @return First matching facet of the specified class
-     * @since 1.556
-     */
-    public @CheckForNull <T extends FingerprintFacet> T getFacet(Class<T> type) {
-        for (FingerprintFacet f : getFacets()) {
-            if (type.isInstance(f))
-                return type.cast(f);
-        }
-        return null;
-    }
-
-    /**
-     * Returns the actions contributed from {@link #getFacets()}
-     */
-    public @Nonnull List<Action> getActions() {
-        List<Action> r = new ArrayList<>();
-        for (FingerprintFacet ff : getFacets())
-            ff.createActions(r);
-        return Collections.unmodifiableList(r);
-    }
-
-    /**
-     * Save the settings to a file.
-     * @throws IOException Save error
-     */
-    public synchronized void save() throws IOException {
-        if(BulkChange.contains(this))   return;
-
-        long start=0;
-        if(logger.isLoggable(Level.FINE))
-            start = System.currentTimeMillis();
-
-        File file = getFingerprintFile(md5sum);
-        save(file);
-        SaveableListener.fireOnChange(this, getConfigFile(file));
-
-        if(logger.isLoggable(Level.FINE))
-            logger.fine("Saving fingerprint "+file+" took "+(System.currentTimeMillis()-start)+"ms");
-    }
-
-    void save(File file) throws IOException {
-        if (facets.isEmpty()) {
-            file.getParentFile().mkdirs();
-            // JENKINS-16301: fast path for the common case.
-            AtomicFileWriter afw = new AtomicFileWriter(file);
-            try {
-                PrintWriter w = new PrintWriter(afw);
-                w.println("<?xml version='1.1' encoding='UTF-8'?>");
-                w.println("<fingerprint>");
-                w.print("  <timestamp>");
-                w.print(DATE_CONVERTER.toString(timestamp));
-                w.println("</timestamp>");
-                if (original != null) {
-                    w.println("  <original>");
-                    w.print("    <name>");
-                    w.print(Util.xmlEscape(original.name));
-                    w.println("</name>");
-                    w.print("    <number>");
-                    w.print(original.number);
-                    w.println("</number>");
-                    w.println("  </original>");
-                }
-                w.print("  <md5sum>");
-                w.print(Util.toHexString(md5sum));
-                w.println("</md5sum>");
-                w.print("  <fileName>");
-                w.print(Util.xmlEscape(fileName));
-                w.println("</fileName>");
-                w.println("  <usages>");
-                for (Map.Entry<String,RangeSet> e : usages.entrySet()) {
-                    w.println("    <entry>");
-                    w.print("      <string>");
-                    w.print(Util.xmlEscape(e.getKey()));
-                    w.println("</string>");
-                    w.print("      <ranges>");
-                    w.print(RangeSet.ConverterImpl.serialize(e.getValue()));
-                    w.println("</ranges>");
-                    w.println("    </entry>");
-                }
-                w.println("  </usages>");
-                w.println("  <facets/>");
-                w.print("</fingerprint>");
-                w.flush();
-                afw.commit();
-            } finally {
-                afw.abort();
-            }
-        } else {
-            // Slower fallback that can persist facets.
-            getConfigFile(file).write(this);
-        }
-    }
-
-    /**
-     * Update references to a renamed job in the fingerprint
-     */
-    public synchronized void rename(String oldName, String newName) throws IOException {
-        boolean touched = false;
-        if (original != null) {
-            if (original.getName().equals(oldName)) {
-                original.setName(newName);
-                touched = true;
-            }
-        }
-        
-        if (usages != null) {
-            RangeSet r = usages.get(oldName);
-            if (r != null) {
-                usages.put(newName, r);
-                usages.remove(oldName);
-                touched = true;
-            }
-        }
-        
-        if (touched) {
-            save();
-        }
-    }
-    
-    public Api getApi() {
-        return new Api(this);
-    }
-
-    /**
-     * The file we save our configuration.
-     */
-    private static @Nonnull XmlFile getConfigFile(@Nonnull File file) {
-        return new XmlFile(XSTREAM,file);
-    }
-
-    /**
-     * Determines the file name from md5sum.
-     */
-    private static @Nonnull File getFingerprintFile(@Nonnull byte[] md5sum) {
-        assert md5sum.length==16;
-        return new File( Jenkins.get().getRootDir(),
-            "fingerprints/"+ Util.toHexString(md5sum,0,1)+'/'+Util.toHexString(md5sum,1,1)+'/'+Util.toHexString(md5sum,2,md5sum.length-2)+".xml");
-    }
-
-    /**
-     * Loads a {@link Fingerprint} from a file in the image.
-     * @return Loaded {@link Fingerprint}. Null if the config file does not exist or
-     * malformed.
-     */
-    /*package*/ static @CheckForNull Fingerprint load(@Nonnull byte[] md5sum) throws IOException {
-        return load(getFingerprintFile(md5sum));
-    }
-    /*package*/ static @CheckForNull Fingerprint load(@Nonnull File file) throws IOException {
-        XmlFile configFile = getConfigFile(file);
-        if(!configFile.exists())
-            return null;
-
-        long start=0;
-        if(logger.isLoggable(Level.FINE))
-            start = System.currentTimeMillis();
-
-        try {
-            Object loaded = configFile.read();
-            if (!(loaded instanceof Fingerprint)) {
-                throw new IOException("Unexpected Fingerprint type. Expected " + Fingerprint.class + " or subclass but got "
-                        + (loaded != null ? loaded.getClass() : "null"));
-            }
-            Fingerprint f = (Fingerprint) loaded;
-            if(logger.isLoggable(Level.FINE))
-                logger.fine("Loading fingerprint "+file+" took "+(System.currentTimeMillis()-start)+"ms");
-            if (f.facets==null)
-                f.facets = new PersistedList<>(f);
-            for (FingerprintFacet facet : f.facets)
-                facet._setOwner(f);
-            return f;
-        } catch (IOException e) {
-            if(file.exists() && file.length()==0) {
-                // Despite the use of AtomicFile, there are reports indicating that people often see
-                // empty XML file, presumably either due to file system corruption (perhaps by sudden
-                // power loss, etc.) or abnormal program termination.
-                // generally we don't want to wipe out user data just because we can't load it,
-                // but if the file size is 0, which is what's reported in HUDSON-2012, then it seems
-                // like recovering it silently by deleting the file is not a bad idea.
-                logger.log(Level.WARNING, "Size zero fingerprint. Disk corruption? {0}", configFile);
-                file.delete();
-                return null;
-            }
-            String parseError = messageOfParseException(e);
-            if (parseError != null) {
-                logger.log(Level.WARNING, "Malformed XML in {0}: {1}", new Object[] {configFile, parseError});
-                file.delete();
-                return null;
-            }
-            logger.log(Level.WARNING, "Failed to load "+configFile,e);
-            throw e;
-        }
-    }
-    private static String messageOfParseException(Throwable t) {
-        if (t instanceof XmlPullParserException || t instanceof EOFException) {
-            return t.getMessage();
-        }
-        Throwable t2 = t.getCause();
-        if (t2 != null) {
-            return messageOfParseException(t2);
-        } else {
-            return null;
-        }
-    }
-
-    @Override public String toString() {
-        return "Fingerprint[original=" + original + ",hash=" + getHashString() + ",fileName=" + fileName + ",timestamp=" + DATE_CONVERTER.toString(timestamp) + ",usages=" + ((usages == null) ? "null" : new TreeMap<>(getUsages())) + ",facets=" + facets + "]";
-    }
-    
-    /**
-     * Checks if the current user can Discover the item.
-     * If yes, it may be displayed as a text in Fingerprint UIs.
-     * @param fullName Full name of the job
-     * @return {@code true} if the user can discover the item
-     */
-    private static boolean canDiscoverItem(@Nonnull final String fullName) {
-        final Jenkins jenkins = Jenkins.get();
-
-        // Fast check to avoid security context switches
-        Item item = null;
-        try {
-            item = jenkins.getItemByFullName(fullName);
-        } catch (AccessDeniedException ex) {
-            // ignore, we will fall-back later
-        }
-        if (item != null) {
-            return true;
-        }
-          
-        // Probably it failed due to the missing Item.DISCOVER
-        // We try to retrieve the job using SYSTEM user and to check permissions manually.
-        final Authentication userAuth = Jenkins.getAuthentication();
-        try (ACLContext acl = ACL.as(ACL.SYSTEM)) {
-            final Item itemBySystemUser = jenkins.getItemByFullName(fullName);
-            if (itemBySystemUser == null) {
-                return false;
-            }
-
-            // To get the item existence fact, a user needs Item.DISCOVER for the item
-            // and Item.READ for all container folders.
-            boolean canDiscoverTheItem = itemBySystemUser.hasPermission(userAuth, Item.DISCOVER);
-            if (canDiscoverTheItem) {
-                ItemGroup<?> current = itemBySystemUser.getParent();
-                do {
-                    if (current instanceof Item) {
-                        final Item i = (Item) current;
-                        current = i.getParent();
-                        if (!i.hasPermission(userAuth, Item.READ)) {
-                            canDiscoverTheItem = false;
-                        }
-                    } else {
-                        current = null;
-                    }
-                } while (canDiscoverTheItem && current != null);
-            }
-            return canDiscoverTheItem;
-        }
-    }
-
-    private static final XStream2 XSTREAM = new XStream2();
-
-    /**
-     * Provides the XStream instance this class is using for serialization.
-     *
-     * @return the XStream instance
-     * @since 1.655
-     */
-    @Nonnull
-    public static XStream2 getXStream() {
-        return XSTREAM;
-    }
-
-    static {
-        XSTREAM.alias("fingerprint",Fingerprint.class);
-        XSTREAM.alias("range",Range.class);
-        XSTREAM.alias("ranges",RangeSet.class);
-        XSTREAM.registerConverter(new HexBinaryConverter(),10);
-        XSTREAM.registerConverter(new RangeSet.ConverterImpl(
-            new CollectionConverter(XSTREAM.getMapper()) {
-                @Override
-                protected Object createCollection(Class type) {
-                    return new ArrayList();
-                }
-            }
-        ),10);
-    }
-
-    private static final Logger logger = Logger.getLogger(Fingerprint.class.getName());
 }

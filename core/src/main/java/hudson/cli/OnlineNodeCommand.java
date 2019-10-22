@@ -66,7 +66,7 @@ public class OnlineNodeCommand extends CLICommand {
                     throw e;
                 }
 
-                final String errorMsg = node_s + ": " + e.getMessage();
+                final String errorMsg = new StringBuilder().append(node_s).append(": ").append(e.getMessage()).toString();
                 stderr.println(errorMsg);
                 errorOccurred = true;
                 continue;

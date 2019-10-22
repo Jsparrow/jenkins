@@ -64,8 +64,12 @@ public final class BuildReference<R> {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+			return true;
+		}
+        if (o == null || getClass() != o.getClass()) {
+			return false;
+		}
 
         BuildReference<?> that = (BuildReference) o;
         return id.equals(that.id);
@@ -82,7 +86,22 @@ public final class BuildReference<R> {
         return r != null ? r.toString() : id;
     }
 
-    /**
+    private static <R> Holder<R> findHolder(R referent) {
+        if (referent == null) {
+            // AbstractBuild.NONE
+            return new DefaultHolderFactory.NoHolder<>();
+        }
+        for (HolderFactory f : ExtensionList.lookup(HolderFactory.class)) {
+            Holder<R> h = f.make(referent);
+            if (h != null) {
+                LOGGER.log(Level.FINE, "created build reference for {0} using {1}", new Object[] {referent, f});
+                return h;
+            }
+        }
+        return new DefaultHolderFactory().make(referent);
+    }
+
+	/**
      * An abstraction of {@link Reference}.
      * @since 1.548
      */
@@ -112,21 +131,6 @@ public final class BuildReference<R> {
 
     }
 
-    private static <R> Holder<R> findHolder(R referent) {
-        if (referent == null) {
-            // AbstractBuild.NONE
-            return new DefaultHolderFactory.NoHolder<>();
-        }
-        for (HolderFactory f : ExtensionList.lookup(HolderFactory.class)) {
-            Holder<R> h = f.make(referent);
-            if (h != null) {
-                LOGGER.log(Level.FINE, "created build reference for {0} using {1}", new Object[] {referent, f});
-                return h;
-            }
-        }
-        return new DefaultHolderFactory().make(referent);
-    }
-
     /**
      * Default factory if none other are installed.
      * Its behavior can be controlled via the system property {@link DefaultHolderFactory#MODE_PROPERTY}:
@@ -148,16 +152,16 @@ public final class BuildReference<R> {
         private static final String mode = SystemProperties.getString(MODE_PROPERTY);
 
         @Override public <R> Holder<R> make(R referent) {
-            if (mode == null || mode.equals("soft")) {
+            if (mode == null || "soft".equals(mode)) {
                 return new SoftHolder<>(referent);
-            } else if (mode.equals("weak")) {
+            } else if ("weak".equals(mode)) {
                 return new WeakHolder<>(referent);
-            } else if (mode.equals("strong")) {
+            } else if ("strong".equals(mode)) {
                 return new StrongHolder<>(referent);
-            } else if (mode.equals("none")) {
+            } else if ("none".equals(mode)) {
                 return new NoHolder<>();
             } else {
-                throw new IllegalStateException("unrecognized value of " + MODE_PROPERTY + ": " + mode);
+                throw new IllegalStateException(new StringBuilder().append("unrecognized value of ").append(MODE_PROPERTY).append(": ").append(mode).toString());
             }
         }
 

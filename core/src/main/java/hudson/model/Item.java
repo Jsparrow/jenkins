@@ -75,17 +75,34 @@ import javax.annotation.Nonnull;
  * @see ItemVisitor
  */
 public interface Item extends PersistenceRoot, SearchableModelObject, AccessControlled, OnMaster {
-    /**
+    PermissionGroup PERMISSIONS = new PermissionGroup(Item.class,Messages._Item_Permissions_Title());
+	Permission CREATE = new Permission(PERMISSIONS, "Create", Messages._Item_CREATE_description(), Permission.CREATE, PermissionScope.ITEM_GROUP);
+	Permission DELETE = new Permission(PERMISSIONS, "Delete", Messages._Item_DELETE_description(), Permission.DELETE, PermissionScope.ITEM);
+	Permission CONFIGURE = new Permission(PERMISSIONS, "Configure", Messages._Item_CONFIGURE_description(), Permission.CONFIGURE, PermissionScope.ITEM);
+	Permission READ = new Permission(PERMISSIONS, "Read", Messages._Item_READ_description(), Permission.READ, PermissionScope.ITEM);
+	Permission DISCOVER = new Permission(PERMISSIONS, "Discover", Messages._AbstractProject_DiscoverPermission_Description(), READ, PermissionScope.ITEM);
+	/**
+     * Ability to view configuration details.
+     * If the user lacks {@link #CONFIGURE} then any {@link Secret}s must be masked out, even in encrypted form.
+     * @see Secret#ENCRYPTED_VALUE_PATTERN
+     */
+    Permission EXTENDED_READ = new Permission(PERMISSIONS,"ExtendedRead", Messages._AbstractProject_ExtendedReadPermission_Description(), CONFIGURE, SystemProperties.getBoolean("hudson.security.ExtendedReadPermission"), new PermissionScope[]{PermissionScope.ITEM});
+	// TODO the following really belong in Job, not Item, but too late to move since the owner.name is encoded in the ID:
+    Permission BUILD = new Permission(PERMISSIONS, "Build", Messages._AbstractProject_BuildPermission_Description(),  Permission.UPDATE, PermissionScope.ITEM);
+	Permission WORKSPACE = new Permission(PERMISSIONS, "Workspace", Messages._AbstractProject_WorkspacePermission_Description(), Permission.READ, PermissionScope.ITEM);
+	Permission WIPEOUT = new Permission(PERMISSIONS, "WipeOut", Messages._AbstractProject_WipeOutPermission_Description(), null, Functions.isWipeOutPermissionEnabled(), new PermissionScope[]{PermissionScope.ITEM});
+	Permission CANCEL = new Permission(PERMISSIONS, "Cancel", Messages._AbstractProject_CancelPermission_Description(), Permission.UPDATE, PermissionScope.ITEM);
+	/**
      * Gets the parent that contains this item.
      */
     ItemGroup<? extends Item> getParent();
 
-    /**
+	/**
      * Gets all the jobs that this {@link Item} contains as descendants.
      */
     Collection<? extends Job> getAllJobs();
 
-    /**
+	/**
      * Gets the name of the item.
      *
      * <p>
@@ -100,7 +117,7 @@ public interface Item extends PersistenceRoot, SearchableModelObject, AccessCont
      */
     String getName();
 
-    /**
+	/**
      * Gets the full name of this item, like "abc/def/ghi".
      *
      * <p>
@@ -113,7 +130,7 @@ public interface Item extends PersistenceRoot, SearchableModelObject, AccessCont
      */
     String getFullName();
 
-    /**
+	/**
      * Gets the human readable short name of this item.
      *
      * <p>
@@ -125,16 +142,17 @@ public interface Item extends PersistenceRoot, SearchableModelObject, AccessCont
      * The returned string should not include the display names
      * of {@link #getParent() ancestor items}.
      */
-    String getDisplayName();
+    @Override
+	String getDisplayName();
 
-    /**
+	/**
      * Works like {@link #getDisplayName()} but return
      * the full path that includes all the display names
      * of the ancestors.
      */
     String getFullDisplayName();
 
-    /**
+	/**
      * Gets the relative name to this item from the specified group.
      *
      * @param g
@@ -151,7 +169,7 @@ public interface Item extends PersistenceRoot, SearchableModelObject, AccessCont
         return Functions.getRelativeNameFrom(this, g);
     }
 
-    /**
+	/**
      * Short for {@code getRelativeNameFrom(item.getParent())}
      *
      * @return String like "../foo/bar".
@@ -164,7 +182,7 @@ public interface Item extends PersistenceRoot, SearchableModelObject, AccessCont
 
     }
 
-    /**
+	/**
      * Returns the URL of this item relative to the context root of the application.
      *
      * @see AbstractItem#getUrl() for how to implement this.
@@ -174,7 +192,7 @@ public interface Item extends PersistenceRoot, SearchableModelObject, AccessCont
      */
     String getUrl();
 
-    /**
+	/**
      * Returns the URL of this item relative to the parent {@link ItemGroup}.
      * @see AbstractItem#getShortUrl() for how to implement this.
      *
@@ -183,7 +201,7 @@ public interface Item extends PersistenceRoot, SearchableModelObject, AccessCont
      */
     String getShortUrl();
 
-    /**
+	/**
      * Returns the absolute URL of this item. This relies on the current
      * {@link StaplerRequest} to figure out what the host name is,
      * so can be used only during processing client requests.
@@ -202,12 +220,13 @@ public interface Item extends PersistenceRoot, SearchableModelObject, AccessCont
     @Deprecated
     default String getAbsoluteUrl() {
         String r = Jenkins.get().getRootUrl();
-        if(r==null)
-            throw new IllegalStateException("Root URL isn't configured yet. Cannot compute absolute URL.");
+        if(r==null) {
+			throw new IllegalStateException("Root URL isn't configured yet. Cannot compute absolute URL.");
+		}
         return Util.encode(r+getUrl());
     }
 
-    /**
+	/**
      * Called right after when a {@link Item} is loaded from disk.
      * This is an opportunity to do a post load processing.
      *
@@ -218,7 +237,7 @@ public interface Item extends PersistenceRoot, SearchableModelObject, AccessCont
      */
     void onLoad(ItemGroup<? extends Item> parent, String name) throws IOException;
 
-    /**
+	/**
      * When a {@link Item} is copied from existing one,
      * the files are first copied on the file system,
      * then it will be loaded, then this method will be invoked
@@ -226,7 +245,7 @@ public interface Item extends PersistenceRoot, SearchableModelObject, AccessCont
      */
     void onCopiedFrom(Item src);
 
-    /**
+	/**
      * When an item is created from scratch (instead of copied),
      * this method will be invoked. Used as the post-construction initialization.
      *
@@ -236,35 +255,18 @@ public interface Item extends PersistenceRoot, SearchableModelObject, AccessCont
         // do nothing by default
     }
 
-    /**
+	/**
      * Save the settings to a file.
      *
      * Use {@link Items#getConfigFile(Item)}
      * or {@link AbstractItem#getConfigFile()} to obtain the file
      * to save the data.
      */
-    void save() throws IOException;
+    @Override
+	void save() throws IOException;
 
-    /**
+	/**
      * Deletes this item.
      */
     void delete() throws IOException, InterruptedException;
-
-    PermissionGroup PERMISSIONS = new PermissionGroup(Item.class,Messages._Item_Permissions_Title());
-    Permission CREATE = new Permission(PERMISSIONS, "Create", Messages._Item_CREATE_description(), Permission.CREATE, PermissionScope.ITEM_GROUP);
-    Permission DELETE = new Permission(PERMISSIONS, "Delete", Messages._Item_DELETE_description(), Permission.DELETE, PermissionScope.ITEM);
-    Permission CONFIGURE = new Permission(PERMISSIONS, "Configure", Messages._Item_CONFIGURE_description(), Permission.CONFIGURE, PermissionScope.ITEM);
-    Permission READ = new Permission(PERMISSIONS, "Read", Messages._Item_READ_description(), Permission.READ, PermissionScope.ITEM);
-    Permission DISCOVER = new Permission(PERMISSIONS, "Discover", Messages._AbstractProject_DiscoverPermission_Description(), READ, PermissionScope.ITEM);
-    /**
-     * Ability to view configuration details.
-     * If the user lacks {@link #CONFIGURE} then any {@link Secret}s must be masked out, even in encrypted form.
-     * @see Secret#ENCRYPTED_VALUE_PATTERN
-     */
-    Permission EXTENDED_READ = new Permission(PERMISSIONS,"ExtendedRead", Messages._AbstractProject_ExtendedReadPermission_Description(), CONFIGURE, SystemProperties.getBoolean("hudson.security.ExtendedReadPermission"), new PermissionScope[]{PermissionScope.ITEM});
-    // TODO the following really belong in Job, not Item, but too late to move since the owner.name is encoded in the ID:
-    Permission BUILD = new Permission(PERMISSIONS, "Build", Messages._AbstractProject_BuildPermission_Description(),  Permission.UPDATE, PermissionScope.ITEM);
-    Permission WORKSPACE = new Permission(PERMISSIONS, "Workspace", Messages._AbstractProject_WorkspacePermission_Description(), Permission.READ, PermissionScope.ITEM);
-    Permission WIPEOUT = new Permission(PERMISSIONS, "WipeOut", Messages._AbstractProject_WipeOutPermission_Description(), null, Functions.isWipeOutPermissionEnabled(), new PermissionScope[]{PermissionScope.ITEM});
-    Permission CANCEL = new Permission(PERMISSIONS, "Cancel", Messages._AbstractProject_CancelPermission_Description(), Permission.UPDATE, PermissionScope.ITEM);
 }

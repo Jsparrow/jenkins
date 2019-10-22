@@ -86,7 +86,7 @@ public class DeleteViewCommand extends CLICommand {
                     throw e;
                 }
 
-                final String errorMsg = view_s + ": " + e.getMessage();
+                final String errorMsg = new StringBuilder().append(view_s).append(": ").append(e.getMessage()).toString();
                 stderr.println(errorMsg);
                 errorOccurred = true;
                 continue;

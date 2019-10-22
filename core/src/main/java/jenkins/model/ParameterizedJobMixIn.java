@@ -91,31 +91,38 @@ import org.kohsuke.stapler.interceptor.RequirePOST;
 @SuppressWarnings("unchecked") // AbstractItem.getParent does not correctly override; scheduleBuild2 inherently untypable
 public abstract class ParameterizedJobMixIn<JobT extends Job<JobT, RunT> & ParameterizedJobMixIn.ParameterizedJob<JobT, RunT> & Queue.Task, RunT extends Run<JobT, RunT> & Queue.Executable> {
     
-    protected abstract JobT asJob();
+    /**
+     * Allows customization of the human-readable display name to be rendered in the <i>Build Now</i> link.
+     * @see #getBuildNowText
+     * @since 1.624
+     */
+    public static final AlternativeUiTextProvider.Message<ParameterizedJob> BUILD_NOW_TEXT = new AlternativeUiTextProvider.Message<>();
 
-    /** @see BuildableItem#scheduleBuild() */
+	protected abstract JobT asJob();
+
+	/** @see BuildableItem#scheduleBuild() */
     @SuppressWarnings("deprecation")
     public final boolean scheduleBuild() {
         return scheduleBuild(asJob().getQuietPeriod(), new Cause.LegacyCodeCause());
     }
 
-    /** @see BuildableItem#scheduleBuild(Cause) */
+	/** @see BuildableItem#scheduleBuild(Cause) */
     public final boolean scheduleBuild(Cause c) {
         return scheduleBuild(asJob().getQuietPeriod(), c);
     }
 
-    /** @see BuildableItem#scheduleBuild(int) */
+	/** @see BuildableItem#scheduleBuild(int) */
     @SuppressWarnings("deprecation")
     public final boolean scheduleBuild(int quietPeriod) {
         return scheduleBuild(quietPeriod, new Cause.LegacyCodeCause());
     }
 
-    /** @see BuildableItem#scheduleBuild(int, Cause) */
+	/** @see BuildableItem#scheduleBuild(int, Cause) */
     public final boolean scheduleBuild(int quietPeriod, Cause c) {
         return scheduleBuild2(quietPeriod, c != null ? Collections.singletonList(new CauseAction(c)) : Collections.emptyList()) != null;
     }
 
-    /**
+	/**
      * Standard implementation of {@link ParameterizedJob#scheduleBuild2}.
      */
     public final @CheckForNull QueueTaskFuture<RunT> scheduleBuild2(int quietPeriod, Action... actions) {
@@ -123,7 +130,7 @@ public abstract class ParameterizedJobMixIn<JobT extends Job<JobT, RunT> & Param
         return i != null ? (QueueTaskFuture) i.getFuture() : null;
     }
 
-    /**
+	/**
      * Convenience method to schedule a build.
      * Useful for {@link Trigger} implementations, for example.
      * If you need to wait for the build to start (or finish), use {@link Queue.Item#getFuture}.
@@ -144,9 +151,10 @@ public abstract class ParameterizedJobMixIn<JobT extends Job<JobT, RunT> & Param
         }.scheduleBuild2(quietPeriod == -1 ? ((ParameterizedJob) job).getQuietPeriod() : quietPeriod, Arrays.asList(actions));
     }
 
-    @CheckForNull Queue.Item scheduleBuild2(int quietPeriod, List<Action> actions) {
-        if (!asJob().isBuildable())
-            return null;
+	@CheckForNull Queue.Item scheduleBuild2(int quietPeriod, List<Action> actions) {
+        if (!asJob().isBuildable()) {
+			return null;
+		}
 
         List<Action> queueActions = new ArrayList<>(actions);
         if (isParameterized() && Util.filter(queueActions, ParametersAction.class).isEmpty()) {
@@ -155,36 +163,35 @@ public abstract class ParameterizedJobMixIn<JobT extends Job<JobT, RunT> & Param
         return Jenkins.get().getQueue().schedule2(asJob(), quietPeriod, queueActions).getItem();
     }
 
-    private List<ParameterValue> getDefaultParametersValues() {
+	private List<ParameterValue> getDefaultParametersValues() {
         ParametersDefinitionProperty paramDefProp = asJob().getProperty(ParametersDefinitionProperty.class);
         ArrayList<ParameterValue> defValues = new ArrayList<>();
 
         /*
          * This check is made ONLY if someone will call this method even if isParametrized() is false.
          */
-        if(paramDefProp == null)
-            return defValues;
+        if(paramDefProp == null) {
+			return defValues;
+		}
 
         /* Scan for all parameter with an associated default values */
-        for(ParameterDefinition paramDefinition : paramDefProp.getParameterDefinitions())
-        {
-           ParameterValue defaultValue  = paramDefinition.getDefaultParameterValue();
-
-            if(defaultValue != null)
-                defValues.add(defaultValue);
-        }
+		paramDefProp.getParameterDefinitions().stream().map(ParameterDefinition::getDefaultParameterValue).forEach(defaultValue -> {
+			if(defaultValue != null) {
+				defValues.add(defaultValue);
+			}
+		});
 
         return defValues;
     }
 
-    /**
+	/**
      * Standard implementation of {@link ParameterizedJob#isParameterized}.
      */
     public final boolean isParameterized() {
         return asJob().getProperty(ParametersDefinitionProperty.class) != null;
     }
 
-    /**
+	/**
      * Standard implementation of {@link ParameterizedJob#doBuild}.
      */
     @SuppressWarnings("deprecation")
@@ -199,7 +206,7 @@ public abstract class ParameterizedJobMixIn<JobT extends Job<JobT, RunT> & Param
 
         // if a build is parameterized, let that take over
         ParametersDefinitionProperty pp = asJob().getProperty(ParametersDefinitionProperty.class);
-        if (pp != null && !req.getMethod().equals("POST")) {
+        if (pp != null && !"POST".equals(req.getMethod())) {
             // show the parameter entry form.
             req.getView(pp, "index.jelly").forward(req, rsp);
             return;
@@ -215,13 +222,13 @@ public abstract class ParameterizedJobMixIn<JobT extends Job<JobT, RunT> & Param
 
         Queue.Item item = Jenkins.get().getQueue().schedule2(asJob(), delay.getTimeInSeconds(), getBuildCause(asJob(), req)).getItem();
         if (item != null) {
-            rsp.sendRedirect(SC_CREATED, req.getContextPath() + '/' + item.getUrl());
+            rsp.sendRedirect(SC_CREATED, new StringBuilder().append(req.getContextPath()).append('/').append(item.getUrl()).toString());
         } else {
             rsp.sendRedirect(".");
         }
     }
 
-    /**
+	/**
      * Standard implementation of {@link ParameterizedJob#doBuildWithParameters}.
      */
     @SuppressWarnings("deprecation")
@@ -239,7 +246,7 @@ public abstract class ParameterizedJobMixIn<JobT extends Job<JobT, RunT> & Param
         }
     }
 
-    /**
+	/**
      * Standard implementation of {@link ParameterizedJob#doCancelQueue}.
      */
     @RequirePOST
@@ -249,7 +256,7 @@ public abstract class ParameterizedJobMixIn<JobT extends Job<JobT, RunT> & Param
         rsp.forwardToPreviousPage(req);
     }
 
-    /**
+	/**
      * Use from a {@link Job#makeSearchIndex} override.
      * @param sib the super value
      * @return the value to return
@@ -261,7 +268,7 @@ public abstract class ParameterizedJobMixIn<JobT extends Job<JobT, RunT> & Param
         return sib;
     }
 
-    /**
+	/**
      * Computes the build cause, using RemoteCause or UserCause as appropriate.
      */
     @Restricted(NoExternalUse.class)
@@ -279,14 +286,7 @@ public abstract class ParameterizedJobMixIn<JobT extends Job<JobT, RunT> & Param
         return new CauseAction(cause);
     }
 
-    /**
-     * Allows customization of the human-readable display name to be rendered in the <i>Build Now</i> link.
-     * @see #getBuildNowText
-     * @since 1.624
-     */
-    public static final AlternativeUiTextProvider.Message<ParameterizedJob> BUILD_NOW_TEXT = new AlternativeUiTextProvider.Message<>();
-
-    /**
+	/**
      * Suggested implementation of {@link ParameterizedJob#getBuildNowText}.
      */
     public final String getBuildNowText() {
@@ -294,7 +294,7 @@ public abstract class ParameterizedJobMixIn<JobT extends Job<JobT, RunT> & Param
                 : AlternativeUiTextProvider.get(BUILD_NOW_TEXT, asJob(), Messages.ParameterizedJobMixIn_build_now());
     }
 
-    /**
+	/**
      * Checks for the existence of a specific trigger on a job.
      * @param <T> a trigger type
      * @param job a job
@@ -314,7 +314,7 @@ public abstract class ParameterizedJobMixIn<JobT extends Job<JobT, RunT> & Param
         return null;
     }
 
-    /**
+	/**
      * Marker for job using this mixin, and default implementations of many methods.
      */
     public interface ParameterizedJob<JobT extends Job<JobT, RunT> & ParameterizedJobMixIn.ParameterizedJob<JobT, RunT> & Queue.Task, RunT extends Run<JobT, RunT> & Queue.Executable> extends BuildableItem {

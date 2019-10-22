@@ -45,14 +45,10 @@ public class UrlAnnotatorTest {
         assertEquals("Hello [foo]<a href='http://foo/bar.txt'>http://foo/bar.txt</a>[/foo] Bye",
                      annotate("Hello [foo]http://foo/bar.txt[/foo] Bye"));
 
-        assertEquals("Hello '<a href='http://foo'>http://foo</a>' or \"<a href='ftp://bar'>"
-                + "ftp://bar</a>\" or &lt;<a href='https://baz/'>https://baz/</a>&gt; or (<a "
-                + "href='http://a.b.c/x.y'>http://a.b.c/x.y</a>) Bye",
+        assertEquals(new StringBuilder().append("Hello '<a href='http://foo'>http://foo</a>' or \"<a href='ftp://bar'>").append("ftp://bar</a>\" or &lt;<a href='https://baz/'>https://baz/</a>&gt; or (<a ").append("href='http://a.b.c/x.y'>http://a.b.c/x.y</a>) Bye").toString(),
                 annotate("Hello 'http://foo' or \"ftp://bar\" or <https://baz/> or (http://a.b.c/x.y) Bye"));
 
-        assertEquals("Fake '<a href='http://foo'>http://foo</a> or \"<a href='ftp://bar'>"
-                + "ftp://bar</a> or &lt;<a href='https://baz/'>https://baz/</a> or (<a "
-                + "href='http://a.b.c/x.y'>http://a.b.c/x.y</a> Bye",
+        assertEquals(new StringBuilder().append("Fake '<a href='http://foo'>http://foo</a> or \"<a href='ftp://bar'>").append("ftp://bar</a> or &lt;<a href='https://baz/'>https://baz/</a> or (<a ").append("href='http://a.b.c/x.y'>http://a.b.c/x.y</a> Bye").toString(),
                 annotate("Fake 'http://foo or \"ftp://bar or <https://baz/ or (http://a.b.c/x.y Bye"));
 
         assertEquals("Punctuation: <a href='http://foo/'>http://foo/</a>.", annotate("Punctuation: http://foo/."));

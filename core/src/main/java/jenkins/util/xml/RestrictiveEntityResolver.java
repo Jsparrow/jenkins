@@ -15,11 +15,10 @@ import java.io.IOException;
 @Restricted(NoExternalUse.class)
 public final class RestrictiveEntityResolver implements EntityResolver {
 
-    public final static RestrictiveEntityResolver INSTANCE = new RestrictiveEntityResolver();
+    public static final RestrictiveEntityResolver INSTANCE = new RestrictiveEntityResolver();
 
     private RestrictiveEntityResolver() {
         // prevent multiple instantiation.
-        super();
     }
 
     /**
@@ -27,6 +26,6 @@ public final class RestrictiveEntityResolver implements EntityResolver {
      */
     @Override
     public InputSource resolveEntity(String publicId, String systemId) throws SAXException, IOException {
-        throw new SAXException("Refusing to resolve entity with publicId(" + publicId + ") and systemId (" + systemId + ")");
+        throw new SAXException(new StringBuilder().append("Refusing to resolve entity with publicId(").append(publicId).append(") and systemId (").append(systemId).append(")").toString());
     }
 }

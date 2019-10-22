@@ -101,7 +101,9 @@ public interface SCMTriggerItem {
      */
     class SCMTriggerItems {
 
-        /**
+        private SCMTriggerItems() {}
+
+		/**
          * See whether an item can be coerced to {@link SCMTriggerItem}.
          * @param item any item
          * @return itself, if a {@link SCMTriggerItem}, or an adapter, if an {@link hudson.model.SCMedItem}, else null
@@ -117,7 +119,22 @@ public interface SCMTriggerItem {
             }
         }
 
-        private static final class Bridge implements SCMTriggerItem {
+		public static @Nonnull Collection<? extends SCM> resolveMultiScmIfConfigured(@CheckForNull SCM scm) {
+            if (scm == null || scm instanceof NullSCM) {
+                return Collections.emptySet();
+            } else if ("org.jenkinsci.plugins.multiplescms.MultiSCM".equals(scm.getClass().getName())) {
+                try {
+                    return (Collection<? extends SCM>) scm.getClass().getMethod("getConfiguredSCMs").invoke(scm);
+                } catch (Exception x) {
+                    Logger.getLogger(SCMTriggerItem.class.getName()).log(Level.WARNING, null, x);
+                    return Collections.singleton(scm);
+                }
+            } else {
+                return Collections.singleton(scm);
+            }
+        }
+
+		private static final class Bridge implements SCMTriggerItem {
             private final hudson.model.SCMedItem delegate;
             Bridge(hudson.model.SCMedItem delegate) {
                 this.delegate = delegate;
@@ -136,11 +153,11 @@ public interface SCMTriggerItem {
             }
             @Override public PollingResult poll(TaskListener listener) {
                 SCMDecisionHandler veto = SCMDecisionHandler.firstShouldPollVeto(asItem());
-                if (veto != null && !veto.shouldPoll(asItem())) {
-                    listener.getLogger().println(Messages.SCMTriggerItem_PollingVetoed(veto));
-                    return PollingResult.NO_CHANGES;
-                }
-                return delegate.poll(listener);
+                if (!(veto != null && !veto.shouldPoll(asItem()))) {
+					return delegate.poll(listener);
+				}
+				listener.getLogger().println(Messages.SCMTriggerItem_PollingVetoed(veto));
+				return PollingResult.NO_CHANGES;
             }
             @Override public SCMTrigger getSCMTrigger() {
                 return delegate.asProject().getTrigger(SCMTrigger.class);
@@ -149,23 +166,6 @@ public interface SCMTriggerItem {
                 return resolveMultiScmIfConfigured(delegate.asProject().getScm());
             }
         }
-
-        public static @Nonnull Collection<? extends SCM> resolveMultiScmIfConfigured(@CheckForNull SCM scm) {
-            if (scm == null || scm instanceof NullSCM) {
-                return Collections.emptySet();
-            } else if (scm.getClass().getName().equals("org.jenkinsci.plugins.multiplescms.MultiSCM")) {
-                try {
-                    return (Collection<? extends SCM>) scm.getClass().getMethod("getConfiguredSCMs").invoke(scm);
-                } catch (Exception x) {
-                    Logger.getLogger(SCMTriggerItem.class.getName()).log(Level.WARNING, null, x);
-                    return Collections.singleton(scm);
-                }
-            } else {
-                return Collections.singleton(scm);
-            }
-        }
-
-        private SCMTriggerItems() {}
 
     }
 

@@ -71,7 +71,16 @@ public class DownloadService {
      * the prefix for the signature validator name
      */
     private static final String signatureValidatorPrefix = "downloadable";
-    /**
+
+	// TODO this was previously referenced in the browser-based download, but should probably be checked for the server-based download
+    public static boolean neverUpdate = SystemProperties.getBoolean(DownloadService.class.getName()+".never");
+
+	/**
+     * May be used to temporarily disable signature checking on {@link DownloadService} and {@link UpdateCenter}.
+     * Useful when upstream signatures are broken, such as due to expired certificates.
+     */
+    public static boolean signatureCheck = !SystemProperties.getBoolean(DownloadService.class.getName()+".noSignatureCheck");
+	/**
      * Builds up an HTML fragment that starts all the download jobs.
      *
      * @deprecated browser-based download has been disabled
@@ -81,18 +90,15 @@ public class DownloadService {
         return "";
     }
 
-    /**
+	/**
      * Gets {@link Downloadable} by its ID.
      * Used to bind them to URL.
      */
     public Downloadable getById(String id) {
-        for (Downloadable d : Downloadable.all())
-            if(d.getId().equals(id))
-                return d;
-        return null;
+        return Downloadable.all().stream().filter(d -> d.getId().equals(id)).findFirst().orElse(null);
     }
 
-    /**
+	/**
      * Loads JSON from a JSONP URL.
      * Metadata for downloadables and update centers is offered in two formats, both designed for download from the browser (a feature since removed):
      * HTML using {@code postMessage} for newer browsers, and JSONP as a fallback.
@@ -122,7 +128,7 @@ public class DownloadService {
         }
     }
 
-    /**
+	/**
      * Loads JSON from a JSON-with-{@code postMessage} URL.
      * @param src a URL to a JSON HTML file (typically including {@code id} and {@code version} query parameters)
      * @return the embedded JSON text
@@ -147,7 +153,6 @@ public class DownloadService {
             }
         }
     }
-
     /**
      * This installs itself as a listener to changes to the Downloadable extension list and will download the metadata
      * for any newly added Downloadables.
@@ -155,7 +160,9 @@ public class DownloadService {
     @Restricted(NoExternalUse.class)
     public static class DownloadableListener extends ExtensionListListener {
 
-        /**
+        private static final Logger LOGGER = Logger.getLogger(DownloadableListener.class.getName());
+
+		/**
          * Install this listener to the Downloadable extension list after all extensions have been loaded; we only
          * care about those that are added after initialization
          */
@@ -164,12 +171,12 @@ public class DownloadService {
             ExtensionList.lookup(Downloadable.class).addListener(new DownloadableListener());
         }
 
-        /**
+		/**
          * Look for Downloadables that have no data, and update them.
          */
         @Override
         public void onChange() {
-            for (Downloadable d : Downloadable.all()) {
+            Downloadable.all().forEach(d -> {
                 TextFile f = d.getDataFile();
                 if (f == null || !f.exists()) {
                     LOGGER.log(Level.FINE, "Updating metadata for " + d.getId());
@@ -181,10 +188,8 @@ public class DownloadService {
                 } else {
                     LOGGER.log(Level.FINER, "Skipping update of metadata for " + d.getId());
                 }
-            }
+            });
         }
-
-        private static final Logger LOGGER = Logger.getLogger(DownloadableListener.class.getName());
     }
 
     /**
@@ -197,13 +202,16 @@ public class DownloadService {
      * @since 1.305
      */
     public static class Downloadable implements ExtensionPoint {
-        private final String id;
-        private final String url;
-        private final long interval;
-        private volatile long due=0;
-        private volatile long lastAttempt=Long.MIN_VALUE;
+        private static final Logger LOGGER = Logger.getLogger(Downloadable.class.getName());
+		private static final long DEFAULT_INTERVAL =
+                SystemProperties.getLong(Downloadable.class.getName()+".defaultInterval", DAYS.toMillis(1));
+		private final String id;
+		private final String url;
+		private final long interval;
+		private volatile long due=0;
+		private volatile long lastAttempt=Long.MIN_VALUE;
 
-        /**
+		/**
          *
          * @param url
          *      URL relative to {@link UpdateCenter#getDefaultBaseUrl()}.
@@ -219,57 +227,56 @@ public class DownloadService {
             this.interval = interval;
         }
 
-        public Downloadable() {
+		public Downloadable() {
             this.id = getClass().getName().replace('$','.');
             this.url = this.id+".json";
             this.interval = DEFAULT_INTERVAL;
         }
 
-        /**
+		/**
          * Uses the class name as an ID.
          */
         public Downloadable(Class id) {
             this(id.getName().replace('$','.'));
         }
 
-        public Downloadable(String id) {
+		public Downloadable(String id) {
             this(id,id+".json");
         }
 
-        public Downloadable(String id, String url) {
+		public Downloadable(String id, String url) {
             this(id,url, DEFAULT_INTERVAL);
         }
 
-        public String getId() {
+		public String getId() {
             return id;
         }
 
-        /**
+		/**
          * URL to download.
          */
         public String getUrl() {
-            return Jenkins.get().getUpdateCenter().getDefaultBaseUrl()+"updates/"+url;
+            return new StringBuilder().append(Jenkins.get().getUpdateCenter().getDefaultBaseUrl()).append("updates/").append(url).toString();
         }
 
-        /**
+		/**
          * URLs to download from.
          */
         public List<String> getUrls() {
             List<String> updateSites = new ArrayList<>();
-            for (UpdateSite site : Jenkins.getActiveInstance().getUpdateCenter().getSiteList()) {
-                String siteUrl = site.getUrl();
-                int baseUrlEnd = siteUrl.indexOf("update-center.json");
-                if (baseUrlEnd != -1) {
+            Jenkins.getActiveInstance().getUpdateCenter().getSiteList().stream().map(UpdateSite::getUrl).forEach(siteUrl -> {
+				int baseUrlEnd = siteUrl.indexOf("update-center.json");
+				if (baseUrlEnd != -1) {
                     String siteBaseUrl = siteUrl.substring(0, baseUrlEnd);
-                    updateSites.add(siteBaseUrl + "updates/" + url);
+                    updateSites.add(new StringBuilder().append(siteBaseUrl).append("updates/").append(url).toString());
                 } else {
                     LOGGER.log(Level.WARNING, "Url {0} does not look like an update center:", siteUrl);
                 }
-            }
+			});
             return updateSites;
         }
 
-        /**
+		/**
          * How often do we retrieve the new image?
          *
          * @return
@@ -279,42 +286,44 @@ public class DownloadService {
             return interval;
         }
 
-        /**
+		/**
          * This is where the retrieved file will be stored.
          */
         public TextFile getDataFile() {
             return new TextFile(new File(Jenkins.get().getRootDir(),"updates/"+id));
         }
 
-        /**
+		/**
          * When shall we retrieve this file next time?
          */
         public long getDue() {
-            if(due==0)
-                // if the file doesn't exist, this code should result
+            if(due==0) {
+				// if the file doesn't exist, this code should result
                 // in a very small (but >0) due value, which should trigger
                 // the retrieval immediately.
                 due = getDataFile().file.lastModified()+interval;
+			}
             return due;
         }
 
-        /**
+		/**
          * Loads the current file into JSON and returns it, or null
          * if no data exists.
          */
         public JSONObject getData() throws IOException {
             TextFile df = getDataFile();
-            if(df.exists())
-                try {
+            if(df.exists()) {
+				try {
                     return JSONObject.fromObject(df.read());
                 } catch (JSONException e) {
                     df.delete(); // if we keep this file, it will cause repeated failures
-                    throw new IOException("Failed to parse "+df+" into JSON",e);
+                    throw new IOException(new StringBuilder().append("Failed to parse ").append(df).append(" into JSON").toString(),e);
                 }
+			}
             return null;
         }
 
-        private FormValidation load(String json, long dataTimestamp) throws IOException {
+		private FormValidation load(String json, long dataTimestamp) throws IOException {
             TextFile df = getDataFile();
             df.write(json);
             df.file.setLastModified(dataTimestamp);
@@ -322,18 +331,19 @@ public class DownloadService {
             return FormValidation.ok();
         }
 
-        @Restricted(NoExternalUse.class)
+		@Restricted(NoExternalUse.class)
         public FormValidation updateNow() throws IOException {
             List<JSONObject> jsonList = new ArrayList<>();
             boolean toolInstallerMetadataExists = false;
             for (UpdateSite updatesite : Jenkins.getActiveInstance().getUpdateCenter().getSiteList()) {
                 String site = updatesite.getMetadataUrlForDownloadable(url);
                 if (site == null) {
-                    return FormValidation.warning("The update site " + updatesite.getId() + " does not look like an update center");
+                    return FormValidation.warning(new StringBuilder().append("The update site ").append(updatesite.getId()).append(" does not look like an update center").toString());
                 }
                 String jsonString;
                 try {
-                    jsonString = loadJSONHTML(new URL(site + ".html?id=" + URLEncoder.encode(getId(), "UTF-8") + "&version=" + URLEncoder.encode(Jenkins.VERSION, "UTF-8")));
+                    jsonString = loadJSONHTML(new URL(new StringBuilder().append(site).append(".html?id=").append(URLEncoder.encode(getId(), "UTF-8")).append("&version=").append(URLEncoder.encode(Jenkins.VERSION, "UTF-8"))
+							.toString()));
                     toolInstallerMetadataExists = true;
                 } catch (Exception e) {
                     LOGGER.log(Level.FINE, "Could not load json from " + site, e );
@@ -341,7 +351,7 @@ public class DownloadService {
                 }
                 JSONObject o = JSONObject.fromObject(jsonString);
                 if (signatureCheck) {
-                    FormValidation e = updatesite.getJsonSignatureValidator(signatureValidatorPrefix +" '"+id+"'").verifySignature(o);
+                    FormValidation e = updatesite.getJsonSignatureValidator(new StringBuilder().append(signatureValidatorPrefix).append(" '").append(id).append("'").toString()).verifySignature(o);
                     if (e.kind!= Kind.OK) {
                         LOGGER.log(Level.WARNING, "signature check failed for " + site, e );
                         continue;
@@ -359,7 +369,7 @@ public class DownloadService {
             return load(reducedJson.toString(), System.currentTimeMillis());
         }
 
-        /**
+		/**
          * Function that takes multiple JSONObjects and returns a single one.
          * @param jsonList to be processed
          * @return a single JSONObject
@@ -368,7 +378,7 @@ public class DownloadService {
             return jsonList.get(0);
         }
 
-        /**
+		/**
          * check if the list of update center entries has duplicates
          * @param genericList list of entries coming from multiple update centers
          * @param comparator the unique ID of an entry
@@ -383,7 +393,8 @@ public class DownloadService {
             try {
                 field = genericList.get(0).getClass().getDeclaredField(comparator);
             } catch (NoSuchFieldException e) {
-                LOGGER.warning("comparator: " + comparator + "does not exist for " + genericList.get(0).getClass() + ", " + e);
+                LOGGER.warning(new StringBuilder().append("comparator: ").append(comparator).append("does not exist for ").append(genericList.get(0).getClass()).append(", ").append(e)
+						.toString());
                 return false;
             }
             for (int i = 0; i < genericList.size(); i ++ ) {
@@ -395,43 +406,26 @@ public class DownloadService {
                             return true;
                         }
                     } catch (IllegalAccessException e) {
-                        LOGGER.warning("could not access field: " + comparator + ", " + e);
+                        LOGGER.warning(new StringBuilder().append("could not access field: ").append(comparator).append(", ").append(e).toString());
                     }
                 }
             }
             return false;
         }
 
-        /**
+		/**
          * Returns all the registered {@link Downloadable}s.
          */
         public static ExtensionList<Downloadable> all() {
             return ExtensionList.lookup(Downloadable.class);
         }
 
-        /**
+		/**
          * Returns the {@link Downloadable} that has the given ID.
          */
         public static Downloadable get(String id) {
-            for (Downloadable d : all()) {
-                if(d.id.equals(id))
-                    return d;
-            }
-            return null;
+            return all().stream().filter(d -> d.id.equals(id)).findFirst().orElse(null);
         }
-
-        private static final Logger LOGGER = Logger.getLogger(Downloadable.class.getName());
-        private static final long DEFAULT_INTERVAL =
-                SystemProperties.getLong(Downloadable.class.getName()+".defaultInterval", DAYS.toMillis(1));
     }
-
-    // TODO this was previously referenced in the browser-based download, but should probably be checked for the server-based download
-    public static boolean neverUpdate = SystemProperties.getBoolean(DownloadService.class.getName()+".never");
-
-    /**
-     * May be used to temporarily disable signature checking on {@link DownloadService} and {@link UpdateCenter}.
-     * Useful when upstream signatures are broken, such as due to expired certificates.
-     */
-    public static boolean signatureCheck = !SystemProperties.getBoolean(DownloadService.class.getName()+".noSignatureCheck");
 }
 

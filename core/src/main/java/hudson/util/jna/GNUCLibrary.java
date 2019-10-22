@@ -45,64 +45,53 @@ import org.jvnet.libpam.impl.CLibrary.passwd;
  * @author Kohsuke Kawaguchi
  */
 public interface GNUCLibrary extends Library {
-    int fork();
-    int kill(int pid, int signum);
-    int setsid();
-    int umask(int mask);
-    int getpid();
-    int geteuid();
-    int getegid();
-    int getppid();
-    int chdir(String dir);
-    int getdtablesize();
-
-    int execv(String path, StringArray args);
-    int execvp(String file, StringArray args);
-    int setenv(String name, String value,int replace);
-    int unsetenv(String name);
-    void perror(String msg);
-    String strerror(int errno);
-
-    passwd getpwuid(int uid);
-
-    int fcntl(int fd, int command);
-    int fcntl(int fd, int command, int flags);
-
     // obtained from Linux. Needs to be checked if these values are portable.
     int F_GETFD = 1;
-    int F_SETFD = 2;
-    int FD_CLOEXEC = 1;
+	int F_SETFD = 2;
+	int FD_CLOEXEC = 1;
+	GNUCLibrary LIBC = Native.loadLibrary("c",GNUCLibrary.class);
 
-    int chown(String fileName, int uid, int gid);
-    int chmod(String fileName, int i);
-
-    int open(String pathname, int flags) throws LastErrorException;
-    int dup(int old);
-    int dup2(int old, int _new);
-    long pread(int fd, Memory buffer, NativeLong size, NativeLong offset) throws LastErrorException;
-    int close(int fd);
-
-    // see http://www.gnu.org/s/libc/manual/html_node/Renaming-Files.html
+	int fork();
+	int kill(int pid, int signum);
+	int setsid();
+	int umask(int mask);
+	int getpid();
+	int geteuid();
+	int getegid();
+	int getppid();
+	int chdir(String dir);
+	int getdtablesize();
+	int execv(String path, StringArray args);
+	int execvp(String file, StringArray args);
+	int setenv(String name, String value,int replace);
+	int unsetenv(String name);
+	void perror(String msg);
+	String strerror(int errno);
+	passwd getpwuid(int uid);
+	int fcntl(int fd, int command);
+	int fcntl(int fd, int command, int flags);
+	int chown(String fileName, int uid, int gid);
+	int chmod(String fileName, int i);
+	int open(String pathname, int flags);
+	int dup(int old);
+	int dup2(int old, int _new);
+	long pread(int fd, Memory buffer, NativeLong size, NativeLong offset);
+	int close(int fd);
+	// see http://www.gnu.org/s/libc/manual/html_node/Renaming-Files.html
     int rename(String oldname, String newname);
-
-
-    // this is listed in http://developer.apple.com/DOCUMENTATION/Darwin/Reference/ManPages/man3/sysctlbyname.3.html
+	// this is listed in http://developer.apple.com/DOCUMENTATION/Darwin/Reference/ManPages/man3/sysctlbyname.3.html
     // but not in http://www.gnu.org/software/libc/manual/html_node/System-Parameters.html#index-sysctl-3493
     // perhaps it is only supported on BSD?
     int sysctlbyname(String name, Pointer oldp, IntByReference oldlenp, Pointer newp, IntByReference newlen);
-
-    int sysctl(int[] mib, int nameLen, Pointer oldp, IntByReference oldlenp, Pointer newp, IntByReference newlen);
-
-    int sysctlnametomib(String name, Pointer mibp, IntByReference size);
-
-    /**
+	int sysctl(int[] mib, int nameLen, Pointer oldp, IntByReference oldlenp, Pointer newp, IntByReference newlen);
+	int sysctlnametomib(String name, Pointer mibp, IntByReference size);
+	/**
      * Creates a symlink.
      *
      * See http://linux.die.net/man/3/symlink
      */
     int symlink(String oldname, String newname);
-
-    /**
+	/**
      * Read a symlink. The name will be copied into the specified memory, and returns the number of
      * bytes copied. The string is not null-terminated.
      *
@@ -111,6 +100,4 @@ public interface GNUCLibrary extends Library {
      *      If -1, error.
      */
     int readlink(String filename, Memory buffer, NativeLong size);
-
-    GNUCLibrary LIBC = Native.loadLibrary("c",GNUCLibrary.class);
 }

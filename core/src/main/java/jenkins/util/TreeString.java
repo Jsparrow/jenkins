@@ -197,28 +197,27 @@ public final class TreeString implements Serializable {
     public static final class ConverterImpl implements Converter {
         public ConverterImpl(final XStream xs) {}
 
-        public void marshal(final Object source, final HierarchicalStreamWriter writer,
+        @Override
+		public void marshal(final Object source, final HierarchicalStreamWriter writer,
                 final MarshallingContext context) {
             writer.setValue(source == null ? null : source.toString());
         }
 
-        public Object unmarshal(final HierarchicalStreamReader reader, final UnmarshallingContext context) {
+        @Override
+		public Object unmarshal(final HierarchicalStreamReader reader, final UnmarshallingContext context) {
             TreeStringBuilder builder = (TreeStringBuilder)context.get(TreeStringBuilder.class);
             if (builder == null) {
                 context.put(TreeStringBuilder.class, builder = new TreeStringBuilder());
 
                 // dedup at the end
                 final TreeStringBuilder _builder = builder;
-                context.addCompletionCallback(new Runnable() {
-                    public void run() {
-                        _builder.dedup();
-                    }
-                }, 0);
+                context.addCompletionCallback(_builder::dedup, 0);
             }
             return builder.intern(reader.getValue());
         }
 
-        public boolean canConvert(final Class type) {
+        @Override
+		public boolean canConvert(final Class type) {
             return type == TreeString.class;
         }
     }

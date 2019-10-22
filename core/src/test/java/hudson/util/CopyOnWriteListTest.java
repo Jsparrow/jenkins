@@ -36,11 +36,6 @@ import java.util.List;
  */
 public class CopyOnWriteListTest {
 
-    public static final class TestData {
-        CopyOnWriteList list1 = new CopyOnWriteList();
-        List list2 = new ArrayList();
-    }
-
     /**
      * Verify that the serialization form of List and CopyOnWriteList are the same.
      */
@@ -53,19 +48,22 @@ public class CopyOnWriteListTest {
         assertEquals("empty lists", "<hudson.util.CopyOnWriteListTest_-TestData>"
                 + "<list1/><list2/></hudson.util.CopyOnWriteListTest_-TestData>",
                 out.replaceAll("\\s+", ""));
-        TestData td2 = (TestData)xs.fromXML(out.toString());
+        TestData td2 = (TestData)xs.fromXML(out);
         assertTrue(td2.list1.isEmpty());
         assertTrue(td2.list2.isEmpty());
 
         td.list1.add("foobar1");
         td.list2.add("foobar2");
         out = xs.toXML(td);
-        assertEquals("lists", "<hudson.util.CopyOnWriteListTest_-TestData>"
-                + "<list1><string>foobar1</string></list1><list2><string>foobar2"
-                + "</string></list2></hudson.util.CopyOnWriteListTest_-TestData>",
+        assertEquals("lists", new StringBuilder().append("<hudson.util.CopyOnWriteListTest_-TestData>").append("<list1><string>foobar1</string></list1><list2><string>foobar2").append("</string></list2></hudson.util.CopyOnWriteListTest_-TestData>").toString(),
                 out.replaceAll("\\s+", ""));
-        td2 = (TestData)xs.fromXML(out.toString());
+        td2 = (TestData)xs.fromXML(out);
         assertEquals("foobar1", td2.list1.getView().get(0));
         assertEquals("foobar2", td2.list2.get(0));
+    }
+
+	public static final class TestData {
+        CopyOnWriteList list1 = new CopyOnWriteList();
+        List list2 = new ArrayList();
     }
 }

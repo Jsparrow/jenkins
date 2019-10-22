@@ -15,12 +15,16 @@ import java.util.logging.Logger;
  * @author Kohsuke Kawaguchi
  */
 public abstract class SlaveRestarter implements ExtensionPoint, Serializable {
-    /**
+    private static final Logger LOGGER = Logger.getLogger(SlaveRestarter.class.getName());
+
+	private static final long serialVersionUID = 1L;
+
+	/**
      * Called on the agent to see if this restarter can work on this agent.
      */
     public abstract boolean canWork();
 
-    /**
+	/**
      * If {@link #canWork()} method returns true, this method is called later when
      * the connection is lost to restart the agent.
      *
@@ -38,11 +42,7 @@ public abstract class SlaveRestarter implements ExtensionPoint, Serializable {
      */
     public abstract void restart() throws Exception;
 
-    public static ExtensionList<SlaveRestarter> all() {
+	public static ExtensionList<SlaveRestarter> all() {
         return ExtensionList.lookup(SlaveRestarter.class);
     }
-
-    private static final Logger LOGGER = Logger.getLogger(SlaveRestarter.class.getName());
-
-    private static final long serialVersionUID = 1L;
 }

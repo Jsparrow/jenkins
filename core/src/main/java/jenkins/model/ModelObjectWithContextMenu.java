@@ -68,7 +68,8 @@ public interface ModelObjectWithContextMenu extends ModelObject {
         @Exported(inline=true)
         public final List<MenuItem> items = new ArrayList<>();
         
-        public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object o) throws IOException, ServletException {
+        @Override
+		public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object o) throws IOException, ServletException {
             rsp.serveExposedBean(req,this,Flavor.JSON);
         }
         
@@ -78,8 +79,7 @@ public interface ModelObjectWithContextMenu extends ModelObject {
         }
 
         public ContextMenu addAll(Collection<? extends Action> actions) {
-            for (Action a : actions)
-                add(a);
+            actions.forEach(this::add);
             return this;
         }
 
@@ -93,8 +93,11 @@ public interface ModelObjectWithContextMenu extends ModelObject {
             StaplerRequest req = Stapler.getCurrentRequest();
             String text = a.getDisplayName();
             String base = Functions.getIconFilePath(a);
-            if (base==null)     return this;
-            String icon = Stapler.getCurrentRequest().getContextPath()+(base.startsWith("images/")?Functions.getResourcePath():"")+'/'+base;
+            if (base==null) {
+				return this;
+			}
+            String icon = new StringBuilder().append(Stapler.getCurrentRequest().getContextPath()).append(base.startsWith("images/")?Functions.getResourcePath():"").append('/').append(base)
+					.toString();
 
             String url =  Functions.getActionUrl(req.findAncestor(ModelObject.class).getUrl(),a);
 
@@ -102,8 +105,9 @@ public interface ModelObjectWithContextMenu extends ModelObject {
         }
 
         public ContextMenu add(String url, String icon, String text) {
-            if (text != null && icon != null && url != null)
-                items.add(new MenuItem(url,icon,text));
+            if (text != null && icon != null && url != null) {
+				items.add(new MenuItem(url,icon,text));
+			}
             return this;
         }
 
@@ -202,11 +206,13 @@ public interface ModelObjectWithContextMenu extends ModelObject {
                 request.setAttribute("mode","side-panel");
                 // run sidepanel but ignore generated HTML
                 facet.scriptInvoker.invokeScript(request,response,new Script() {
-                    public Script compile() throws JellyException {
+                    @Override
+					public Script compile() throws JellyException {
                         return this;
                     }
 
-                    public void run(JellyContext context, XMLOutput output) throws JellyTagException {
+                    @Override
+					public void run(JellyContext context, XMLOutput output) throws JellyTagException {
                         Functions.initPageVariables(context);
                         s.run(context,output);
                     }
@@ -276,7 +282,7 @@ public interface ModelObjectWithContextMenu extends ModelObject {
             try {
                 this.url = new URI(Stapler.getCurrentRequest().getRequestURI()).resolve(new URI(url)).toString();
             } catch (URISyntaxException x) {
-                throw new IllegalArgumentException("Bad URI from " + Stapler.getCurrentRequest().getRequestURI() + " vs. " + url, x);
+                throw new IllegalArgumentException(new StringBuilder().append("Bad URI from ").append(Stapler.getCurrentRequest().getRequestURI()).append(" vs. ").append(url).toString(), x);
             }
             return this;
         }
@@ -285,7 +291,9 @@ public interface ModelObjectWithContextMenu extends ModelObject {
          * Sets the URL by passing in a URL relative to the context path of Jenkins
          */
         public MenuItem withContextRelativeUrl(String url) {
-            if (!url.startsWith("/"))   url = '/'+url;
+            if (!url.startsWith("/")) {
+				url = '/'+url;
+			}
             this.url = Stapler.getCurrentRequest().getContextPath()+url;
             return this;
         }
@@ -306,7 +314,7 @@ public interface ModelObjectWithContextMenu extends ModelObject {
          *      String like "gear.png" that resolves to 24x24 stock icon in the core
          */
         public MenuItem withStockIcon(String icon) {
-            this.icon = Stapler.getCurrentRequest().getContextPath() + Jenkins.RESOURCE_PATH + "/images/24x24/"+icon;
+            this.icon = new StringBuilder().append(Stapler.getCurrentRequest().getContextPath()).append(Jenkins.RESOURCE_PATH).append("/images/24x24/").append(icon).toString();
             return this;
         }
 

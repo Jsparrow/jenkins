@@ -64,40 +64,26 @@ public abstract class KeyedDataStorage<T,P> {
      * The thread can wait on this object to be notified when the loading completes.
      */
     private final ConcurrentHashMap<String,Object> core = new ConcurrentHashMap<>();
-
-    /**
-     * Used in {@link KeyedDataStorage#core} to indicate that the loading of a fingerprint
-     * is in progress, so that we can avoid creating two {@link Fingerprint}s for the same hash code,
-     * but do so without having a single lock.
+	/**
+     * Total number of queries into this storage.
      */
-    private static class Loading<T> {
-        private @CheckForNull T value;
-        private boolean set;
-
-        public synchronized void set(@CheckForNull T value) {
-            this.set = true;
-            this.value = value;
-            notifyAll();
-        }
-
-        /**
-         * Blocks until the value is {@link #set(Object)} by another thread
-         * and returns the value.
-         */
-        public synchronized @CheckForNull T get() {
-            try {
-                while(!set)
-                    wait();
-                return value;
-            } catch (InterruptedException e) {
-                // assume the loading failed, but make sure we process interruption properly later
-                Thread.currentThread().interrupt();
-                return null;
-            }
-        }
-    }
-
-    /**
+    public final AtomicInteger totalQuery = new AtomicInteger();
+	/**
+     * Number of cache hits (of all the total queries.)
+     */
+    public final AtomicInteger cacheHit = new AtomicInteger();
+	/**
+     * Among cache misses, number of times when we had {@link SoftReference}
+     * but lost its value due to GC.
+     *
+     * {@code totalQuery-cacheHit-weakRefLost} means cache miss.
+     */
+    public final AtomicInteger weakRefLost = new AtomicInteger();
+	/**
+     * Number of failures in loading data.
+     */
+    public final AtomicInteger loadFailure = new AtomicInteger();
+	/**
      * Atomically gets the existing data object if any, or if it doesn't exist
      * {@link #create(String,Object) create} it and return it.
      *
@@ -111,7 +97,7 @@ public abstract class KeyedDataStorage<T,P> {
         return get(key,true,createParams);
     }
 
-    /**
+	/**
      * Finds the data object that matches the given key if available, or null
      * if not found.
      * @return Item with the specified {@code key}
@@ -121,7 +107,7 @@ public abstract class KeyedDataStorage<T,P> {
         return get(key,false,null);
     }
 
-    /**
+	/**
      * Implementation of get/getOrCreate.
      * @return Item with the specified {@code key}
      * @throws IOException Loading error
@@ -144,7 +130,9 @@ public abstract class KeyedDataStorage<T,P> {
                 // another thread is loading it. get the value from there.
                 T t = ((Loading<T>)value).get();
                 if(t!=null || !createIfNotExist)
-                    return t;   // found it (t!=null) or we are just 'get' (!createIfNotExist)
+				 {
+					return t;   // found it (t!=null) or we are just 'get' (!createIfNotExist)
+				}
             }
 
             // the fingerprint doesn't seem to be loaded thus far, so let's load it now.
@@ -162,7 +150,9 @@ public abstract class KeyedDataStorage<T,P> {
                 if(t==null && createIfNotExist) {
                     t = create(key,createParams);    // create the new data
                     if(t==null)
-                        throw new IllegalStateException("Bug in the derived class"); // bug in the derived classes
+					 {
+						throw new IllegalStateException("Bug in the derived class"); // bug in the derived classes
+					}
                 }
             } catch(IOException e) {
                 loadFailure.incrementAndGet();
@@ -174,17 +164,18 @@ public abstract class KeyedDataStorage<T,P> {
             }
 
             // the map needs to be updated to reflect the result of loading
-            if(t!=null)
-                core.put(key, new SoftReference<>(t));
-            else
-                core.remove(key);
+            if(t!=null) {
+				core.put(key, new SoftReference<>(t));
+			} else {
+				core.remove(key);
+			}
 
             return t;
         }
 
     }
 
-    /**
+	/**
      * Attempts to load an existing data object from disk.
      *
      * <p>
@@ -201,7 +192,7 @@ public abstract class KeyedDataStorage<T,P> {
      */
     protected abstract @CheckForNull T load(String key) throws IOException;
 
-    /**
+	/**
      * Creates a new data object.
      *
      * <p>
@@ -221,14 +212,14 @@ public abstract class KeyedDataStorage<T,P> {
      */
     protected abstract @Nonnull T create(@Nonnull String key, @Nonnull P createParams) throws IOException;
 
-    public void resetPerformanceStats() {
+	public void resetPerformanceStats() {
         totalQuery.set(0);
         cacheHit.set(0);
         weakRefLost.set(0);
         loadFailure.set(0);
     }
 
-    /**
+	/**
      * Gets the short summary of performance statistics.
      */
     public String getPerformanceStats() {
@@ -243,22 +234,35 @@ public abstract class KeyedDataStorage<T,P> {
     }
 
     /**
-     * Total number of queries into this storage.
+     * Used in {@link KeyedDataStorage#core} to indicate that the loading of a fingerprint
+     * is in progress, so that we can avoid creating two {@link Fingerprint}s for the same hash code,
+     * but do so without having a single lock.
      */
-    public final AtomicInteger totalQuery = new AtomicInteger();
-    /**
-     * Number of cache hits (of all the total queries.)
-     */
-    public final AtomicInteger cacheHit = new AtomicInteger();
-    /**
-     * Among cache misses, number of times when we had {@link SoftReference}
-     * but lost its value due to GC.
-     *
-     * {@code totalQuery-cacheHit-weakRefLost} means cache miss.
-     */
-    public final AtomicInteger weakRefLost = new AtomicInteger();
-    /**
-     * Number of failures in loading data.
-     */
-    public final AtomicInteger loadFailure = new AtomicInteger();
+    private static class Loading<T> {
+        private @CheckForNull T value;
+        private boolean set;
+
+        public synchronized void set(@CheckForNull T value) {
+            this.set = true;
+            this.value = value;
+            notifyAll();
+        }
+
+        /**
+         * Blocks until the value is {@link #set(Object)} by another thread
+         * and returns the value.
+         */
+        public synchronized @CheckForNull T get() {
+            try {
+                while(!set) {
+					wait();
+				}
+                return value;
+            } catch (InterruptedException e) {
+                // assume the loading failed, but make sure we process interruption properly later
+                Thread.currentThread().interrupt();
+                return null;
+            }
+        }
+    }
 }

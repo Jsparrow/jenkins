@@ -56,63 +56,63 @@ import java.util.Set;
  */
 public final class PermissionScope {
     /**
+     * Permissions scoped to the entire Jenkins instance.
+     */
+    public static final PermissionScope JENKINS = new PermissionScope(Jenkins.class);
+
+	/**
+     * Permissions scoped to containers of {@link Item}s.
+     */
+    public static final PermissionScope ITEM_GROUP = new PermissionScope(ItemGroup.class,JENKINS);
+
+	/**
+     * Permissions scoped to {@link Item}s (including {@link Job}s and other subtypes)
+     */
+    public static final PermissionScope ITEM = new PermissionScope(Item.class,ITEM_GROUP);
+
+	/**
+     * Permissions scoped to {@link Run}s (including {@link Build}s and other subtypes)
+     */
+    public static final PermissionScope RUN = new PermissionScope(Run.class,ITEM);
+
+	/**
+     * Permissions scoped to {@link Node}s or {@link Computer}s (generally interchangeably).
+     */
+    public static final PermissionScope COMPUTER = new PermissionScope(Computer.class,JENKINS);
+
+	/**
      * Domain model type that approximates this scope.
      */
     public final Class<? extends ModelObject> modelClass;
 
-    /**
+	/**
      * Other bigger scopes that this scope divides. For example, permissions scoped to {@link ItemGroup}
      * should be automatically configurable at {@link Jenkins} level, and in situations like this,
      * we say {@link ItemGroup} permission scope is contained in the {@link Jenkins} permission scope.
      */
     private final Set<PermissionScope> containers;
 
-    public PermissionScope(Class<? extends ModelObject> modelClass, PermissionScope... containers) {
+	public PermissionScope(Class<? extends ModelObject> modelClass, PermissionScope... containers) {
         this.modelClass = modelClass;
         this.containers = ImmutableSet.copyOf(containers);
     }
 
-    /**
+	/**
      * Returns true if this scope is directly or indirectly contained by the given scope.
      *
      * <p>
      * A scope always contains itself.
      */
     public boolean isContainedBy(PermissionScope s) {
-        if (this==s)    return true;
-        for (PermissionScope c : containers) {
-            if (c.isContainedBy(s))
-                return true;
-        }
-        return false;
+        if (this==s) {
+			return true;
+		}
+        return containers.stream().anyMatch(c -> c.isContainedBy(s));
     }
 
     //
 // A few built-in permission scopes
 //
 
-    /**
-     * Permissions scoped to the entire Jenkins instance.
-     */
-    public static final PermissionScope JENKINS = new PermissionScope(Jenkins.class);
-
-    /**
-     * Permissions scoped to containers of {@link Item}s.
-     */
-    public static final PermissionScope ITEM_GROUP = new PermissionScope(ItemGroup.class,JENKINS);
-
-    /**
-     * Permissions scoped to {@link Item}s (including {@link Job}s and other subtypes)
-     */
-    public static final PermissionScope ITEM = new PermissionScope(Item.class,ITEM_GROUP);
-
-    /**
-     * Permissions scoped to {@link Run}s (including {@link Build}s and other subtypes)
-     */
-    public static final PermissionScope RUN = new PermissionScope(Run.class,ITEM);
-
-    /**
-     * Permissions scoped to {@link Node}s or {@link Computer}s (generally interchangeably).
-     */
-    public static final PermissionScope COMPUTER = new PermissionScope(Computer.class,JENKINS);
+    
 }

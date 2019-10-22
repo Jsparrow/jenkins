@@ -94,22 +94,18 @@ public class BeanBuilder extends GroovyObjectSupport {
 
 
     public BeanBuilder() {
-		super();
 	}
 
     public BeanBuilder(ClassLoader classLoader) {
-		super();
 		this.classLoader = classLoader;
 	}
 
 	public BeanBuilder(ApplicationContext parent) {
-		super();
 		this.parentCtx = parent;
 		this.springConfig = new DefaultRuntimeSpringConfiguration(parent);
 	}
 
 	public BeanBuilder(ApplicationContext parent,ClassLoader classLoader) {
-		super();
 		this.parentCtx = parent;
 		this.springConfig = new DefaultRuntimeSpringConfiguration(parent);
 		this.classLoader = classLoader;
@@ -126,8 +122,9 @@ public class BeanBuilder extends GroovyObjectSupport {
      * Parses the bean definition groovy script by first exporting the given {@link Binding}. 
      */
     public void parse(InputStream script, Binding binding) {
-        if (script==null)
-            throw new IllegalArgumentException("No script is provided");
+        if (script==null) {
+			throw new IllegalArgumentException("No script is provided");
+		}
         setBinding(binding);
         CompilerConfiguration cc = new CompilerConfiguration();
         cc.setScriptBaseClass(ClosureScript.class.getName());
@@ -160,8 +157,9 @@ public class BeanBuilder extends GroovyObjectSupport {
 	 * @return The BeanDefinition instance
 	 */
 	public BeanDefinition getBeanDefinition(String name) {
-		if(!getSpringConfig().containsBean(name))
+		if(!getSpringConfig().containsBean(name)) {
 			return null;
+		}
 		return getSpringConfig().getBeanConfig(name).getBeanDefinition();
 	}
 
@@ -173,12 +171,12 @@ public class BeanBuilder extends GroovyObjectSupport {
     public Map<String,BeanDefinition> getBeanDefinitions() {
 
         Map<String,BeanDefinition> beanDefinitions = new HashMap<>();
-        for (String beanName : getSpringConfig().getBeanNames()) {
+        getSpringConfig().getBeanNames().forEach(beanName -> {
             BeanDefinition bd = getSpringConfig()
                     .getBeanConfig(beanName)
                     .getBeanDefinition();
             beanDefinitions.put(beanName, bd);
-        }
+        });
         return beanDefinitions;
     }
 
@@ -195,108 +193,6 @@ public class BeanBuilder extends GroovyObjectSupport {
 
 
 
-	/**
-	 * This class is used to defer the adding of a property to a bean definition until later
-	 * This is for a case where you assign a property to a list that may not contain bean references at
-	 * that point of assignment, but may later hence it would need to be managed
-	 *
-	 * @author Graeme Rocher
-	 */
-	private static class DeferredProperty {
-		private BeanConfiguration config;
-		private String name;
-		private Object value;
-
-		DeferredProperty(BeanConfiguration config, String name, Object value) {
-			this.config = config;
-			this.name = name;
-			this.value = value;
-		}
-
-		public void setInBeanConfig() {
-			this.config.addProperty(name, value);
-		}
-	}
-
-	/**
-	 * A RuntimeBeanReference that takes care of adding new properties to runtime references
-	 *
-	 * @author Graeme Rocher
-	 * @since 0.4
-	 *
-	 */
-	private class ConfigurableRuntimeBeanReference extends RuntimeBeanReference implements GroovyObject {
-
-		private MetaClass metaClass;
-		private BeanConfiguration beanConfig;
-
-		public ConfigurableRuntimeBeanReference(String beanName, BeanConfiguration beanConfig) {
-			this(beanName, beanConfig, false);
-		}
-
-		public ConfigurableRuntimeBeanReference(String beanName, BeanConfiguration beanConfig, boolean toParent) {
-			super(beanName, toParent);
-			this.beanConfig = beanConfig;
-			if(beanConfig == null)
-				throw new IllegalArgumentException("Argument [beanConfig] cannot be null");
-			this.metaClass = InvokerHelper.getMetaClass(this);
-		}
-
-		public MetaClass getMetaClass() {
-			return this.metaClass;
-		}
-
-		public Object getProperty(String property) {
-			if(property.equals("beanName"))
-				return getBeanName();
-			else if(property.equals("source"))
-				return getSource();
-			else if(this.beanConfig != null) {
-				return new WrappedPropertyValue(property,beanConfig.getPropertyValue(property));
-			}
-			else
-				return this.metaClass.getProperty(this, property);
-		}
-
-
-
-        /**
-		 * Wraps a BeanConfiguration property an ensures that any RuntimeReference additions to it are
-		 * deferred for resolution later
-		 *
-		 * @author Graeme Rocher
-		 * @since 0.4
-		 *
-		 */
-		private class WrappedPropertyValue extends GroovyObjectSupport {
-			private Object propertyValue;
-			private String propertyName;
-			public WrappedPropertyValue(String propertyName, Object propertyValue) {
-				this.propertyValue = propertyValue;
-				this.propertyName = propertyName;
-			}
-
-			public void leftShift(Object value) {
-				InvokerHelper.invokeMethod(propertyValue, "leftShift", value);
-				if(value instanceof RuntimeBeanReference) {
-					deferredProperties.put(beanConfig.getName(), new DeferredProperty(beanConfig, propertyName, propertyValue));
-				}
-			}
-		}
-		public Object invokeMethod(String name, Object args) {
-			return this.metaClass.invokeMethod(this, name, args);
-		}
-
-		public void setMetaClass(MetaClass metaClass) {
-			this.metaClass = metaClass;
-		}
-
-		public void setProperty(String property, Object newValue) {
-            if(!addToDeferred(beanConfig,property, newValue)) {
-                beanConfig.setPropertyValue(property, newValue);
-            }
-		}
-	}
 	/**
 	 * Takes a resource pattern as (@see org.springframework.core.io.support.PathMatchingResourcePatternResolver)
 	 * This allows you load multiple bean resources in this single builder
@@ -341,32 +237,33 @@ public class BeanBuilder extends GroovyObjectSupport {
         }
 	}
 
-    public void registerBeans(StaticApplicationContext ctx) {
+	public void registerBeans(StaticApplicationContext ctx) {
         finalizeDeferredProperties();
         springConfig.registerBeansWithContext(ctx);
     }
 
-    public RuntimeBeanReference ref(String refName) {
+	public RuntimeBeanReference ref(String refName) {
         return ref(refName,false);
     }
 
-    public RuntimeBeanReference parentRef(String refName) {
+	public RuntimeBeanReference parentRef(String refName) {
         return ref(refName,true);
     }
 
-    public RuntimeBeanReference ref(String refName, boolean parentRef) {
+	public RuntimeBeanReference ref(String refName, boolean parentRef) {
         return new RuntimeBeanReference(refName, parentRef);
     }
 
-    /**
+	/**
 	 * This method is invoked by Groovy when a method that's not defined in Java is invoked.
      * We use that as a syntax for bean definition. 
 	 */
 	public Object methodMissing(String name, Object arg) {
         Object[] args = (Object[])arg;
 
-        if(args.length == 0)
+        if(args.length == 0) {
 			throw new MissingMethodException(name,getClass(),args);
+		}
 
 		if(args[0] instanceof Closure) {
             // abstract bean definition
@@ -386,24 +283,24 @@ public class BeanBuilder extends GroovyObjectSupport {
         return this;
 	}
 
-    public WebApplicationContext createApplicationContext() {
+	public WebApplicationContext createApplicationContext() {
         finalizeDeferredProperties();
         return springConfig.getApplicationContext();
     }
 
-    private void finalizeDeferredProperties() {
-        for (DeferredProperty dp : deferredProperties.values()) {
+	private void finalizeDeferredProperties() {
+        deferredProperties.values().forEach(dp -> {
             if (dp.value instanceof List) {
                 dp.value = manageListIfNecessary((List)dp.value);
             } else if (dp.value instanceof Map) {
                 dp.value = manageMapIfNecessary((Map)dp.value);
             }
             dp.setInBeanConfig();
-        }
+        });
 		deferredProperties.clear();
 	}
 
-	private boolean addToDeferred(BeanConfiguration beanConfig,String property, Object newValue) {
+	private boolean addToDeferred(String property, Object newValue) {
 		if(newValue instanceof List) {
 			deferredProperties.put(currentBeanConfig.getName()+property,new DeferredProperty(currentBeanConfig, property, newValue));
 			return true;
@@ -414,6 +311,7 @@ public class BeanBuilder extends GroovyObjectSupport {
 		}
 		return false;
 	}
+
 	/**
 	 * This method is called when a bean definition node is called
 	 *
@@ -433,25 +331,28 @@ public class BeanBuilder extends GroovyObjectSupport {
                         if(args.length-1 != 1) {
                             Object[] constructorArgs = ArrayUtils.subarray(args, 1, args.length-1);
                             filterGStringReferences(constructorArgs);
-                            if(name.equals(ANONYMOUS_BEAN))
-                                currentBeanConfig = springConfig.createSingletonBean(beanClass,Arrays.asList(constructorArgs));
-                            else
-                                currentBeanConfig = springConfig.addSingletonBean(name, beanClass, Arrays.asList(constructorArgs));
+                            if(name.equals(ANONYMOUS_BEAN)) {
+								currentBeanConfig = springConfig.createSingletonBean(beanClass,Arrays.asList(constructorArgs));
+							} else {
+								currentBeanConfig = springConfig.addSingletonBean(name, beanClass, Arrays.asList(constructorArgs));
+							}
                         }
                         else {
-                            if(name.equals(ANONYMOUS_BEAN))
-                                currentBeanConfig = springConfig.createSingletonBean(beanClass);
-                            else
-                                currentBeanConfig = springConfig.addSingletonBean(name, beanClass);
+                            if(name.equals(ANONYMOUS_BEAN)) {
+								currentBeanConfig = springConfig.createSingletonBean(beanClass);
+							} else {
+								currentBeanConfig = springConfig.addSingletonBean(name, beanClass);
+							}
                         }
                     }
                     else  {
                         Object[] constructorArgs = ArrayUtils.subarray(args, 1, args.length);
                         filterGStringReferences(constructorArgs);
-                        if(name.equals(ANONYMOUS_BEAN))
-                            currentBeanConfig = springConfig.createSingletonBean(beanClass,Arrays.asList(constructorArgs));
-                        else
-                            currentBeanConfig = springConfig.addSingletonBean(name, beanClass, Arrays.asList(constructorArgs));
+                        if(name.equals(ANONYMOUS_BEAN)) {
+							currentBeanConfig = springConfig.createSingletonBean(beanClass,Arrays.asList(constructorArgs));
+						} else {
+							currentBeanConfig = springConfig.addSingletonBean(name, beanClass, Arrays.asList(constructorArgs));
+						}
                     }
 
                 }
@@ -495,14 +396,16 @@ public class BeanBuilder extends GroovyObjectSupport {
         }
     }
 
-    private void filterGStringReferences(Object[] constructorArgs) {
+	private void filterGStringReferences(Object[] constructorArgs) {
         for (int i = 0; i < constructorArgs.length; i++) {
             Object constructorArg = constructorArgs[i];
-            if(constructorArg instanceof GString) constructorArgs[i] = constructorArg.toString();
+            if(constructorArg instanceof GString) {
+				constructorArgs[i] = constructorArg.toString();
+			}
         }
     }
 
-    /**
+	/**
 	 * When an methods argument is only a closure it is a set of bean definitions
 	 *
 	 * @param callable The closure argument
@@ -516,15 +419,17 @@ public class BeanBuilder extends GroovyObjectSupport {
         return this;
     }
 
-    /**
+	/**
 	 * This method overrides property setting in the scope of the BeanBuilder to set
 	 * properties on the current BeanConfiguration
 	 */
 	@Override
 	public void setProperty(String name, Object value) {
 		if(currentBeanConfig != null) {
-			if(value instanceof GString)value = value.toString();
-			if(addToDeferred(currentBeanConfig, name, value)) {
+			if(value instanceof GString) {
+				value = value.toString();
+			}
+			if(addToDeferred(name, value)) {
 				return;
 			}
 			else if(value instanceof Closure) {
@@ -574,13 +479,13 @@ public class BeanBuilder extends GroovyObjectSupport {
                 containsRuntimeRefs = true;
             }
         }
-		if(containsRuntimeRefs) {
-//			return new ManagedMap(map);
-            ManagedMap m = new ManagedMap();
-            m.putAll(value);
-            return m;
-        }
-		return value;
+		if (!containsRuntimeRefs) {
+			return value;
+		}
+		//			return new ManagedMap(map);
+		ManagedMap m = new ManagedMap();
+		m.putAll(value);
+		return m;
 	}
 
 	/**
@@ -628,16 +533,16 @@ public class BeanBuilder extends GroovyObjectSupport {
 				BeanConfiguration beanConfig = springConfig.getBeanConfig(name);
 				if(beanConfig != null) {
 					return new ConfigurableRuntimeBeanReference(name, springConfig.getBeanConfig(name) ,false);
-				}
-				else
+				} else {
 					return new RuntimeBeanReference(name,false);
+				}
 			}
 			// this is to deal with the case where the property setter is the last
 			// statement in a closure (hence the return value)
 			else if(currentBeanConfig != null) {
-				if(currentBeanConfig.hasProperty(name))
+				if(currentBeanConfig.hasProperty(name)) {
 					return currentBeanConfig.getPropertyValue(name);
-				else {
+				} else {
 					DeferredProperty dp = deferredProperties.get(currentBeanConfig.getName()+name);
 					if(dp!=null) {
 						return dp.value;
@@ -659,6 +564,120 @@ public class BeanBuilder extends GroovyObjectSupport {
 	 */
 	public void setBinding(Binding b) {
 		this.binding = b.getVariables();
+	}
+
+
+
+	/**
+	 * This class is used to defer the adding of a property to a bean definition until later
+	 * This is for a case where you assign a property to a list that may not contain bean references at
+	 * that point of assignment, but may later hence it would need to be managed
+	 *
+	 * @author Graeme Rocher
+	 */
+	private static class DeferredProperty {
+		private BeanConfiguration config;
+		private String name;
+		private Object value;
+
+		DeferredProperty(BeanConfiguration config, String name, Object value) {
+			this.config = config;
+			this.name = name;
+			this.value = value;
+		}
+
+		public void setInBeanConfig() {
+			this.config.addProperty(name, value);
+		}
+	}
+
+	/**
+	 * A RuntimeBeanReference that takes care of adding new properties to runtime references
+	 *
+	 * @author Graeme Rocher
+	 * @since 0.4
+	 *
+	 */
+	private class ConfigurableRuntimeBeanReference extends RuntimeBeanReference implements GroovyObject {
+
+		private MetaClass metaClass;
+		private BeanConfiguration beanConfig;
+
+		public ConfigurableRuntimeBeanReference(String beanName, BeanConfiguration beanConfig) {
+			this(beanName, beanConfig, false);
+		}
+
+		public ConfigurableRuntimeBeanReference(String beanName, BeanConfiguration beanConfig, boolean toParent) {
+			super(beanName, toParent);
+			this.beanConfig = beanConfig;
+			if(beanConfig == null) {
+				throw new IllegalArgumentException("Argument [beanConfig] cannot be null");
+			}
+			this.metaClass = InvokerHelper.getMetaClass(this);
+		}
+
+		@Override
+		public MetaClass getMetaClass() {
+			return this.metaClass;
+		}
+
+		@Override
+		public Object getProperty(String property) {
+			if("beanName".equals(property)) {
+				return getBeanName();
+			} else if("source".equals(property)) {
+				return getSource();
+			} else if(this.beanConfig != null) {
+				return new WrappedPropertyValue(property,beanConfig.getPropertyValue(property));
+			} else {
+				return this.metaClass.getProperty(this, property);
+			}
+		}
+
+
+
+        @Override
+		public Object invokeMethod(String name, Object args) {
+			return this.metaClass.invokeMethod(this, name, args);
+		}
+
+		@Override
+		public void setMetaClass(MetaClass metaClass) {
+			this.metaClass = metaClass;
+		}
+
+		@Override
+		public void setProperty(String property, Object newValue) {
+            if(!addToDeferred(property, newValue)) {
+                beanConfig.setPropertyValue(property, newValue);
+            }
+		}
+
+
+
+		/**
+		 * Wraps a BeanConfiguration property an ensures that any RuntimeReference additions to it are
+		 * deferred for resolution later
+		 *
+		 * @author Graeme Rocher
+		 * @since 0.4
+		 *
+		 */
+		private class WrappedPropertyValue extends GroovyObjectSupport {
+			private Object propertyValue;
+			private String propertyName;
+			public WrappedPropertyValue(String propertyName, Object propertyValue) {
+				this.propertyValue = propertyValue;
+				this.propertyName = propertyName;
+			}
+
+			public void leftShift(Object value) {
+				InvokerHelper.invokeMethod(propertyValue, "leftShift", value);
+				if(value instanceof RuntimeBeanReference) {
+					deferredProperties.put(beanConfig.getName(), new DeferredProperty(beanConfig, propertyName, propertyValue));
+				}
+			}
+		}
 	}
 
 }

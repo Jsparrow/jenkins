@@ -18,13 +18,19 @@ import static java.util.logging.Level.*;
  */
 @Extension
 public class UnixSlaveRestarter extends SlaveRestarter {
-    private transient JavaVMArguments args;
+    private static final Logger LOGGER = Logger.getLogger(UnixSlaveRestarter.class.getName());
 
-    @Override
+	private static final long serialVersionUID = 1L;
+
+	private transient JavaVMArguments args;
+
+	@Override
     public boolean canWork() {
         try {
             if (File.pathSeparatorChar!=':')
-                return false;     // quick test to reject non-Unix without loading all the rest of the classes
+			 {
+				return false;     // quick test to reject non-Unix without loading all the rest of the classes
+			}
 
             args = JavaVMArguments.current();
 
@@ -43,22 +49,21 @@ public class UnixSlaveRestarter extends SlaveRestarter {
         }
     }
 
-    public void restart() throws Exception {
+	@Override
+	public void restart() throws Exception {
         // close all files upon exec, except stdin, stdout, and stderr
         int sz = LIBC.getdtablesize();
         for (int i = 3; i < sz; i++) {
             int flags = LIBC.fcntl(i, F_GETFD);
-            if (flags < 0) continue;
+            if (flags < 0) {
+				continue;
+			}
             LIBC.fcntl(i, F_SETFD, flags | FD_CLOEXEC);
         }
 
         // exec to self
         String exe = Daemon.getCurrentExecutable();
         LIBC.execv(exe, new StringArray(args.toArray(new String[0])));
-        throw new IOException("Failed to exec '" + exe + "' " + LIBC.strerror(Native.getLastError()));
+        throw new IOException(new StringBuilder().append("Failed to exec '").append(exe).append("' ").append(LIBC.strerror(Native.getLastError())).toString());
     }
-
-    private static final Logger LOGGER = Logger.getLogger(UnixSlaveRestarter.class.getName());
-
-    private static final long serialVersionUID = 1L;
 }

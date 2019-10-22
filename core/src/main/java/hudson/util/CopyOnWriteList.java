@@ -58,27 +58,27 @@ public class CopyOnWriteList<E> implements Iterable<E> {
         this(core,false);
     }
 
-    private CopyOnWriteList(List<E> core, boolean noCopy) {
-        this.core = noCopy ? core : new ArrayList<>(core);
-    }
-
     public CopyOnWriteList() {
         this.core = Collections.emptyList();
     }
 
-    public synchronized void add(E e) {
+	private CopyOnWriteList(List<E> core, boolean noCopy) {
+        this.core = noCopy ? core : new ArrayList<>(core);
+    }
+
+	public synchronized void add(E e) {
         List<E> n = new ArrayList<>(core);
         n.add(e);
         core = n;
     }
 
-    public synchronized void addAll(Collection<? extends E> items) {
+	public synchronized void addAll(Collection<? extends E> items) {
         List<E> n = new ArrayList<>(core);
         n.addAll(items);
         core = n;
     }
 
-    /**
+	/**
      * Removes an item from the list.
      *
      * @return
@@ -92,85 +92,89 @@ public class CopyOnWriteList<E> implements Iterable<E> {
         return r;
     }
 
-    /**
+	/**
      * Returns an iterator.
      */
-    public Iterator<E> iterator() {
+    @Override
+	public Iterator<E> iterator() {
         final Iterator<? extends E> itr = core.iterator();
         return new Iterator<E>() {
             private E last;
-            public boolean hasNext() {
+            @Override
+			public boolean hasNext() {
                 return itr.hasNext();
             }
 
-            public E next() {
+            @Override
+			public E next() {
                 return last=itr.next();
             }
 
-            public void remove() {
+            @Override
+			public void remove() {
                 CopyOnWriteList.this.remove(last);
             }
         };
     }
 
-    /**
+	/**
      * Completely replaces this list by the contents of the given list.
      */
     public void replaceBy(CopyOnWriteList<? extends E> that) {
         this.core = that.core;
     }
 
-    /**
+	/**
      * Completely replaces this list by the contents of the given list.
      */
     public void replaceBy(Collection<? extends E> that) {
         this.core = new ArrayList<E>(that);
     }
 
-    /**
+	/**
      * Completely replaces this list by the contents of the given list.
      */
     public void replaceBy(E... that) {
         replaceBy(Arrays.asList(that));
     }
 
-    public void clear() {
+	public void clear() {
         this.core = new ArrayList<>();
     }
 
-    public <E> E[] toArray(E[] array) {
+	public <E> E[] toArray(E[] array) {
         return core.toArray(array);
     }
 
-    public List<E> getView() {
+	public List<E> getView() {
         return Collections.unmodifiableList(core);
     }
 
-    public void addAllTo(Collection<? super E> dst) {
+	public void addAllTo(Collection<? super E> dst) {
         dst.addAll(core);
     }
 
-    public E get(int index) {
+	public E get(int index) {
         return core.get(index);
     }
 
-    public boolean isEmpty() {
+	public boolean isEmpty() {
         return core.isEmpty();
     }
 
-    public int size() {
+	public int size() {
         return core.size();
     }
 
-    public boolean contains(Object item) {
+	public boolean contains(Object item) {
         return core.contains(item);
     }
 
-    @Override public String toString() {
+	@Override public String toString() {
         return core.toString();
     }
 
-    /**
+	/**
      * {@link Converter} implementation for XStream.
      */
     public static final class ConverterImpl extends AbstractCollectionConverter {
@@ -178,16 +182,20 @@ public class CopyOnWriteList<E> implements Iterable<E> {
             super(mapper);
         }
 
-        public boolean canConvert(Class type) {
+        @Override
+		public boolean canConvert(Class type) {
             return type==CopyOnWriteList.class;
         }
 
-        public void marshal(Object source, HierarchicalStreamWriter writer, MarshallingContext context) {
-            for (Object o : (CopyOnWriteList) source)
-                writeItem(o, context, writer);
+        @Override
+		public void marshal(Object source, HierarchicalStreamWriter writer, MarshallingContext context) {
+            for (Object o : (CopyOnWriteList) source) {
+				writeItem(o, context, writer);
+			}
         }
 
-        @SuppressWarnings("unchecked")
+        @Override
+		@SuppressWarnings("unchecked")
         public CopyOnWriteList unmarshal(HierarchicalStreamReader reader, UnmarshallingContext context) {
             // read the items from xml into a list
             List items = new ArrayList();

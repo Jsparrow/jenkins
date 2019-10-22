@@ -55,7 +55,9 @@ public class QueryParameterMap {
      *      String that looks like {@code abc=def&ghi=jkl}
      */
     public QueryParameterMap(String queryString) {
-        if (queryString==null || queryString.length()==0)   return;
+        if (queryString==null || queryString.isEmpty()) {
+			return;
+		}
         try {
             for (String param : queryString.split("&")) {
                 String[] kv = param.split("=");

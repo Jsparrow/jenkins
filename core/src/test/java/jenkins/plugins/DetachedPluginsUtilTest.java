@@ -19,7 +19,7 @@ public class DetachedPluginsUtilTest {
     public void checkJaxb() {
         final List<DetachedPluginsUtil.DetachedPlugin> plugins =
                 DetachedPluginsUtil.DETACHED_LIST.stream()
-                        .filter(plugin -> plugin.getShortName().equals("jaxb"))
+                        .filter(plugin -> "jaxb".equals(plugin.getShortName()))
                         .collect(Collectors.toList());
         assertEquals(1, plugins.size());
 
@@ -30,10 +30,10 @@ public class DetachedPluginsUtilTest {
         final List<DetachedPluginsUtil.DetachedPlugin> detachedPlugins = DetachedPluginsUtil.getDetachedPlugins();
         if (JavaUtils.isRunningWithJava8OrBelow()) {
             assertEquals(0, detachedPlugins.stream()
-                    .filter(plugin -> plugin.getShortName().equals("jaxb")).count());
+                    .filter(plugin -> "jaxb".equals(plugin.getShortName())).count());
         } else if (JavaUtils.getCurrentJavaRuntimeVersionNumber().isNewerThanOrEqualTo(new VersionNumber("11.0.2"))) {
             assertEquals(1, detachedPlugins.stream()
-                    .filter(plugin -> plugin.getShortName().equals("jaxb")).count());
+                    .filter(plugin -> "jaxb".equals(plugin.getShortName())).count());
 
             final List<DetachedPluginsUtil.DetachedPlugin> detachedPluginsSince2_161 =
                     DetachedPluginsUtil.getDetachedPlugins(new VersionNumber("2.161"));

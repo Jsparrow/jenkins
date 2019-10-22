@@ -42,29 +42,36 @@ import java.io.IOException;
 @Deprecated
 public class LineEndNormalizingWriter extends FilterWriter {
 
-    private boolean seenCR;
+    private static final int CR = 0x0D;
+	private static final int LF = 0x0A;
+	private boolean seenCR;
 
-    public LineEndNormalizingWriter(Writer out) {
+	public LineEndNormalizingWriter(Writer out) {
         super(out);
     }
 
-    public void write(char[] cbuf) throws IOException {
+	@Override
+	public void write(char[] cbuf) throws IOException {
         write(cbuf, 0, cbuf.length);
     }
 
-    public void write(String str) throws IOException {
+	@Override
+	public void write(String str) throws IOException {
         write(str,0,str.length());
     }
 
-    public void write(int c) throws IOException {
-        if(!seenCR && c==LF)
-            super.write("\r\n");
-        else
-            super.write(c);
+	@Override
+	public void write(int c) throws IOException {
+        if(!seenCR && c==LF) {
+			super.write("\r\n");
+		} else {
+			super.write(c);
+		}
         seenCR = (c==CR);
     }
 
-    public void write(char[] cbuf, int off, int len) throws IOException {
+	@Override
+	public void write(char[] cbuf, int off, int len) throws IOException {
         int end = off+len;
         int writeBegin = off;
 
@@ -82,7 +89,8 @@ public class LineEndNormalizingWriter extends FilterWriter {
         super.write(cbuf,writeBegin,end-writeBegin);
     }
 
-    public void write(String str, int off, int len) throws IOException {
+	@Override
+	public void write(String str, int off, int len) throws IOException {
         int end = off+len;
         int writeBegin = off;
 
@@ -99,7 +107,4 @@ public class LineEndNormalizingWriter extends FilterWriter {
 
         super.write(str,writeBegin,end-writeBegin);
     }
-
-    private static final int CR = 0x0D;
-    private static final int LF = 0x0A;
 }

@@ -56,9 +56,11 @@ public abstract class ToolInstallerDescriptor<T extends ToolInstaller> extends D
      */
     public static List<ToolInstallerDescriptor<?>> for_(Class<? extends ToolInstallation> type) {
         List<ToolInstallerDescriptor<?>> r = new ArrayList<>();
-        for (ToolInstallerDescriptor<?> d : all())
-            if(d.isApplicable(type))
-                r.add(d);
+        for (ToolInstallerDescriptor<?> d : all()) {
+			if(d.isApplicable(type)) {
+				r.add(d);
+			}
+		}
         return r;
     }
 

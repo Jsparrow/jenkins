@@ -52,12 +52,10 @@ class DefaultRuntimeSpringConfiguration implements RuntimeSpringConfiguration {
     private List<String> beanNames = new ArrayList<>();
 
     public DefaultRuntimeSpringConfiguration() {
-        super();
         this.context = new StaticWebApplicationContext();
     }
 
     public DefaultRuntimeSpringConfiguration(ApplicationContext parent) {
-        super();
         this.context = new StaticWebApplicationContext();
         context.setParent(parent);
 //        if(parent != null){
@@ -77,45 +75,53 @@ class DefaultRuntimeSpringConfiguration implements RuntimeSpringConfiguration {
 //    }
 
 
-    public BeanConfiguration addSingletonBean(String name, Class clazz) {
+    @Override
+	public BeanConfiguration addSingletonBean(String name, Class clazz) {
         BeanConfiguration bc = new DefaultBeanConfiguration(name,clazz);
         registerBeanConfiguration(name, bc);
         return bc;
     }
 
-    public BeanConfiguration addPrototypeBean(String name, Class clazz) {
+    @Override
+	public BeanConfiguration addPrototypeBean(String name, Class clazz) {
         BeanConfiguration bc = new DefaultBeanConfiguration(name,clazz,true);
         registerBeanConfiguration(name, bc);
         return bc;
     }
 
-    public WebApplicationContext getApplicationContext() {
+    @Override
+	public WebApplicationContext getApplicationContext() {
         registerBeansWithContext(context);
         context.refresh();
         return context;
     }
 
-    public WebApplicationContext getUnrefreshedApplicationContext() {
+    @Override
+	public WebApplicationContext getUnrefreshedApplicationContext() {
         return context;
     }
 
-    public BeanConfiguration addSingletonBean(String name) {
+    @Override
+	public BeanConfiguration addSingletonBean(String name) {
         BeanConfiguration bc = new DefaultBeanConfiguration(name);
         registerBeanConfiguration(name, bc);
         return bc;
     }
 
-    public BeanConfiguration createSingletonBean(Class clazz) {
+    @Override
+	public BeanConfiguration createSingletonBean(Class clazz) {
         return new DefaultBeanConfiguration(clazz);
     }
 
-    public BeanConfiguration addSingletonBean(String name, Class clazz, Collection args) {
+    @Override
+	public BeanConfiguration addSingletonBean(String name, Class clazz, Collection args) {
         BeanConfiguration bc = new DefaultBeanConfiguration(name,clazz,args);
         registerBeanConfiguration(name, bc);
         return bc;
     }
 
-    public BeanConfiguration addPrototypeBean(String name) {
+    @Override
+	public BeanConfiguration addPrototypeBean(String name) {
         BeanConfiguration bc = new DefaultBeanConfiguration(name,true);
         registerBeanConfiguration(name, bc);
         return bc;
@@ -126,77 +132,92 @@ class DefaultRuntimeSpringConfiguration implements RuntimeSpringConfiguration {
         beanNames.add(name);
     }
 
-    public BeanConfiguration createSingletonBean(Class clazz, Collection constructorArguments) {
+    @Override
+	public BeanConfiguration createSingletonBean(Class clazz, Collection constructorArguments) {
         return new DefaultBeanConfiguration(clazz, constructorArguments);
     }
 
-    public void setServletContext(ServletContext context) {
+    @Override
+	public void setServletContext(ServletContext context) {
         this.context.setServletContext(context);
     }
 
-    public BeanConfiguration createPrototypeBean(String name) {
+    @Override
+	public BeanConfiguration createPrototypeBean(String name) {
         return new DefaultBeanConfiguration(name,true);
     }
 
-    public BeanConfiguration createSingletonBean(String name) {
+    @Override
+	public BeanConfiguration createSingletonBean(String name) {
         return new DefaultBeanConfiguration(name);
     }
 
-    public void addBeanConfiguration(String beanName, BeanConfiguration beanConfiguration) {
+    @Override
+	public void addBeanConfiguration(String beanName, BeanConfiguration beanConfiguration) {
         beanConfiguration.setName(beanName);
         registerBeanConfiguration(beanName, beanConfiguration);
     }
 
-    public void addBeanDefinition(String name, BeanDefinition bd) {
+    @Override
+	public void addBeanDefinition(String name, BeanDefinition bd) {
         beanDefinitions.put(name,bd);
         beanNames.add(name);
     }
 
-    public boolean containsBean(String name) {
+    @Override
+	public boolean containsBean(String name) {
         return beanNames .contains(name);
     }
 
-    public BeanConfiguration getBeanConfig(String name) {
+    @Override
+	public BeanConfiguration getBeanConfig(String name) {
         return beanConfigs.get(name);
     }
 
-    public AbstractBeanDefinition createBeanDefinition(String name) {
+    @Override
+	public AbstractBeanDefinition createBeanDefinition(String name) {
         if(containsBean(name)) {
-            if(beanDefinitions.containsKey(name))
-                return (AbstractBeanDefinition)beanDefinitions.get(name);
-            else if(beanConfigs.containsKey(name))
-                return beanConfigs.get(name).getBeanDefinition();
+            if(beanDefinitions.containsKey(name)) {
+				return (AbstractBeanDefinition)beanDefinitions.get(name);
+			} else if(beanConfigs.containsKey(name)) {
+				return beanConfigs.get(name).getBeanDefinition();
+			}
         }
         return null;
     }
 
-    public void registerPostProcessor(BeanFactoryPostProcessor processor) {
+    @Override
+	public void registerPostProcessor(BeanFactoryPostProcessor processor) {
         this.context.addBeanFactoryPostProcessor(processor);
     }
 
 
 
-    public List<String> getBeanNames() {
+    @Override
+	public List<String> getBeanNames() {
         return beanNames;
     }
 
-    public void registerBeansWithContext(StaticApplicationContext applicationContext) {
+    @Override
+	public void registerBeansWithContext(StaticApplicationContext applicationContext) {
         for (BeanConfiguration bc : beanConfigs.values()) {
             if (LOGGER.isLoggable(Level.FINER)) {
-                LOGGER.finer("[RuntimeConfiguration] Registering bean [" + bc.getName() + "]");
+                LOGGER.finer(new StringBuilder().append("[RuntimeConfiguration] Registering bean [").append(bc.getName()).append("]").toString());
                 if (LOGGER.isLoggable(Level.FINEST)) {
                     PropertyValue[] pvs = bc.getBeanDefinition()
                             .getPropertyValues()
                             .getPropertyValues();
                     for (PropertyValue pv : pvs) {
-                        LOGGER.finest("[RuntimeConfiguration] With property [" + pv.getName() + "] set to [" + pv.getValue() + "]");
+                        LOGGER.finest(new StringBuilder().append("[RuntimeConfiguration] With property [").append(pv.getName()).append("] set to [").append(pv.getValue()).append("]")
+								.toString());
                     }
                 }
             }
 
 
-            if (applicationContext.containsBeanDefinition(bc.getName()))
-                applicationContext.removeBeanDefinition(bc.getName());
+            if (applicationContext.containsBeanDefinition(bc.getName())) {
+				applicationContext.removeBeanDefinition(bc.getName());
+			}
 
             applicationContext.registerBeanDefinition(bc.getName(),
                     bc.getBeanDefinition());
@@ -204,10 +225,11 @@ class DefaultRuntimeSpringConfiguration implements RuntimeSpringConfiguration {
         for (String key : beanDefinitions.keySet()) {
             BeanDefinition bd = beanDefinitions.get(key);
             if (LOGGER.isLoggable(Level.FINER)) {
-                LOGGER.finer("[RuntimeConfiguration] Registering bean [" + key + "]");
+                LOGGER.finer(new StringBuilder().append("[RuntimeConfiguration] Registering bean [").append(key).append("]").toString());
                 if (LOGGER.isLoggable(Level.FINEST)) {
                     for (PropertyValue pv : bd.getPropertyValues().getPropertyValues()) {
-                        LOGGER.finest("[RuntimeConfiguration] With property [" + pv.getName() + "] set to [" + pv.getValue() + "]");
+                        LOGGER.finest(new StringBuilder().append("[RuntimeConfiguration] With property [").append(pv.getName()).append("] set to [").append(pv.getValue()).append("]")
+								.toString());
                     }
                 }
             }
@@ -226,7 +248,8 @@ class DefaultRuntimeSpringConfiguration implements RuntimeSpringConfiguration {
      * @param name The name of the bean
      * @return The BeanConfiguration object
      */
-    public BeanConfiguration addAbstractBean(String name) {
+    @Override
+	public BeanConfiguration addAbstractBean(String name) {
         BeanConfiguration bc = new DefaultBeanConfiguration(name);
         bc.setAbstract(true);
         registerBeanConfiguration(name, bc);

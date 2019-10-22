@@ -56,17 +56,17 @@ public class UserTest {
     @Test
     @Issue("JENKINS-35967")
     public void shouldNotAllowIllegalRestrictedNamesEvenIfTrimmed() {
-        for (String username : User.getIllegalPersistedUsernames()) {
+        User.getIllegalPersistedUsernames().forEach(username -> {
             assertIdOrFullNameNotAllowed(username);
             assertIdOrFullNameNotAllowed(" " + username);
             assertIdOrFullNameNotAllowed(username + " ");
-            assertIdOrFullNameNotAllowed("      " + username + "    ");
-            assertIdOrFullNameNotAllowed("\t" + username + "\t");  
-        }
+            assertIdOrFullNameNotAllowed(new StringBuilder().append("      ").append(username).append("    ").toString());
+            assertIdOrFullNameNotAllowed(new StringBuilder().append("\t").append(username).append("\t").toString());  
+        });
     }
     
     private void assertIdOrFullNameNotAllowed(String id) {
-        assertThat("User ID or full name '" + id + "' should not be allowed", 
+        assertThat(new StringBuilder().append("User ID or full name '").append(id).append("' should not be allowed").toString(), 
                 User.isIdOrFullnameAllowed(id), is(false));
     }
     

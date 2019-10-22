@@ -245,7 +245,9 @@ public class ViewOptionHandlerTest {
 
         } catch (Exception ex) {
 
-            if (!type.isAssignableFrom(ex.getClass())) throw ex;
+            if (!type.isAssignableFrom(ex.getClass())) {
+				throw ex;
+			}
 
             return ex.getMessage();
         }
@@ -256,16 +258,18 @@ public class ViewOptionHandlerTest {
 
     private void parse(final String... params) throws CmdLineException {
         handler.parseArguments(new Parameters() {
-            public String getParameter(int idx) throws CmdLineException {
+            @Override
+			public String getParameter(int idx) throws CmdLineException {
                 return params[idx];
             }
-            public int size() {
+            @Override
+			public int size() {
                 return params.length;
             }
         });
     }
 
-    private static abstract class CompositeView extends View implements ViewGroup {
+    private abstract static class CompositeView extends View implements ViewGroup {
         protected CompositeView(String name) {
             super(name);
         }

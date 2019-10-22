@@ -52,13 +52,16 @@ public abstract class DownloadFromUrlInstaller extends ToolInstaller {
      * @return null if no such ID is found.
      */
     public Installable getInstallable() throws IOException {
-        for (Installable i : ((DescriptorImpl<?>)getDescriptor()).getInstallables())
-            if(id.equals(i.id))
-                return i;
+        for (Installable i : ((DescriptorImpl<?>)getDescriptor()).getInstallables()) {
+			if(id.equals(i.id)) {
+				return i;
+			}
+		}
         return null;
     }
 
-    public FilePath performInstallation(ToolInstallation tool, Node node, TaskListener log) throws IOException, InterruptedException {
+    @Override
+	public FilePath performInstallation(ToolInstallation tool, Node node, TaskListener log) throws IOException, InterruptedException {
         FilePath expected = preferredLocation(tool, node);
 
         Installable inst = getInstallable();
@@ -71,14 +74,17 @@ public abstract class DownloadFromUrlInstaller extends ToolInstaller {
             inst = (Installable) ((NodeSpecific) inst).forNode(node, log);
         }
 
-        if(isUpToDate(expected,inst))
-            return expected;
+        if(isUpToDate(expected,inst)) {
+			return expected;
+		}
 
-        if(expected.installIfNecessaryFrom(new URL(inst.url), log, "Unpacking " + inst.url + " to " + expected + " on " + node.getDisplayName())) {
+        if(expected.installIfNecessaryFrom(new URL(inst.url), log, new StringBuilder().append("Unpacking ").append(inst.url).append(" to ").append(expected).append(" on ").append(node.getDisplayName())
+				.toString())) {
             expected.child(".timestamp").delete(); // we don't use the timestamp
             FilePath base = findPullUpDirectory(expected);
-            if(base!=null && base!=expected)
-                base.moveAllChildrenTo(expected);
+            if(base!=null && base!=expected) {
+				base.moveAllChildrenTo(expected);
+			}
             // leave a record for the next up-to-date check
             expected.child(".installedFrom").write(inst.url,"UTF-8");
             expected.act(new ZipExtractionInstaller.ChmodRecAPlusX());
@@ -115,13 +121,16 @@ public abstract class DownloadFromUrlInstaller extends ToolInstaller {
         // if the directory just contains one directory and that alone, assume that's the pull up subject
         // otherwise leave it as is.
         List<FilePath> children = root.list();
-        if(children.size()!=1)    return null;
-        if(children.get(0).isDirectory())
-            return children.get(0);
+        if(children.size()!=1) {
+			return null;
+		}
+        if(children.get(0).isDirectory()) {
+			return children.get(0);
+		}
         return null;
     }
 
-    public static abstract class DescriptorImpl<T extends DownloadFromUrlInstaller> extends ToolInstallerDescriptor<T> {
+    public abstract static class DescriptorImpl<T extends DownloadFromUrlInstaller> extends ToolInstallerDescriptor<T> {
         
         @SuppressWarnings("deprecation") // intentionally adding dynamic item here
         protected DescriptorImpl() {
@@ -135,7 +144,8 @@ public abstract class DownloadFromUrlInstaller extends ToolInstaller {
         public Downloadable createDownloadable() {
             final DescriptorImpl delegate = this;
             return new Downloadable(getId()) {
-                public JSONObject reduce(List<JSONObject> jsonList) {
+                @Override
+				public JSONObject reduce(List<JSONObject> jsonList) {
                     if (isDefaultSchema(jsonList)) {
                         return delegate.reduce(jsonList);
                     } else {
@@ -158,11 +168,10 @@ public abstract class DownloadFromUrlInstaller extends ToolInstaller {
             if (toolInstallerList != null) {
                 ToolInstallerEntry[] entryList = toolInstallerList.list;
                 ToolInstallerEntry sampleEntry = entryList[0];
-                if (sampleEntry != null) {
-                    if (sampleEntry.id != null && sampleEntry.name != null && sampleEntry.url != null) {
-                        return true;
-                    }
-                }
+                boolean condition = sampleEntry != null && sampleEntry.id != null && sampleEntry.name != null && sampleEntry.url != null;
+				if (condition) {
+				    return true;
+				}
             }
             return false;
         }
@@ -176,15 +185,14 @@ public abstract class DownloadFromUrlInstaller extends ToolInstaller {
             List<ToolInstallerEntry> reducedToolEntries = new LinkedList<>();
 
             HashSet<String> processedIds = new HashSet<>();
-            for (JSONObject jsonToolList : jsonList) {
-                ToolInstallerList toolInstallerList = (ToolInstallerList) JSONObject.toBean(jsonToolList, ToolInstallerList.class);
-                for(ToolInstallerEntry entry : toolInstallerList.list) {
+            jsonList.stream().map(jsonToolList -> (ToolInstallerList) JSONObject.toBean(jsonToolList, ToolInstallerList.class)).forEach(toolInstallerList -> {
+				for(ToolInstallerEntry entry : toolInstallerList.list) {
                     // being able to add the id into the processedIds set means this tool has not been processed before
                     if (processedIds.add(entry.id)) {
                         reducedToolEntries.add(entry);
                     }
                 }
-            }
+			});
 
             ToolInstallerList toolInstallerList = new ToolInstallerList();
             toolInstallerList.list = new ToolInstallerEntry[reducedToolEntries.size()];
@@ -198,7 +206,8 @@ public abstract class DownloadFromUrlInstaller extends ToolInstaller {
          * <p>
          * By default we use the fully-qualified class name of the {@link DownloadFromUrlInstaller} subtype.
          */
-        public String getId() {
+        @Override
+		public String getId() {
             return clazz.getName().replace('$','.');
         }
 
@@ -213,7 +222,9 @@ public abstract class DownloadFromUrlInstaller extends ToolInstaller {
          */
         public List<? extends Installable> getInstallables() throws IOException {
             JSONObject d = Downloadable.get(getId()).getData();
-            if(d==null)     return Collections.emptyList();
+            if(d==null) {
+				return Collections.emptyList();
+			}
             return Arrays.asList(((InstallableList)JSONObject.toBean(d,InstallableList.class)).list);
         }
     }

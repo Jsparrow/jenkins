@@ -44,13 +44,19 @@ import javax.annotation.CheckForNull;
 
 import jenkins.model.Configuration;
 
-public abstract class AbstractCIBase extends Node implements ItemGroup<TopLevelItem>, StaplerProxy, StaplerFallback, ViewGroup, AccessControlled, DescriptorByNameOwner {
+public abstract class AbstractCIBase extends Node implements ItemGroup<TopLevelItem>, StaplerProxy, StaplerFallback, ViewGroup, DescriptorByNameOwner {
 
     public static boolean LOG_STARTUP_PERFORMANCE = Configuration.getBooleanConfigParameter("logStartupPerformance", false);
 
     private static final Logger LOGGER = Logger.getLogger(AbstractCIBase.class.getName());
 
-    /**
+	/* =================================================================================================================
+    * Package-protected, but accessed API
+    * ============================================================================================================== */
+
+    /*package*/ final CopyOnWriteArraySet<String> disabledAdministrativeMonitors = new CopyOnWriteArraySet<>();
+
+	/**
      * If you are calling this on Hudson something is wrong.
      *
      * @deprecated
@@ -61,46 +67,42 @@ public abstract class AbstractCIBase extends Node implements ItemGroup<TopLevelI
         return "";
     }
 
-   /**
-     * @deprecated
-     *      Why are you calling a method that always returns ""?
-    *       You probably want to call {@link Jenkins#getRootUrl()}
-     */
-    @Deprecated
-    public String getUrl() {
-        return "";
-    }
+	/**
+	     * @deprecated
+	     *      Why are you calling a method that always returns ""?
+	    *       You probably want to call {@link Jenkins#getRootUrl()}
+	     */
+	    @Override
+		@Deprecated
+	    public String getUrl() {
+	        return "";
+	    }
 
-    /* =================================================================================================================
+	/* =================================================================================================================
      * Support functions that can only be accessed through package-protected
      * ============================================================================================================== */
     protected void resetLabel(Label l) {
         l.reset();
     }
 
-    protected void setViewOwner(View v) {
+	protected void setViewOwner(View v) {
         v.owner = this;
     }
-    protected void interruptReloadThread() {
+
+	protected void interruptReloadThread() {
         ViewJob.interruptReloadThread();
     }
 
-    protected void killComputer(Computer c) {
+	protected void killComputer(Computer c) {
         c.kill();
     }
 
-    /* =================================================================================================================
-    * Package-protected, but accessed API
-    * ============================================================================================================== */
-
-    /*package*/ final CopyOnWriteArraySet<String> disabledAdministrativeMonitors = new CopyOnWriteArraySet<>();
-
-    @Restricted(NoExternalUse.class)
+	@Restricted(NoExternalUse.class)
     public CopyOnWriteArraySet<String> getDisabledAdministrativeMonitors(){
     	return disabledAdministrativeMonitors;
     }
-    
-    /* =================================================================================================================
+
+	/* =================================================================================================================
      * Implementation provided
      * ============================================================================================================== */
 
@@ -110,11 +112,11 @@ public abstract class AbstractCIBase extends Node implements ItemGroup<TopLevelI
      */
     public abstract List<Node> getNodes();
 
-    public abstract Queue getQueue();
+	public abstract Queue getQueue();
 
-    protected abstract Map<Node,Computer> getComputerMap();
+	protected abstract Map<Node,Computer> getComputerMap();
 
-    /* =================================================================================================================
+	/* =================================================================================================================
      * Computer API uses package protection heavily
      * ============================================================================================================== */
 
@@ -127,7 +129,7 @@ public abstract class AbstractCIBase extends Node implements ItemGroup<TopLevelI
                 c.setNode(n); // reuse
                 used.add(c);
             } catch (RuntimeException e) {
-                LOGGER.log(Level.WARNING, "Error updating node " + n.getNodeName() + ", continuing", e);
+                LOGGER.log(Level.WARNING, new StringBuilder().append("Error updating node ").append(n.getNodeName()).append(", continuing").toString(), e);
             }
         } else {
             // we always need Computer for the master as a fallback in case there's no other Computer.
@@ -135,7 +137,7 @@ public abstract class AbstractCIBase extends Node implements ItemGroup<TopLevelI
                 try {
                     c = n.createComputer();
                 } catch(RuntimeException ex) { // Just in case there is a bogus extension
-                    LOGGER.log(Level.WARNING, "Error retrieving computer for node " + n.getNodeName() + ", continuing", ex);
+                    LOGGER.log(Level.WARNING, new StringBuilder().append("Error retrieving computer for node ").append(n.getNodeName()).append(", continuing").toString(), ex);
                 }
                 if (c == null) {
                     LOGGER.log(Level.WARNING, "Cannot create computer for node {0}, the {1}#createComputer() method returned null. Skipping this node", 
@@ -162,28 +164,25 @@ public abstract class AbstractCIBase extends Node implements ItemGroup<TopLevelI
         }
     }
 
-    /*package*/ void removeComputer(final Computer computer) {
-        Queue.withLock(new Runnable() {
-            @Override
-            public void run() {
-                Map<Node,Computer> computers = getComputerMap();
-                for (Map.Entry<Node, Computer> e : computers.entrySet()) {
-                    if (e.getValue() == computer) {
-                        computers.remove(e.getKey());
-                        computer.onRemoved();
-                        return;
-                    }
-                }
-            }
-        });
+	/*package*/ void removeComputer(final Computer computer) {
+        Queue.withLock(() -> {
+		    Map<Node,Computer> computers = getComputerMap();
+		    for (Map.Entry<Node, Computer> e : computers.entrySet()) {
+		        if (e.getValue() == computer) {
+		            computers.remove(e.getKey());
+		            computer.onRemoved();
+		            return;
+		        }
+		    }
+		});
     }
 
-    /*package*/ @CheckForNull Computer getComputer(Node n) {
+	/*package*/ @CheckForNull Computer getComputer(Node n) {
         Map<Node,Computer> computers = getComputerMap();
         return computers.get(n);
     }
 
-    /**
+	/**
      * Updates Computers.
      *
      * <p>
@@ -193,53 +192,48 @@ public abstract class AbstractCIBase extends Node implements ItemGroup<TopLevelI
     protected void updateComputerList(final boolean automaticSlaveLaunch) {
         final Map<Node,Computer> computers = getComputerMap();
         final Set<Computer> old = new HashSet<>(computers.size());
-        Queue.withLock(new Runnable() {
-            @Override
-            public void run() {
-                Map<String,Computer> byName = new HashMap<>();
-                for (Computer c : computers.values()) {
-                    old.add(c);
-                    Node node = c.getNode();
-                    if (node == null)
-                        continue;   // this computer is gone
-                    byName.put(node.getNodeName(),c);
-                }
+        Queue.withLock(() -> {
+		    Map<String,Computer> byName = new HashMap<>();
+		    for (Computer c : computers.values()) {
+		        old.add(c);
+		        Node node = c.getNode();
+		        if (node == null)
+				 {
+					continue;   // this computer is gone
+				}
+		        byName.put(node.getNodeName(),c);
+		    }
 
-                Set<Computer> used = new HashSet<>(old.size());
+		    Set<Computer> used = new HashSet<>(old.size());
 
-                updateComputer(AbstractCIBase.this, byName, used, automaticSlaveLaunch);
-                for (Node s : getNodes()) {
-                    long start = System.currentTimeMillis();
-                    updateComputer(s, byName, used, automaticSlaveLaunch);
-                    if (LOG_STARTUP_PERFORMANCE && LOGGER.isLoggable(Level.FINE)) {
-                        LOGGER.fine(String.format("Took %dms to update node %s",
-                                System.currentTimeMillis() - start, s.getNodeName()));
-                    }
-                }
+		    updateComputer(AbstractCIBase.this, byName, used, automaticSlaveLaunch);
+		    getNodes().forEach(s -> {
+		        long start = System.currentTimeMillis();
+		        updateComputer(s, byName, used, automaticSlaveLaunch);
+		        if (LOG_STARTUP_PERFORMANCE && LOGGER.isLoggable(Level.FINE)) {
+		            LOGGER.fine(String.format("Took %dms to update node %s",
+		                    System.currentTimeMillis() - start, s.getNodeName()));
+		        }
+		    });
 
-                // find out what computers are removed, and kill off all executors.
-                // when all executors exit, it will be removed from the computers map.
-                // so don't remove too quickly
-                old.removeAll(used);
-                // we need to start the process of reducing the executors on all computers as distinct
-                // from the killing action which should not excessively use the Queue lock.
-                for (Computer c : old) {
-                    c.inflictMortalWound();
-                }
-            }
-        });
-        for (Computer c : old) {
-            // when we get to here, the number of executors should be zero so this call should not need the Queue.lock
-            killComputer(c);
-        }
+		    // find out what computers are removed, and kill off all executors.
+		    // when all executors exit, it will be removed from the computers map.
+		    // so don't remove too quickly
+		    old.removeAll(used);
+		    // we need to start the process of reducing the executors on all computers as distinct
+			// from the killing action which should not excessively use the Queue lock.
+			old.forEach(Computer::inflictMortalWound);
+		});
+        // when we get to here, the number of executors should be zero so this call should not need the Queue.lock
+		old.forEach(this::killComputer);
         getQueue().scheduleMaintenance();
-        for (ComputerListener cl : ComputerListener.all()) {
+        ComputerListener.all().forEach(cl -> {
             try {
                 cl.onConfigurationChange();
             } catch (Throwable t) {
                 LOGGER.log(Level.WARNING, null, t);
             }
-        }
+        });
     }
 
 }

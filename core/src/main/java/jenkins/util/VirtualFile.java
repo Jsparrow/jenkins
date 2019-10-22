@@ -234,28 +234,6 @@ public abstract class VirtualFile implements Comparable<VirtualFile>, Serializab
             return includePatterns.stream().anyMatch(patt -> patt.matchPath(path, true)) && excludePatterns.stream().noneMatch(patt -> patt.matchPath(path, true));
         }).collect(Collectors.toSet());
     }
-    private static final class CollectFiles extends MasterToSlaveCallable<Collection<String>, IOException> {
-        private static final long serialVersionUID = 1;
-        private final VirtualFile root;
-        CollectFiles(VirtualFile root) {
-            this.root = root;
-        }
-        @Override
-        public Collection<String> call() throws IOException {
-            List<String> r = new ArrayList<>();
-            collectFiles(root, r, "");
-            return r;
-        }
-        private static void collectFiles(VirtualFile d, Collection<String> names, String prefix) throws IOException {
-            for (VirtualFile child : d.list()) {
-                if (child.isFile()) {
-                    names.add(prefix + child.getName());
-                } else if (child.isDirectory()) {
-                    collectFiles(child, names, prefix + child.getName() + "/");
-                }
-            }
-        }
-    }
     private List<TokenizedPattern> patterns(String patts) {
         List<TokenizedPattern> r = new ArrayList<>();
         if (patts != null) {
@@ -269,28 +247,28 @@ public abstract class VirtualFile implements Comparable<VirtualFile>, Serializab
         return r;
     }
 
-    /**
+	/**
      * Obtains a child file.
      * @param name a relative path, possibly including {@code /} (but not {@code ..})
      * @return a representation of that child, whether it actually exists or not
      */
     public abstract @Nonnull VirtualFile child(@Nonnull String name);
 
-    /**
+	/**
      * Gets the file length.
      * @return a length, or 0 if inapplicable (e.g. a directory)
      * @throws IOException if checking the length failed
      */
     public abstract long length() throws IOException;
 
-    /**
+	/**
      * Gets the file timestamp.
      * @return a length, or 0 if inapplicable
      * @throws IOException if checking the timestamp failed
      */
     public abstract long lastModified() throws IOException;
 
-    /**
+	/**
      * Gets the file’s Unix mode, if meaningful.
      * If the file is symlink (see {@link #readLink}), the mode is that of the link target, not the link itself.
      * @return for example, 0644 ~ {@code rw-r--r--}; -1 by default, meaning unknown or inapplicable
@@ -302,21 +280,21 @@ public abstract class VirtualFile implements Comparable<VirtualFile>, Serializab
         return -1;
     }
 
-    /**
+	/**
      * Checks whether this file can be read.
      * @return true normally
      * @throws IOException if checking status failed
      */
     public abstract boolean canRead() throws IOException;
 
-    /**
+	/**
      * Opens an input stream on the file so its contents can be read.
      * @return an open stream
      * @throws IOException if it could not be opened
      */
     public abstract InputStream open() throws IOException;
 
-    /**
+	/**
      * Does case-insensitive comparison.
      * {@inheritDoc}
      */
@@ -324,7 +302,7 @@ public abstract class VirtualFile implements Comparable<VirtualFile>, Serializab
         return getName().compareToIgnoreCase(o.getName());
     }
 
-    /**
+	/**
      * Compares according to {@link #toURI}.
      * {@inheritDoc}
      */
@@ -332,7 +310,7 @@ public abstract class VirtualFile implements Comparable<VirtualFile>, Serializab
         return obj instanceof VirtualFile && toURI().equals(((VirtualFile) obj).toURI());
     }
 
-    /**
+	/**
      * Hashes according to {@link #toURI}.
      * {@inheritDoc}
      */
@@ -340,7 +318,7 @@ public abstract class VirtualFile implements Comparable<VirtualFile>, Serializab
         return toURI().hashCode();
     }
 
-    /**
+	/**
      * Displays {@link #toURI}.
      * {@inheritDoc}
      */
@@ -348,7 +326,7 @@ public abstract class VirtualFile implements Comparable<VirtualFile>, Serializab
         return toURI().toString();
     }
 
-    /**
+	/**
      * Does some calculations in batch.
      * For a remote file, this can be much faster than doing the corresponding operations one by one as separate requests.
      * The default implementation just calls the block directly.
@@ -362,7 +340,7 @@ public abstract class VirtualFile implements Comparable<VirtualFile>, Serializab
         return callable.call();
     }
 
-    /**
+	/**
      * Optionally obtains a URL which may be used to retrieve file contents from any process on any node.
      * For example, given cloud storage this might produce a permalink to the file.
      * <p>Only {@code http} and {@code https} protocols are permitted.
@@ -384,7 +362,7 @@ public abstract class VirtualFile implements Comparable<VirtualFile>, Serializab
         return null;
     }
 
-    /**
+	/**
      * Determine if the implementation supports the {@link #isDescendant(String)} method
      *
      * TODO un-restrict it in a weekly after the patch
@@ -394,7 +372,7 @@ public abstract class VirtualFile implements Comparable<VirtualFile>, Serializab
         return false;
     }
 
-    /**
+	/**
      * Check if the relative path is really a descendant of this folder, following the symbolic links.
      * Meant to be used in coordination with {@link #child(String)}.
      *
@@ -404,20 +382,51 @@ public abstract class VirtualFile implements Comparable<VirtualFile>, Serializab
     public boolean isDescendant(String childRelativePath) throws IOException {
         return false;
     }
-    
-    String joinWithForwardSlashes(Collection<String> relativePath){
+
+	String joinWithForwardSlashes(Collection<String> relativePath){
         // instead of File.separator that is specific to the master, the / has the advantage to be supported
         // by either Windows AND Linux for the Path.toRealPath() used in isDescendant
         return String.join("/", relativePath) + "/";
     }
 
-    /**
+	/**
      * Creates a virtual file wrapper for a local file.
      * @param f a disk file (need not exist)
      * @return a wrapper
      */
     public static VirtualFile forFile(final File f) {
         return new FileVF(f, f);
+    }
+
+	/**
+     * Creates a virtual file wrapper for a remotable file.
+     * @param f a local or remote file (need not exist)
+     * @return a wrapper
+     */
+    public static VirtualFile forFilePath(final FilePath f) {
+        return new FilePathVF(f, f);
+    }
+	private static final class CollectFiles extends MasterToSlaveCallable<Collection<String>, IOException> {
+        private static final long serialVersionUID = 1;
+        private final VirtualFile root;
+        CollectFiles(VirtualFile root) {
+            this.root = root;
+        }
+        @Override
+        public Collection<String> call() throws IOException {
+            List<String> r = new ArrayList<>();
+            collectFiles(root, r, "");
+            return r;
+        }
+        private static void collectFiles(VirtualFile d, Collection<String> names, String prefix) throws IOException {
+            for (VirtualFile child : d.list()) {
+                if (child.isFile()) {
+                    names.add(prefix + child.getName());
+                } else if (child.isDirectory()) {
+                    collectFiles(child, names, new StringBuilder().append(prefix).append(child.getName()).append("/").toString());
+                }
+            }
+        }
     }
     private static final class FileVF extends VirtualFile {
         private final File f;
@@ -554,7 +563,7 @@ public abstract class VirtualFile implements Comparable<VirtualFile>, Serializab
             } catch (InvalidPathException x2) {
                 // if this cannot be converted to a path, it cannot be an illegal symlink, as it cannot exist
                 // it's the case when we are calling it with *zip*
-                Logger.getLogger(VirtualFile.class.getName()).log(Level.FINE, "Could not convert " + f + " to path", x2);
+                Logger.getLogger(VirtualFile.class.getName()).log(Level.FINE, new StringBuilder().append("Could not convert ").append(f).append(" to path").toString(), x2);
             }
             return false;
         }
@@ -586,12 +595,11 @@ public abstract class VirtualFile implements Comparable<VirtualFile>, Serializab
             // as we know that a file that is a direct descendant of its parent can only be descendant of the root
             // if the parent is descendant AND the file itself is not symbolic
             File directChild = new File(f, potentialChildRelativePath);
-            if (directChild.getParentFile().equals(f)) {
-                // potential shortcut for "simple" / direct child
-                if (!Util.isSymlink(directChild)) {
-                    return true;
-                }
-            }
+            boolean condition = directChild.getParentFile().equals(f) && !Util.isSymlink(directChild);
+			// potential shortcut for "simple" / direct child
+			if (condition) {
+			    return true;
+			}
 
             FilePath root = new FilePath(this.root);
             String relativePath = computeRelativePathToRoot();
@@ -628,14 +636,6 @@ public abstract class VirtualFile implements Comparable<VirtualFile>, Serializab
         }
     }
 
-    /**
-     * Creates a virtual file wrapper for a remotable file.
-     * @param f a local or remote file (need not exist)
-     * @return a wrapper
-     */
-    public static VirtualFile forFilePath(final FilePath f) {
-        return new FilePathVF(f, f);
-    }
     private static final class FilePathVF extends VirtualFile {
         private final FilePath f;
         private final FilePath root;
@@ -789,7 +789,7 @@ public abstract class VirtualFile implements Comparable<VirtualFile>, Serializab
         @Override
         @Restricted(NoExternalUse.class)
         public boolean isDescendant(String potentialChildRelativePath) throws IOException {
-            if (potentialChildRelativePath.equals("") && cacheDescendant) {
+            if ("".equals(potentialChildRelativePath) && cacheDescendant) {
                 return true;
             }
 
@@ -844,7 +844,8 @@ public abstract class VirtualFile implements Comparable<VirtualFile>, Serializab
         }
     }
     private static final class Scanner extends MasterToSlaveFileCallable<List<String>> {
-        private final String includes, excludes;
+        private final String includes;
+		private final String excludes;
         private final boolean useDefaultExcludes;
         Scanner(String includes, String excludes, boolean useDefaultExcludes) {
             this.includes = includes;

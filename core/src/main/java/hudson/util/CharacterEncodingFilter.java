@@ -57,32 +57,36 @@ public class CharacterEncodingFilter implements Filter {
     private static final Boolean FORCE_ENCODING
             = SystemProperties.getBoolean(CharacterEncodingFilter.class.getName() + ".forceEncoding");
 
-    public void init(FilterConfig filterConfig) throws ServletException {
+	private static final Logger LOGGER = Logger.getLogger(CharacterEncodingFilter.class.getName());
+
+	@Override
+	public void init(FilterConfig filterConfig) throws ServletException {
         LOGGER.log(Level.FINE,
                 "CharacterEncodingFilter initialized. DISABLE_FILTER: {0} FORCE_ENCODING: {1}",
                 new Object[]{DISABLE_FILTER, FORCE_ENCODING});
     }
 
-    public void destroy() {
+	@Override
+	public void destroy() {
         LOGGER.fine("CharacterEncodingFilter destroyed.");
     }
 
-    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+	@Override
+	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
             throws IOException, ServletException {
 
-        if (!DISABLE_FILTER) {
-            if (request instanceof HttpServletRequest) {
-                HttpServletRequest req = (HttpServletRequest) request;
-                if (shouldSetCharacterEncoding(req)) {
-                    req.setCharacterEncoding(ENCODING);
-                }
-            }
-        }
+        boolean condition = !DISABLE_FILTER && request instanceof HttpServletRequest;
+		if (condition) {
+		    HttpServletRequest req = (HttpServletRequest) request;
+		    if (shouldSetCharacterEncoding(req)) {
+		        req.setCharacterEncoding(ENCODING);
+		    }
+		}
 
         chain.doFilter(request, response);
     }
 
-    private boolean shouldSetCharacterEncoding(HttpServletRequest req) {
+	private boolean shouldSetCharacterEncoding(HttpServletRequest req) {
         String method = req.getMethod();
         if (!"POST".equalsIgnoreCase(method)) {
             return false;
@@ -106,6 +110,4 @@ public class CharacterEncodingFilter implements Filter {
         
         return false;
     }
-
-    private static final Logger LOGGER = Logger.getLogger(CharacterEncodingFilter.class.getName());
 }

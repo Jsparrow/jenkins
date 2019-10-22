@@ -43,7 +43,8 @@ enum Boundary {
     FLOOR(0,-1),
     CEIL(0,0);
 
-    private final int offsetOfExactMatch, offsetOfInsertionPoint;
+    private final int offsetOfExactMatch;
+	private final int offsetOfInsertionPoint;
 
     Boundary(int offsetOfExactMatch, int offsetOfInsertionPoint) {
         this.offsetOfExactMatch = offsetOfExactMatch;
@@ -54,7 +55,10 @@ enum Boundary {
      * Computes the boundary value.
      */
     public int apply(int binarySearchOutput) {
-        if (binarySearchOutput >=0)    return binarySearchOutput +offsetOfExactMatch;   // if we had some x_i==p
+        if (binarySearchOutput >=0)
+		 {
+			return binarySearchOutput +offsetOfExactMatch;   // if we had some x_i==p
+		}
 
         int ip = -(binarySearchOutput +1);
         return ip+offsetOfInsertionPoint;

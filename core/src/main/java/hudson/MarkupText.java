@@ -48,6 +48,115 @@ public class MarkupText extends AbstractMarkupText {
     private final List<Tag> tags = new ArrayList<>();
 
     /**
+     *
+     * @param text
+     *      Plain text. This shouldn't include any markup nor escape. Those are done later in {@link #toString(boolean)}.
+     */
+    public MarkupText(String text) {
+        this.text = text;
+    }
+
+	@Override
+    public String getText() {
+        return text;
+    }
+
+	/**
+     * Returns a subtext.
+     *
+     * @param end
+     *      If negative, -N means "trim the last N-1 chars". That is, (s,-1) is the same as (s,length)
+     */
+    @Override
+	public SubText subText(int start, int end) {
+        return new SubText(start, end<0 ? text.length()+1+end : end);
+    }
+
+	@Override
+    public void addMarkup( int startPos, int endPos, String startTag, String endTag ) {
+        rangeCheck(startPos);
+        rangeCheck(endPos);
+        if(startPos>endPos) {
+			throw new IndexOutOfBoundsException();
+		}
+
+        // when multiple tags are added to the same range, we want them to show up like
+        // <b><i>abc</i></b>, not <b><i>abc</b></i>. Also, we'd like <b>abc</b><i>def</i>,
+        // not <b>abc<i></b>def</i>. Do this by inserting them to different places.
+        tags.add(new Tag(startPos, startTag));
+        tags.add(0,new Tag(endPos,endTag));
+    }
+
+	public void addMarkup(int pos, String tag) {
+        rangeCheck(pos);
+        tags.add(new Tag(pos,tag));
+    }
+
+	private void rangeCheck(int pos) {
+        if(pos<0 || pos>text.length()) {
+			throw new IndexOutOfBoundsException();
+		}
+    }
+
+	/**
+     * Returns the fully marked-up text.
+     *
+     * @deprecated as of 1.350.
+     *      Use {@link #toString(boolean)} to be explicit about the escape mode.
+     */
+    @Override
+    @Deprecated
+    public String toString() {
+        return toString(false);
+    }
+
+	/**
+     * Returns the fully marked-up text.
+     *
+     * @param preEscape
+     *      If true, the escaping is for the {@code <PRE>} context. This leave SP and CR/LF intact.
+     *      If false, the escape is for the normal HTML, thus SP becomes &amp;nbsp; and CR/LF becomes {@code <BR>}
+     */
+    public String toString(boolean preEscape) {
+        if(tags.isEmpty())
+		 {
+			return preEscape? Util.xmlEscape(text) : Util.escape(text);  // the most common case
+		}
+
+        Collections.sort(tags);
+
+        StringBuilder buf = new StringBuilder();
+        int copied = 0; // # of chars already copied from text to buf
+
+        for (Tag tag : tags) {
+            if (copied<tag.pos) {
+                String portion = text.substring(copied, tag.pos);
+                buf.append(preEscape ? Util.xmlEscape(portion) : Util.escape(portion));
+                copied = tag.pos;
+            }
+            buf.append(tag.markup);
+        }
+        if (copied<text.length()) {
+            String portion = text.substring(copied);
+            buf.append(preEscape ? Util.xmlEscape(portion) : Util.escape(portion));
+        }
+
+        return buf.toString();
+    }
+
+	// perhaps this method doesn't need to be here to remain binary compatible with past versions,
+    // but having this seems to be safer.
+    @Override
+    public List<SubText> findTokens(Pattern pattern) {
+        return super.findTokens(pattern);
+    }
+
+	@Override
+    protected SubText createSubText(Matcher m) {
+        return new SubText(m,0);
+    }
+
+	/**
      * Represents one mark up inserted into text.
      */
     private static final class Tag implements Comparable<Tag> {
@@ -64,7 +173,8 @@ public class MarkupText extends AbstractMarkupText {
             this.markup = markup;
         }
 
-        public int compareTo(Tag that) {
+        @Override
+		public int compareTo(Tag that) {
             return this.pos-that.pos;
         }
     }
@@ -73,7 +183,8 @@ public class MarkupText extends AbstractMarkupText {
      * Represents a substring of a {@link MarkupText}.
      */
     public final class SubText extends AbstractMarkupText {
-        private final int start,end;
+        private final int start;
+		private final int end;
         private final int[] groups;
 
         public SubText(Matcher m, int textOffset) {
@@ -145,7 +256,9 @@ public class MarkupText extends AbstractMarkupText {
          *      groups captured by '(...)' in the regexp.
          */
         public int start(int groupIndex) {
-            if(groupIndex==0)    return start;
+            if(groupIndex==0) {
+				return start;
+			}
             return groups[groupIndex*2-2];
         }
 
@@ -160,7 +273,9 @@ public class MarkupText extends AbstractMarkupText {
          * Gets the end index of the captured group within {@link MarkupText#getText()}.
          */
         public int end(int groupIndex) {
-            if(groupIndex==0)    return end;
+            if(groupIndex==0) {
+				return end;
+			}
             return groups[groupIndex*2-1];
         }
 
@@ -175,8 +290,9 @@ public class MarkupText extends AbstractMarkupText {
          * Gets the text that represents the captured group.
          */
         public String group(int groupIndex) {
-            if(start(groupIndex)==-1)
-                return null;
+            if(start(groupIndex)==-1) {
+				return null;
+			}
             return text.substring(start(groupIndex),end(groupIndex));
         }
 
@@ -210,8 +326,9 @@ public class MarkupText extends AbstractMarkupText {
                     } else {
                     	// add the group text
                     	String group = group(groupId);
-                    	if (group != null) 
-                    		buf.append(group);
+                    	if (group != null) {
+							buf.append(group);
+						}
                     }
 
                 } else {
@@ -227,108 +344,5 @@ public class MarkupText extends AbstractMarkupText {
         protected SubText createSubText(Matcher m) {
             return new SubText(m,start);
         }
-    }
-
-    /**
-     *
-     * @param text
-     *      Plain text. This shouldn't include any markup nor escape. Those are done later in {@link #toString(boolean)}.
-     */
-    public MarkupText(String text) {
-        this.text = text;
-    }
-
-    @Override
-    public String getText() {
-        return text;
-    }
-
-    /**
-     * Returns a subtext.
-     *
-     * @param end
-     *      If negative, -N means "trim the last N-1 chars". That is, (s,-1) is the same as (s,length)
-     */
-    public SubText subText(int start, int end) {
-        return new SubText(start, end<0 ? text.length()+1+end : end);
-    }
-
-    @Override
-    public void addMarkup( int startPos, int endPos, String startTag, String endTag ) {
-        rangeCheck(startPos);
-        rangeCheck(endPos);
-        if(startPos>endPos) throw new IndexOutOfBoundsException();
-
-        // when multiple tags are added to the same range, we want them to show up like
-        // <b><i>abc</i></b>, not <b><i>abc</b></i>. Also, we'd like <b>abc</b><i>def</i>,
-        // not <b>abc<i></b>def</i>. Do this by inserting them to different places.
-        tags.add(new Tag(startPos, startTag));
-        tags.add(0,new Tag(endPos,endTag));
-    }
-
-    public void addMarkup(int pos, String tag) {
-        rangeCheck(pos);
-        tags.add(new Tag(pos,tag));
-    }
-
-    private void rangeCheck(int pos) {
-        if(pos<0 || pos>text.length())
-            throw new IndexOutOfBoundsException();
-    }
-
-    /**
-     * Returns the fully marked-up text.
-     *
-     * @deprecated as of 1.350.
-     *      Use {@link #toString(boolean)} to be explicit about the escape mode.
-     */
-    @Override
-    @Deprecated
-    public String toString() {
-        return toString(false);
-    }
-
-    /**
-     * Returns the fully marked-up text.
-     *
-     * @param preEscape
-     *      If true, the escaping is for the {@code <PRE>} context. This leave SP and CR/LF intact.
-     *      If false, the escape is for the normal HTML, thus SP becomes &amp;nbsp; and CR/LF becomes {@code <BR>}
-     */
-    public String toString(boolean preEscape) {
-        if(tags.isEmpty())
-            return preEscape? Util.xmlEscape(text) : Util.escape(text);  // the most common case
-
-        Collections.sort(tags);
-
-        StringBuilder buf = new StringBuilder();
-        int copied = 0; // # of chars already copied from text to buf
-
-        for (Tag tag : tags) {
-            if (copied<tag.pos) {
-                String portion = text.substring(copied, tag.pos);
-                buf.append(preEscape ? Util.xmlEscape(portion) : Util.escape(portion));
-                copied = tag.pos;
-            }
-            buf.append(tag.markup);
-        }
-        if (copied<text.length()) {
-            String portion = text.substring(copied);
-            buf.append(preEscape ? Util.xmlEscape(portion) : Util.escape(portion));
-        }
-
-        return buf.toString();
-    }
-
-    // perhaps this method doesn't need to be here to remain binary compatible with past versions,
-    // but having this seems to be safer.
-    @Override
-    public List<SubText> findTokens(Pattern pattern) {
-        return super.findTokens(pattern);
-    }
-
-    @Override
-    protected SubText createSubText(Matcher m) {
-        return new SubText(m,0);
     }
 }

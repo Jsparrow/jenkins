@@ -58,7 +58,11 @@ public abstract class CauseOfBlockage {
         return getShortDescription();
     }
 
-    /**
+    public static CauseOfBlockage createNeedsMoreExecutor(Localizable l) {
+        return new NeedsMoreExecutorImpl(l);
+    }
+
+	/**
      * Marker interface to indicates that we can reasonably expect
      * that adding a suitable executor/node will resolve this blockage.
      *
@@ -69,10 +73,6 @@ public abstract class CauseOfBlockage {
      */
     interface NeedsMoreExecutor {}
 
-    public static CauseOfBlockage createNeedsMoreExecutor(Localizable l) {
-        return new NeedsMoreExecutorImpl(l);
-    }
-
     private static final class NeedsMoreExecutorImpl extends CauseOfBlockage implements NeedsMoreExecutor {
         private final Localizable l;
 
@@ -80,7 +80,8 @@ public abstract class CauseOfBlockage {
             this.l = l;
         }
 
-        public String getShortDescription() {
+        @Override
+		public String getShortDescription() {
             return l.toString();
         }
     }
@@ -95,7 +96,8 @@ public abstract class CauseOfBlockage {
             this.node = node;
         }
 
-        public String getShortDescription() {
+        @Override
+		public String getShortDescription() {
             String name = (node.toComputer() != null) ? node.toComputer().getDisplayName() : node.getDisplayName();
             return Messages.Queue_NodeOffline(name);
         }
@@ -144,7 +146,8 @@ public abstract class CauseOfBlockage {
             this.label = l;
         }
 
-        public String getShortDescription() {
+        @Override
+		public String getShortDescription() {
             if (label.isEmpty()) {
                 return Messages.Queue_LabelHasNoNodes(label.getName());
             } else {
@@ -163,7 +166,8 @@ public abstract class CauseOfBlockage {
             this.node = node;
         }
 
-        public String getShortDescription() {
+        @Override
+		public String getShortDescription() {
             String name = (node.toComputer() != null) ? node.toComputer().getDisplayName() : node.getDisplayName();
             return Messages.Queue_WaitingForNextAvailableExecutorOn(name);
         }
@@ -184,7 +188,8 @@ public abstract class CauseOfBlockage {
             this.label = label;
         }
 
-        public String getShortDescription() {
+        @Override
+		public String getShortDescription() {
             return Messages.Queue_WaitingForNextAvailableExecutorOn(label.getName());
         }
     }

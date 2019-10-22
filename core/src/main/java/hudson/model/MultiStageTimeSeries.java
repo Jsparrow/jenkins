@@ -67,38 +67,42 @@ import javax.servlet.ServletException;
  */
 @ExportedBean
 public class MultiStageTimeSeries implements Serializable {
-    /**
+    private static final Font CHART_FONT = Font.getFont(MultiStageTimeSeries.class.getName() + ".chartFont",
+            new Font(Font.SANS_SERIF, Font.PLAIN, 10));
+
+	private static final long serialVersionUID = 1L;
+
+	/**
      * Name of this data series.
      */
     public final Localizable title;
 
-    /**
+	/**
      * Used to render a line in the trend chart.
      */
     public final Color color;
 
-    /**
+	/**
      * Updated every 10 seconds. Keep data up to 1 hour.
      */
     @Exported
     public final TimeSeries sec10;
-    /**
+
+	/**
      * Updated every 1 min. Keep data up to 1 day.
      */
     @Exported
     public final TimeSeries min;
-    /**
+
+	/**
      * Updated every 1 hour. Keep data up to 4 weeks.
      */
     @Exported
     public final TimeSeries hour;
 
-    private int counter;
+	private int counter;
 
-    private static final Font CHART_FONT = Font.getFont(MultiStageTimeSeries.class.getName() + ".chartFont",
-            new Font(Font.SANS_SERIF, Font.PLAIN, 10));
-
-    public MultiStageTimeSeries(Localizable title, Color color, float initialValue, float decay) {
+	public MultiStageTimeSeries(Localizable title, Color color, float initialValue, float decay) {
         this.title = title;
         this.color = color;
         this.sec10 = new TimeSeries(initialValue,decay,6*60);
@@ -106,7 +110,7 @@ public class MultiStageTimeSeries implements Serializable {
         this.hour = new TimeSeries(initialValue,decay,28*24);
     }
 
-    /**
+	/**
      * @deprecated since 2009-04-05.
      *      Use {@link #MultiStageTimeSeries(Localizable, Color, float, float)}
      */
@@ -115,17 +119,21 @@ public class MultiStageTimeSeries implements Serializable {
         this(Messages._MultiStageTimeSeries_EMPTY_STRING(), Color.WHITE, initialValue,decay);
     }
 
-    /**
+	/**
      * Call this method every 10 sec and supply a new data point.
      */
     public void update(float f) {
         counter = (counter+1)%360;   // 1hour/10sec = 60mins/10sec=3600secs/10sec = 360
         sec10.update(f);
-        if(counter%6==0)    min.update(f);
-        if(counter==0)      hour.update(f);
+        if(counter%6==0) {
+			min.update(f);
+		}
+        if(counter==0) {
+			hour.update(f);
+		}
     }
 
-    /**
+	/**
      * Selects a {@link TimeSeries}.
      */
     public TimeSeries pick(TimeScale timeScale) {
@@ -137,18 +145,22 @@ public class MultiStageTimeSeries implements Serializable {
         }
     }
 
-    /**
+	/**
      * Gets the most up-to-date data point value.
      */
     public float getLatest(TimeScale timeScale) {
         return pick(timeScale).getLatest();
     }
 
-    public Api getApi() {
+	public Api getApi() {
         return new Api(this);
     }
 
-    /**
+	public static TrendChart createTrendChart(TimeScale scale, MultiStageTimeSeries... data) {
+        return new TrendChart(scale,data);
+    }
+
+	/**
      * Choose which datapoint to use.
      */
     public enum TimeScale {
@@ -183,12 +195,14 @@ public class MultiStageTimeSeries implements Serializable {
          * Parses the {@link TimeScale} from the query parameter.
          */
         public static TimeScale parse(String type) {
-            if(type==null)   return TimeScale.MIN;
+            if(type==null) {
+				return TimeScale.MIN;
+			}
             return Enum.valueOf(TimeScale.class, type.toUpperCase(Locale.ENGLISH));
         }
     }
 
-    /**
+	/**
      * Represents the trend chart that consists of several {@link MultiStageTimeSeries}.
      *
      * <p>
@@ -210,12 +224,14 @@ public class MultiStageTimeSeries implements Serializable {
          */
         protected DefaultCategoryDataset createDataset() {
             float[][] dataPoints = new float[series.size()][];
-            for (int i = 0; i < series.size(); i++)
-                dataPoints[i] = series.get(i).pick(timeScale).getHistory();
+            for (int i = 0; i < series.size(); i++) {
+				dataPoints[i] = series.get(i).pick(timeScale).getHistory();
+			}
 
             int dataLength = dataPoints[0].length;
-            for (float[] dataPoint : dataPoints)
-                assert dataLength ==dataPoint.length;
+            for (float[] dataPoint : dataPoints) {
+				assert dataLength ==dataPoint.length;
+			}
 
             DefaultCategoryDataset ds = new DefaultCategoryDataset();
 
@@ -225,8 +241,9 @@ public class MultiStageTimeSeries implements Serializable {
             for (int i = dataLength-1; i>=0; i--) {
                 dt = new Date(dt.getTime()+timeScale.tick);
                 String l = format.format(dt);
-                for(int j=0; j<dataPoints.length; j++)
-                    ds.addValue(dataPoints[j][i],series.get(j).title.toString(),l);
+                for(int j=0; j<dataPoints.length; j++) {
+					ds.addValue(dataPoints[j][i],series.get(j).title.toString(),l);
+				}
             }
             return ds;
         }
@@ -284,8 +301,9 @@ public class MultiStageTimeSeries implements Serializable {
         protected void configureRenderer(LineAndShapeRenderer renderer) {
             renderer.setBaseStroke(new BasicStroke(3));
 
-            for (int i = 0; i < series.size(); i++)
-                renderer.setSeriesPaint(i, series.get(i).color);
+            for (int i = 0; i < series.size(); i++) {
+				renderer.setSeriesPaint(i, series.get(i).color);
+			}
         }
 
         protected void configurePlot(CategoryPlot plot) {
@@ -301,14 +319,9 @@ public class MultiStageTimeSeries implements Serializable {
         /**
          * Renders this object as an image.
          */
-        public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object node) throws IOException, ServletException {
+        @Override
+		public void generateResponse(StaplerRequest req, StaplerResponse rsp, Object node) throws IOException, ServletException {
             ChartUtil.generateGraph(req, rsp, createChart(), 500, 400);
         }
     }
-
-    public static TrendChart createTrendChart(TimeScale scale, MultiStageTimeSeries... data) {
-        return new TrendChart(scale,data);
-    }
-
-    private static final long serialVersionUID = 1L;
 }

@@ -41,7 +41,9 @@ import java.util.logging.Logger;
  * @author Kohsuke Kawaguchi
  */
 public class LocalPluginManager extends PluginManager {
-    /**
+    private static final Logger LOGGER = Logger.getLogger(LocalPluginManager.class.getName());
+
+	/**
      * Creates a new LocalPluginManager
      * @param context Servlet context. Provided for compatibility as {@code Jenkins.get().servletContext} should be used.
      * @param rootDir Jenkins home directory.
@@ -50,7 +52,7 @@ public class LocalPluginManager extends PluginManager {
         super(context, new File(rootDir,"plugins"));
     }
 
-    /**
+	/**
      * Creates a new LocalPluginManager
      * @param jenkins Jenkins instance that will use the plugin manager.
      */
@@ -58,7 +60,7 @@ public class LocalPluginManager extends PluginManager {
         this(jenkins.servletContext, jenkins.getRootDir());
     }
 
-    /**
+	/**
      * Creates a new LocalPluginManager
      * @param rootDir Jenkins home directory.
      */
@@ -66,7 +68,7 @@ public class LocalPluginManager extends PluginManager {
         this(null, rootDir);
     }
 
-    @Override
+	@Override
     protected Collection<String> loadBundledPlugins() {
         // this is used in tests, when we want to override the default bundled plugins with .jpl (or .hpl) versions
         if (SystemProperties.getString("hudson.bundled.plugins") != null) {
@@ -79,6 +81,4 @@ public class LocalPluginManager extends PluginManager {
             loadDetachedPlugins();
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(LocalPluginManager.class.getName());
 }

@@ -69,33 +69,35 @@ import java.lang.reflect.Method;
  * @since 1.178
  */
 public class DoubleLaunchChecker {
-    /**
+    private static final Logger LOGGER = Logger.getLogger(DoubleLaunchChecker.class.getName());
+
+	/**
      * The timestamp of the owner file when we updated it for the last time.
      * 0 to indicate that there was no update before.
      */
     private long lastWriteTime = 0L;
 
-    /**
+	/**
      * Once the error is reported, the user can choose to ignore and proceed anyway,
      * in which case the flag is set to true.
      */
     private boolean ignore = false;
 
-    private final Random random = new Random();
+	private final Random random = new Random();
 
-    public final File home;
+	public final File home;
 
-    /**
+	/**
      * ID string of the other Hudson that we are colliding with. 
      * Can be null.
      */
     private String collidingId;
 
-    public DoubleLaunchChecker() {
+	public DoubleLaunchChecker() {
         home = Jenkins.get().getRootDir();
     }
 
-    protected void execute() {
+	protected void execute() {
         File timestampFile = new File(home,".owner");
 
         long t = timestampFile.lastModified();
@@ -108,7 +110,7 @@ public class DoubleLaunchChecker {
             // we noticed that someone else have updated this file.
             // switch GUI to display this error.
             Jenkins.get().servletContext.setAttribute("app",this);
-            LOGGER.severe("Collision detected. timestamp="+t+", expected="+lastWriteTime);
+            LOGGER.severe(new StringBuilder().append("Collision detected. timestamp=").append(t).append(", expected=").append(lastWriteTime).toString());
             // we need to continue updating this file, so that the other Hudson would notice the problem, too.
         }
 
@@ -123,7 +125,7 @@ public class DoubleLaunchChecker {
         schedule();
     }
 
-    /**
+	/**
      * Figures out a string that identifies this instance of Hudson.
      */
     public String getId() {
@@ -133,19 +135,19 @@ public class DoubleLaunchChecker {
         String contextPath="";
         try {
             Method m = ServletContext.class.getMethod("getContextPath");
-            contextPath=" contextPath=\""+m.invoke(h.servletContext)+"\"";
+            contextPath=new StringBuilder().append(" contextPath=\"").append(m.invoke(h.servletContext)).append("\"").toString();
         } catch (Exception e) {
             // maybe running with Servlet 2.4
         }
 
-        return h.hashCode()+contextPath+" at "+ManagementFactory.getRuntimeMXBean().getName();
+        return new StringBuilder().append(h.hashCode()).append(contextPath).append(" at ").append(ManagementFactory.getRuntimeMXBean().getName()).toString();
     }
 
-    public String getCollidingId() {
+	public String getCollidingId() {
         return collidingId;
     }
 
-    /**
+	/**
      * Schedules the next execution.
      */
     public void schedule() {
@@ -154,18 +156,19 @@ public class DoubleLaunchChecker {
 
         Timer.get()
             .schedule(new SafeTimerTask() {
-                protected void doRun() {
+                @Override
+				protected void doRun() {
                     execute();
                 }
             }, (random.nextInt(30) + 60) * MINUTE, TimeUnit.MILLISECONDS);
     }
 
-    @Initializer(after= JOB_LOADED)
+	@Initializer(after= JOB_LOADED)
     public static void init() {
         new DoubleLaunchChecker().schedule();
     }
 
-    /**
+	/**
      * Serve all URLs with the index view.
      */
     public void doDynamic(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
@@ -173,7 +176,7 @@ public class DoubleLaunchChecker {
         req.getView(this,"index.jelly").forward(req,rsp);
     }
 
-    /**
+	/**
      * Ignore the problem and go back to using Hudson.
      */
     @RequirePOST
@@ -182,6 +185,4 @@ public class DoubleLaunchChecker {
         Jenkins.get().servletContext.setAttribute("app", Jenkins.get());
         rsp.sendRedirect2(req.getContextPath()+'/');
     }
-
-    private static final Logger LOGGER = Logger.getLogger(DoubleLaunchChecker.class.getName());
 }

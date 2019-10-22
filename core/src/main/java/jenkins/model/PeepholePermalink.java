@@ -67,20 +67,25 @@ public abstract class PeepholePermalink extends Permalink implements Predicate<R
      */
     private static final Map<File, Map<String, Integer>> caches = new HashMap<>();
 
-    /**
+	private static final int RESOLVES_TO_NONE = -1;
+
+	private static final Logger LOGGER = Logger.getLogger(PeepholePermalink.class.getName());
+
+	/**
      * Checks if the given build satisfies the peep-hole criteria.
      *
      * This is the "G(B)" as described in the class javadoc.
      */
-    public abstract boolean apply(Run<?,?> run);
+    @Override
+	public abstract boolean apply(Run<?,?> run);
 
-    /** @deprecated No longer used. */
+	/** @deprecated No longer used. */
     @Deprecated
     protected File getPermalinkFile(Job<?,?> job) {
         return new File(job.getBuildDir(),getId());
     }
 
-    /**
+	/**
      * Resolves the permalink by using the cache if possible.
      */
     @Override
@@ -120,17 +125,17 @@ public abstract class PeepholePermalink extends Permalink implements Predicate<R
         return b;
     }
 
-    /**
+	/**
      * Start from the build 'b' and locate the build that matches the criteria going back in time
      */
     private Run<?,?> find(Run<?,?> b) {
         //noinspection StatementWithEmptyBody
-        for ( ; b!=null && !apply(b); b=b.getPreviousBuild())
-            ;
+        for ( ; b!=null && !apply(b); b=b.getPreviousBuild()) {
+		}
         return b;
     }
 
-    private static @Nonnull Map<String, Integer> cacheFor(@Nonnull File buildDir) {
+	private static @Nonnull Map<String, Integer> cacheFor(@Nonnull File buildDir) {
         synchronized (caches) {
             Map<String, Integer> cache = caches.get(buildDir);
             if (cache == null) {
@@ -141,7 +146,7 @@ public abstract class PeepholePermalink extends Permalink implements Predicate<R
         }
     }
 
-    private static @Nonnull Map<String, Integer> load(@Nonnull File buildDir) {
+	private static @Nonnull Map<String, Integer> load(@Nonnull File buildDir) {
         Map<String, Integer> cache = new TreeMap<>();
         File storage = storageFor(buildDir);
         if (storage.isFile()) {
@@ -160,16 +165,16 @@ public abstract class PeepholePermalink extends Permalink implements Predicate<R
             } catch (IOException x) {
                 LOGGER.log(Level.WARNING, "failed to read " + storage, x);
             }
-            LOGGER.fine(() -> "loading from " + storage + ": " + cache);
+            LOGGER.fine(() -> new StringBuilder().append("loading from ").append(storage).append(": ").append(cache).toString());
         }
         return cache;
     }
 
-    static @Nonnull File storageFor(@Nonnull File buildDir) {
+	static @Nonnull File storageFor(@Nonnull File buildDir) {
         return new File(buildDir, "permalinks");
     }
 
-    /**
+	/**
      * Remembers the value 'n' in the cache for future {@link #resolve(Job)}.
      */
     protected void updateCache(@Nonnull Job<?,?> job, @CheckForNull Run<?,?> b) {
@@ -178,7 +183,7 @@ public abstract class PeepholePermalink extends Permalink implements Predicate<R
         synchronized (cache) {
             cache.put(getId(), b == null ? RESOLVES_TO_NONE : b.getNumber());
             File storage = storageFor(buildDir);
-            LOGGER.fine(() -> "saving to " + storage + ": " + cache);
+            LOGGER.fine(() -> new StringBuilder().append("saving to ").append(storage).append(": ").append(cache).toString());
             try {
                 AtomicFileWriter cw = new AtomicFileWriter(storage);
                 try {
@@ -206,13 +211,12 @@ public abstract class PeepholePermalink extends Permalink implements Predicate<R
         @Override
         public void onDeleted(Run run) {
             Job<?, ?> j = run.getParent();
-            for (PeepholePermalink pp : Util.filter(j.getPermalinks(), PeepholePermalink.class)) {
-                if (pp.resolve(j)==run) {
-                    Run<?,?> r = pp.find(run.getPreviousBuild());
-                    LOGGER.fine(() -> "Updating " + pp.getId() + " permalink from deleted " + run + " to " + (r == null ? -1 : r.getNumber()));
-                    pp.updateCache(j,r);
-                }
-            }
+            Util.filter(j.getPermalinks(), PeepholePermalink.class).stream().filter(pp -> pp.resolve(j)==run).forEach(pp -> {
+			    Run<?,?> r = pp.find(run.getPreviousBuild());
+			    LOGGER.fine(() -> new StringBuilder().append("Updating ").append(pp.getId()).append(" permalink from deleted ").append(run).append(" to ")
+						.append(r == null ? -1 : r.getNumber()).toString());
+			    pp.updateCache(j,r);
+			});
         }
 
         /**
@@ -221,19 +225,13 @@ public abstract class PeepholePermalink extends Permalink implements Predicate<R
         @Override
         public void onCompleted(Run<?,?> run, @Nonnull TaskListener listener) {
             Job<?, ?> j = run.getParent();
-            for (PeepholePermalink pp : Util.filter(j.getPermalinks(), PeepholePermalink.class)) {
-                if (pp.apply(run)) {
-                    Run<?, ?> cur = pp.resolve(j);
-                    if (cur==null || cur.getNumber()<run.getNumber()) {
-                        LOGGER.fine(() -> "Updating " + pp.getId() + " permalink to completed " + run);
-                        pp.updateCache(j,run);
-                    }
-                }
-            }
+            Util.filter(j.getPermalinks(), PeepholePermalink.class).stream().filter(pp -> pp.apply(run)).forEach(pp -> {
+			    Run<?, ?> cur = pp.resolve(j);
+			    if (cur==null || cur.getNumber()<run.getNumber()) {
+			        LOGGER.fine(() -> new StringBuilder().append("Updating ").append(pp.getId()).append(" permalink to completed ").append(run).toString());
+			        pp.updateCache(j,run);
+			    }
+			});
         }
     }
-
-    private static final int RESOLVES_TO_NONE = -1;
-
-    private static final Logger LOGGER = Logger.getLogger(PeepholePermalink.class.getName());
 }

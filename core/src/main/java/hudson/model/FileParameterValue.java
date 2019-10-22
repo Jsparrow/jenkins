@@ -77,7 +77,7 @@ public class FileParameterValue extends ParameterValue {
     public static /* Script Console modifiable */ boolean ALLOW_FOLDER_TRAVERSAL_OUTSIDE_WORKSPACE = 
             Boolean.getBoolean(FileParameterValue.class.getName() + ".allowFolderTraversalOutsideWorkspace");
 
-    private transient final FileItem file;
+    private final transient FileItem file;
 
     /**
      * The name of the originally uploaded file.
@@ -132,11 +132,7 @@ public class FileParameterValue extends ParameterValue {
 
     @Override
     public VariableResolver<String> createVariableResolver(AbstractBuild<?, ?> build) {
-        return new VariableResolver<String>() {
-            public String resolve(String name) {
-                return FileParameterValue.this.name.equals(name) ? originalFileName : null;
-            }
-        };
+        return (String name) -> FileParameterValue.this.name.equals(name) ? originalFileName : null;
     }
 
     /**
@@ -195,16 +191,21 @@ public class FileParameterValue extends ParameterValue {
 	 */
 	@Override
 	public boolean equals(Object obj) {
-		if (this == obj)
+		if (this == obj) {
 			return true;
-		if (!super.equals(obj))
+		}
+		if (!super.equals(obj)) {
 			return false;
-		if (getClass() != obj.getClass())
+		}
+		if (getClass() != obj.getClass()) {
 			return false;
+		}
 		FileParameterValue other = (FileParameterValue) obj;
 		
-		if (location == null && other.location == null) 
+		if (location == null && other.location == null)
+		 {
 			return true; // Consider null parameters as equal
+		}
 
 		//TODO: check fingerprints or checksums to improve the behavior (JENKINS-25211)
 		// Return false even if files are equal
@@ -213,11 +214,11 @@ public class FileParameterValue extends ParameterValue {
 
     @Override
     public String toString() {
-    	return "(FileParameterValue) " + getName() + "='" + originalFileName + "'";
+    	return new StringBuilder().append("(FileParameterValue) ").append(getName()).append("='").append(originalFileName).append("'").toString();
     }
 
     @Override public String getShortDescription() {
-        return name + "=" + originalFileName;
+        return new StringBuilder().append(name).append("=").append(originalFileName).toString();
     }
 
     /**
@@ -229,35 +230,34 @@ public class FileParameterValue extends ParameterValue {
      * @throws IOException
      */
     public void doDynamic(StaplerRequest request, StaplerResponse response) throws ServletException, IOException {
-        if (("/" + originalFileName).equals(request.getRestOfPath())) {
-            AbstractBuild build = (AbstractBuild)request.findAncestor(AbstractBuild.class).getObject();
-            File fileParameter = getLocationUnderBuild(build);
+        if (!("/" + originalFileName).equals(request.getRestOfPath())) {
+			return;
+		}
+		AbstractBuild build = (AbstractBuild)request.findAncestor(AbstractBuild.class).getObject();
+		File fileParameter = getLocationUnderBuild(build);
+		if (!ALLOW_FOLDER_TRAVERSAL_OUTSIDE_WORKSPACE) {
+		    File fileParameterFolder = getFileParameterFolderUnderBuild(build);
 
-            if (!ALLOW_FOLDER_TRAVERSAL_OUTSIDE_WORKSPACE) {
-                File fileParameterFolder = getFileParameterFolderUnderBuild(build);
-
-                //TODO can be replaced by Util#isDescendant in 2.80+
-                Path child = fileParameter.getAbsoluteFile().toPath().normalize();
-                Path parent = fileParameterFolder.getAbsoluteFile().toPath().normalize();
-                if (!child.startsWith(parent)) {
-                    throw new IllegalStateException("The fileParameter tried to escape the expected folder: " + location);
-                }
-            }
-
-            if (fileParameter.isFile()) {
-                try (InputStream data = Files.newInputStream(fileParameter.toPath())) {
-                    long lastModified = fileParameter.lastModified();
-                    long contentLength = fileParameter.length();
-                    if (request.hasParameter("view")) {
-                        response.serveFile(request, data, lastModified, contentLength, "plain.txt");
-                    } else {
-                        response.serveFile(request, data, lastModified, contentLength, originalFileName);
-                    }
-                } catch (InvalidPathException e) {
-                    throw new IOException(e);
-                }
-            }
-        }
+		    //TODO can be replaced by Util#isDescendant in 2.80+
+		    Path child = fileParameter.getAbsoluteFile().toPath().normalize();
+		    Path parent = fileParameterFolder.getAbsoluteFile().toPath().normalize();
+		    if (!child.startsWith(parent)) {
+		        throw new IllegalStateException("The fileParameter tried to escape the expected folder: " + location);
+		    }
+		}
+		if (fileParameter.isFile()) {
+		    try (InputStream data = Files.newInputStream(fileParameter.toPath())) {
+		        long lastModified = fileParameter.lastModified();
+		        long contentLength = fileParameter.length();
+		        if (request.hasParameter("view")) {
+		            response.serveFile(request, data, lastModified, contentLength, "plain.txt");
+		        } else {
+		            response.serveFile(request, data, lastModified, contentLength, originalFileName);
+		        }
+		    } catch (InvalidPathException e) {
+		        throw new IOException(e);
+		    }
+		}
     }
 
     /**
@@ -287,7 +287,8 @@ public class FileParameterValue extends ParameterValue {
             this.file = file;
         }
 
-        public InputStream getInputStream() throws IOException {
+        @Override
+		public InputStream getInputStream() throws IOException {
             try {
                 return Files.newInputStream(file.toPath());
             } catch (InvalidPathException e) {
@@ -295,23 +296,28 @@ public class FileParameterValue extends ParameterValue {
             }
         }
 
-        public String getContentType() {
+        @Override
+		public String getContentType() {
             return null;
         }
 
-        public String getName() {
+        @Override
+		public String getName() {
             return file.getName();
         }
 
-        public boolean isInMemory() {
+        @Override
+		public boolean isInMemory() {
             return false;
         }
 
-        public long getSize() {
+        @Override
+		public long getSize() {
             return file.length();
         }
 
-        public byte[] get() {
+        @Override
+		public byte[] get() {
             try {
                 try (InputStream inputStream = Files.newInputStream(file.toPath())) {
                     return IOUtils.toByteArray(inputStream);
@@ -321,37 +327,46 @@ public class FileParameterValue extends ParameterValue {
             }
         }
 
-        public String getString(String encoding) throws UnsupportedEncodingException {
+        @Override
+		public String getString(String encoding) throws UnsupportedEncodingException {
             return new String(get(), encoding);
         }
 
-        public String getString() {
+        @Override
+		public String getString() {
             return new String(get());
         }
 
-        public void write(File to) throws Exception {
+        @Override
+		public void write(File to) throws Exception {
             new FilePath(file).copyTo(new FilePath(to));
         }
 
-        public void delete() {
+        @Override
+		public void delete() {
             file.delete();
         }
 
-        public String getFieldName() {
+        @Override
+		public String getFieldName() {
             return null;
         }
 
-        public void setFieldName(String name) {
+        @Override
+		public void setFieldName(String name) {
         }
 
-        public boolean isFormField() {
+        @Override
+		public boolean isFormField() {
             return false;
         }
 
-        public void setFormField(boolean state) {
+        @Override
+		public void setFormField(boolean state) {
         }
 
-        @Deprecated
+        @Override
+		@Deprecated
         public OutputStream getOutputStream() throws IOException {
             try {
                 return Files.newOutputStream(file.toPath());

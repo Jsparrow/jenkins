@@ -58,7 +58,7 @@ public class ResourceBundleUtil {
      * @return The bundle JSON.
      * @throws MissingResourceException Missing resource bundle.
      */
-    public static @Nonnull JSONObject getBundle(@Nonnull String baseName) throws MissingResourceException {
+    public static @Nonnull JSONObject getBundle(@Nonnull String baseName) {
         return getBundle(baseName, Locale.getDefault());
     }
 
@@ -69,8 +69,8 @@ public class ResourceBundleUtil {
      * @return The bundle JSON.
      * @throws MissingResourceException Missing resource bundle.
      */
-    public static @Nonnull JSONObject getBundle(@Nonnull String baseName, @Nonnull Locale locale) throws MissingResourceException {
-        String bundleKey = baseName + ":" + locale.toString();
+    public static @Nonnull JSONObject getBundle(@Nonnull String baseName, @Nonnull Locale locale) {
+        String bundleKey = new StringBuilder().append(baseName).append(":").append(locale.toString()).toString();
         JSONObject bundleJSON = bundles.get(bundleKey);
 
         if (bundleJSON != null) {
@@ -91,8 +91,7 @@ public class ResourceBundleUtil {
             }
         }
         if (bundle == null) {
-            throw new MissingResourceException("Can't find bundle for base name "
-                    + baseName + ", locale " + locale, baseName + "_" + locale, "");
+            throw new MissingResourceException(new StringBuilder().append("Can't find bundle for base name ").append(baseName).append(", locale ").append(locale).toString(), new StringBuilder().append(baseName).append("_").append(locale).toString(), "");
         }
 
         bundleJSON = toJSONObject(bundle);
@@ -127,9 +126,7 @@ public class ResourceBundleUtil {
      */
     private static JSONObject toJSONObject(@Nonnull ResourceBundle bundle) {
         JSONObject json = new JSONObject();
-        for (String key : bundle.keySet()) {
-            json.put(key, bundle.getString(key));
-        }
+        bundle.keySet().forEach(key -> json.put(key, bundle.getString(key)));
         return json;
     }
 }

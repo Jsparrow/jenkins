@@ -21,18 +21,23 @@ public class CryptoConfidentialKey extends ConfidentialKey {
     @Restricted(NoExternalUse.class) // TODO pending API
     public static final int DEFAULT_IV_LENGTH = 16;
 
-    private ConfidentialStore lastCS;
-    private SecretKey secret;
+	private static final String KEY_ALGORITHM = "AES";
 
-    public CryptoConfidentialKey(String id) {
+	private static final String ALGORITHM = "AES/CBC/PKCS5Padding";
+
+	private ConfidentialStore lastCS;
+
+	private SecretKey secret;
+
+	public CryptoConfidentialKey(String id) {
         super(id);
     }
 
-    public CryptoConfidentialKey(Class owner, String shortName) {
-        this(owner.getName()+'.'+shortName);
+	public CryptoConfidentialKey(Class owner, String shortName) {
+        this(new StringBuilder().append(owner.getName()).append('.').append(shortName).toString());
     }
 
-    private synchronized SecretKey getKey() {
+	private synchronized SecretKey getKey() {
         ConfidentialStore cs = ConfidentialStore.get();
         if (secret == null || cs != lastCS) {
             lastCS = cs;
@@ -51,7 +56,7 @@ public class CryptoConfidentialKey extends ConfidentialKey {
         return secret;
     }
 
-    /**
+	/**
      * Returns a {@link Cipher} object for encrypting with this key.
      * @deprecated use {@link #encrypt(byte[])}
      */
@@ -66,7 +71,7 @@ public class CryptoConfidentialKey extends ConfidentialKey {
         }
     }
 
-    /**
+	/**
      * Returns a {@link Cipher} object for encrypting with this key using the provided initialization vector.
      * @param iv the initialization vector
      * @return the cipher
@@ -82,7 +87,7 @@ public class CryptoConfidentialKey extends ConfidentialKey {
         }
     }
 
-    /**
+	/**
      * Returns a {@link Cipher} object for decrypting with this key using the provided initialization vector.
      * @param iv the initialization vector
      * @return the cipher
@@ -98,7 +103,7 @@ public class CryptoConfidentialKey extends ConfidentialKey {
         }
     }
 
-    /**
+	/**
      * Generates a new Initialization Vector.
      * @param length the length of the salt
      * @return some random bytes
@@ -109,7 +114,7 @@ public class CryptoConfidentialKey extends ConfidentialKey {
         return ConfidentialStore.get().randomBytes(length);
     }
 
-    /**
+	/**
      * Generates a new Initialization Vector of default length.
      * @return some random bytes
      * @see #newIv(int)
@@ -120,7 +125,7 @@ public class CryptoConfidentialKey extends ConfidentialKey {
         return newIv(DEFAULT_IV_LENGTH);
     }
 
-    /**
+	/**
      * Returns a {@link Cipher} object for decrypting with this key.
      * @deprecated use {@link #decrypt(byte[])}
      */
@@ -134,9 +139,5 @@ public class CryptoConfidentialKey extends ConfidentialKey {
             throw new AssertionError(e);
         }
     }
-
-
-    private static final String KEY_ALGORITHM = "AES";
-    private static final String ALGORITHM = "AES/CBC/PKCS5Padding";
 
 }

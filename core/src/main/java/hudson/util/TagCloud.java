@@ -36,7 +36,34 @@ import java.util.List;
  * @since 1.322
  */
 public class TagCloud<T> extends AbstractList<TagCloud<T>.Entry> {
-    public final class Entry {
+    private final List<Entry> entries = new ArrayList<>();
+	private float max = 1;
+
+	/**
+     * Creates a tag cloud.
+     *
+     * @param f
+     *      Assigns weight to each item.
+     */
+    public TagCloud(Iterable<? extends T> inputs, WeightFunction<T> f) {
+        for (T input : inputs) {
+            float w = Math.abs(f.weight(input));
+            max = Math.max(w,max);
+            entries.add(new Entry(input, w));
+        }
+    }
+
+	@Override
+	public Entry get(int index) {
+        return entries.get(index);
+    }
+
+	@Override
+	public int size() {
+        return entries.size();
+    }
+
+	public final class Entry {
         public final T item;
         public final float weight;
 
@@ -57,30 +84,5 @@ public class TagCloud<T> extends AbstractList<TagCloud<T>.Entry> {
 
     public interface WeightFunction<T> {
         float weight(T item);
-    }
-
-    private final List<Entry> entries = new ArrayList<>();
-    private float max = 1;
-
-    /**
-     * Creates a tag cloud.
-     *
-     * @param f
-     *      Assigns weight to each item.
-     */
-    public TagCloud(Iterable<? extends T> inputs, WeightFunction<T> f) {
-        for (T input : inputs) {
-            float w = Math.abs(f.weight(input));
-            max = Math.max(w,max);
-            entries.add(new Entry(input, w));
-        }
-    }
-
-    public Entry get(int index) {
-        return entries.get(index);
-    }
-
-    public int size() {
-        return entries.size();
     }
 }

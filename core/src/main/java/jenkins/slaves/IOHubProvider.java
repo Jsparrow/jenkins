@@ -62,10 +62,11 @@ public class IOHubProvider {
 
     @Terminator
     public void cleanUp() throws IOException {
-        if (hub != null) {
-            hub.close();
-            hub = null;
-        }
+        if (hub == null) {
+			return;
+		}
+		hub.close();
+		hub = null;
     }
 
 }

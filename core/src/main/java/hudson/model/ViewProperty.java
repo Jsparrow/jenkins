@@ -58,7 +58,8 @@ public class ViewProperty implements ReconfigurableDescribable<ViewProperty>, Ex
         this.view = view;
     }
 
-    public ViewPropertyDescriptor getDescriptor() {
+    @Override
+	public ViewPropertyDescriptor getDescriptor() {
         return (ViewPropertyDescriptor) Jenkins.get().getDescriptorOrDie(getClass());
     }
 
@@ -66,7 +67,8 @@ public class ViewProperty implements ReconfigurableDescribable<ViewProperty>, Ex
         return Jenkins.get().getDescriptorList(ViewProperty.class);
     }
 
-    public ViewProperty reconfigure(StaplerRequest req, JSONObject form) throws Descriptor.FormException {
+    @Override
+	public ViewProperty reconfigure(StaplerRequest req, JSONObject form) throws Descriptor.FormException {
     	return form==null ? null : getDescriptor().newInstance(req, form);
     }
 }

@@ -67,14 +67,16 @@ public class StackedAreaRenderer2 extends StackedAreaRenderer
     /**
      * Override this method to specify the hyperlink target of the given data point.
      */
-    public String generateURL(CategoryDataset dataset, int row, int column) {
+    @Override
+	public String generateURL(CategoryDataset dataset, int row, int column) {
         return null;
     }
 
     /**
      * Override this method to specify the tool tip text of the given data point.
      */
-    public String generateToolTip(CategoryDataset dataset, int row, int column) {
+    @Override
+	public String generateToolTip(CategoryDataset dataset, int row, int column) {
         return null;
     }
 
@@ -127,13 +129,12 @@ public class StackedAreaRenderer2 extends StackedAreaRenderer
         // in column zero, the only job to do is draw any visible item labels
         // and this is done in the second pass...
         if (column == 0) {
-            if (pass == 1) {
-                // draw item labels, if visible
-                if (isItemLabelVisible(row, column)) {
-                    drawItemLabel(g2, plot.getOrientation(), dataset, row, column,
-                            xx1, yy1, (y1 < 0.0));
-                }
-            }
+            boolean condition = pass == 1 && isItemLabelVisible(row, column);
+			// draw item labels, if visible
+			if (condition) {
+			    drawItemLabel(g2, plot.getOrientation(), dataset, row, column,
+			            xx1, yy1, (y1 < 0.0));
+			}
         } else {
             Number previousValue = dataset.getValue(row, column - 1);
             if (previousValue != null) {
@@ -172,8 +173,9 @@ public class StackedAreaRenderer2 extends StackedAreaRenderer
                     g2.setStroke(getItemStroke(row, column-1));
                     g2.fill(p);
 
-                    if (entities != null)
-                        addItemEntity(entities, dataset, row, column-1, p);
+                    if (entities != null) {
+						addItemEntity(entities, dataset, row, column-1, p);
+					}
 
                     // right half
                     p = new Polygon();
@@ -186,8 +188,9 @@ public class StackedAreaRenderer2 extends StackedAreaRenderer
                     g2.setStroke(getItemStroke(row, column));
                     g2.fill(p);
 
-                    if (entities != null)
-                        addItemEntity(entities, dataset, row, column, p);
+                    if (entities != null) {
+						addItemEntity(entities, dataset, row, column, p);
+					}
                 } else {
                     if (isItemLabelVisible(row, column)) {
                         drawItemLabel(g2, plot.getOrientation(), dataset, row,

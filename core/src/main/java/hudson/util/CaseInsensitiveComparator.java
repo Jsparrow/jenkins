@@ -33,12 +33,12 @@ import java.io.Serializable;
  */
 public final class CaseInsensitiveComparator implements Comparator<String>, Serializable {
     public static final Comparator<String> INSTANCE = new CaseInsensitiveComparator();
+	private static final long serialVersionUID = 1L;
 
-    private CaseInsensitiveComparator() {}
+	private CaseInsensitiveComparator() {}
 
-    public int compare(String lhs, String rhs) {
+	@Override
+	public int compare(String lhs, String rhs) {
         return lhs.compareToIgnoreCase(rhs);
     }
-
-    private static final long serialVersionUID = 1L;
 }

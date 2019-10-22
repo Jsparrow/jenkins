@@ -64,21 +64,30 @@ import javax.annotation.Nonnull;
  * @since 1.145
  */
 public abstract class RunListener<R extends Run> implements ExtensionPoint {
-    public final Class<R> targetType;
+    /**
+     * List of registered listeners.
+     * @deprecated as of 1.281
+     *      Use {@link #all()} for read access, and use {@link Extension} for registration.
+     */
+    @Deprecated
+    public static final CopyOnWriteList<RunListener> LISTENERS = ExtensionListView.createCopyOnWriteList(RunListener.class);
+	private static final Logger LOGGER = Logger.getLogger(RunListener.class.getName());
+	public final Class<R> targetType;
 
-    protected RunListener(Class<R> targetType) {
+	protected RunListener(Class<R> targetType) {
         this.targetType = targetType;
     }
 
-    protected RunListener() {
+	protected RunListener() {
         Type type = Types.getBaseClass(getClass(), RunListener.class);
-        if (type instanceof ParameterizedType)
-            targetType = Types.erasure(Types.getTypeArgument(type,0));
-        else
-            throw new IllegalStateException(getClass()+" uses the raw type for extending RunListener");
+        if (type instanceof ParameterizedType) {
+			targetType = Types.erasure(Types.getTypeArgument(type,0));
+		} else {
+			throw new IllegalStateException(getClass()+" uses the raw type for extending RunListener");
+		}
     }
 
-    /**
+	/**
      * Called after a build is completed.
      *
      * @param r
@@ -93,7 +102,7 @@ public abstract class RunListener<R extends Run> implements ExtensionPoint {
      */
     public void onCompleted(R r, @Nonnull TaskListener listener) {}
 
-    /**
+	/**
      * Called after a build is moved to the {@code Run.State.COMPLETED} state.
      *
      * <p>
@@ -106,7 +115,7 @@ public abstract class RunListener<R extends Run> implements ExtensionPoint {
      */
     public void onFinalized(R r) {}
 
-    /**
+	/**
      * Called when a Run is entering execution.
      * @param r
      *      The started build.
@@ -114,7 +123,7 @@ public abstract class RunListener<R extends Run> implements ExtensionPoint {
      */
     public void onInitialize(R r) {}
 
-    /**
+	/**
      * Called when a build is started (i.e. it was in the queue, and will now start running
      * on an executor)
      *
@@ -129,7 +138,7 @@ public abstract class RunListener<R extends Run> implements ExtensionPoint {
      */
     public void onStarted(R r, TaskListener listener) {}
 
-    /**
+	/**
      * Runs before the {@link SCM#checkout(AbstractBuild, Launcher, FilePath, BuildListener, File)} runs, and performs a set up.
      * Can contribute additional properties/env vars to the environment.
      *
@@ -158,11 +167,11 @@ public abstract class RunListener<R extends Run> implements ExtensionPoint {
      *      to suppress a stack trace by the receiver.
      * @since 1.410
      */
-    public Environment setUpEnvironment( AbstractBuild build, Launcher launcher, BuildListener listener ) throws IOException, InterruptedException, RunnerAbortedException {
+    public Environment setUpEnvironment( AbstractBuild build, Launcher launcher, BuildListener listener ) throws IOException, InterruptedException {
     	return new Environment() {};
     }
 
-    /**
+	/**
      * Called right before a build is going to be deleted.
      *
      * @param r The build.
@@ -172,7 +181,7 @@ public abstract class RunListener<R extends Run> implements ExtensionPoint {
      */
     public void onDeleted(R r) {}
 
-    /**
+	/**
      * Registers this object as an active listener so that it can start getting
      * callbacks invoked.
      *
@@ -184,65 +193,59 @@ public abstract class RunListener<R extends Run> implements ExtensionPoint {
         all().add(this);
     }
 
-    /**
+	/**
      * Reverse operation of {@link #register()}.
      */
     public void unregister() {
         all().remove(this);
     }
 
-    /**
-     * List of registered listeners.
-     * @deprecated as of 1.281
-     *      Use {@link #all()} for read access, and use {@link Extension} for registration.
-     */
-    @Deprecated
-    public static final CopyOnWriteList<RunListener> LISTENERS = ExtensionListView.createCopyOnWriteList(RunListener.class);
-
-    /**
+	/**
      * Fires the {@link #onCompleted(Run, TaskListener)} event.
      */
     public static void fireCompleted(Run r, @Nonnull TaskListener listener) {
         for (RunListener l : all()) {
-            if(l.targetType.isInstance(r))
-                try {
+            if(l.targetType.isInstance(r)) {
+				try {
                     l.onCompleted(r,listener);
                 } catch (Throwable e) {
                     report(e);
                 }
+			}
         }
     }
 
-    /**
+	/**
      * Fires the {@link #onInitialize(Run)} event.
      */
     public static void fireInitialize(Run r) {
         for (RunListener l : all()) {
-            if(l.targetType.isInstance(r))
-                try {
+            if(l.targetType.isInstance(r)) {
+				try {
                     l.onInitialize(r);
                 } catch (Throwable e) {
                     report(e);
                 }
+			}
         }
     }
 
-
-    /**
+	/**
      * Fires the {@link #onStarted(Run, TaskListener)} event.
      */
     public static void fireStarted(Run r, TaskListener listener) {
         for (RunListener l : all()) {
-            if(l.targetType.isInstance(r))
-                try {
+            if(l.targetType.isInstance(r)) {
+				try {
                     l.onStarted(r,listener);
                 } catch (Throwable e) {
                     report(e);
                 }
+			}
         }
     }
 
-    /**
+	/**
      * Fires the {@link #onFinalized(Run)} event.
      */
     public static void fireFinalized(Run r) {
@@ -250,40 +253,40 @@ public abstract class RunListener<R extends Run> implements ExtensionPoint {
             return;
         }
         for (RunListener l : all()) {
-            if(l.targetType.isInstance(r))
-                try {
+            if(l.targetType.isInstance(r)) {
+				try {
                     l.onFinalized(r);
                 } catch (Throwable e) {
                     report(e);
                 }
+			}
         }
     }
 
-    /**
+	/**
      * Fires the {@link #onDeleted} event.
      */
     public static void fireDeleted(Run r) {
         for (RunListener l : all()) {
-            if(l.targetType.isInstance(r))
-                try {
+            if(l.targetType.isInstance(r)) {
+				try {
                     l.onDeleted(r);
                 } catch (Throwable e) {
                     report(e);
                 }
+			}
         }
     }
 
-    /**
+	/**
      * Returns all the registered {@link RunListener}s.
      */
     public static ExtensionList<RunListener> all() {
         return ExtensionList.lookup(RunListener.class);
     }
 
-    private static void report(Throwable e) {
+	private static void report(Throwable e) {
         LOGGER.log(Level.WARNING, "RunListener failed",e);
     }
-
-    private static final Logger LOGGER = Logger.getLogger(RunListener.class.getName());
 
 }

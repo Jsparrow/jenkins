@@ -181,8 +181,9 @@ public class ApiTokenStats implements Saveable {
             return;
         }
         
-        if (BulkChange.contains(this))
-            return;
+        if (BulkChange.contains(this)) {
+			return;
+		}
         
         /*
          * Note: the userFolder should never be null at this point.

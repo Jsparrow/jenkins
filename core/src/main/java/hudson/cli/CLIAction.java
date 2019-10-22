@@ -70,17 +70,20 @@ public class CLIAction implements UnprotectedRootAction, StaplerProxy {
 
     private static final Logger LOGGER = Logger.getLogger(CLIAction.class.getName());
 
-    private transient final Map<UUID, FullDuplexHttpService> duplexServices = new HashMap<>();
+    private final transient Map<UUID, FullDuplexHttpService> duplexServices = new HashMap<>();
 
-    public String getIconFileName() {
+    @Override
+	public String getIconFileName() {
         return null;
     }
 
-    public String getDisplayName() {
+    @Override
+	public String getDisplayName() {
         return "Jenkins CLI";
     }
 
-    public String getUrlName() {
+    @Override
+	public String getUrlName() {
         return "cli";
     }
 
@@ -103,7 +106,7 @@ public class CLIAction implements UnprotectedRootAction, StaplerProxy {
     @Override
     public Object getTarget() {
         StaplerRequest req = Stapler.getCurrentRequest();
-        if (req.getRestOfPath().length()==0 && "POST".equals(req.getMethod())) {
+        if (req.getRestOfPath().isEmpty() && "POST".equals(req.getMethod())) {
             // CLI connection request
             if ("false".equals(req.getParameter("remoting"))) {
                 throw new PlainCliEndpointResponse();

@@ -39,7 +39,8 @@ public class PluginsLink extends ManagementLink {
         return "plugin.png";
     }
 
-    public String getDisplayName() {
+    @Override
+	public String getDisplayName() {
         return Messages.PluginsLink_DisplayName();
     }
 

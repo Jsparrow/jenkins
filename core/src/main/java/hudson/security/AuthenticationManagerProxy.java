@@ -41,13 +41,15 @@ import org.acegisecurity.DisabledException;
 public class AuthenticationManagerProxy implements AuthenticationManager {
     private volatile AuthenticationManager delegate;
 
-    public Authentication authenticate(Authentication authentication) throws AuthenticationException {
+    @Override
+	public Authentication authenticate(Authentication authentication) {
         AuthenticationManager m = delegate; // fix the reference we are working with
 
-        if(m ==null)
-            throw new DisabledException("Authentication service is still not ready yet");
-        else
-            return m.authenticate(authentication);
+        if(m ==null) {
+			throw new DisabledException("Authentication service is still not ready yet");
+		} else {
+			return m.authenticate(authentication);
+		}
     }
 
     public void setDelegate(AuthenticationManager manager) {

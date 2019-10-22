@@ -38,7 +38,10 @@ public class BackFiller extends LoadPredictor {
             TentativePlan tp = bi.getAction(TentativePlan.class);
             if (tp==null) {// do this even for bi==plan.item ensures that we have FIFO semantics in tentative plans.
                 tp = makeTentativePlan(bi);
-                if (tp==null)   continue;   // no viable plan.
+                if (tp==null)
+				 {
+					continue;   // no viable plan.
+				}
             }
 
             if (tp.isStale()) {
@@ -49,15 +52,21 @@ public class BackFiller extends LoadPredictor {
             }
 
             // don't let its own tentative plan count when considering a scheduling for a job
-            if (plan.item==bi)  continue;
+            if (plan.item==bi) {
+				continue;
+			}
 
 
             // no overlap in the time span, meaning this plan is for a distant future
-            if (!timeRange.overlapsWith(tp.range)) continue;
+            if (!timeRange.overlapsWith(tp.range)) {
+				continue;
+			}
 
             // if this tentative plan has no baring on this computer, that's ignorable
             Integer i = tp.footprint.get(computer);
-            if (i==null)    continue;
+            if (i==null) {
+				continue;
+			}
 
             return Collections.singleton(tp.range.toFutureLoad(i));
         }
@@ -65,7 +74,92 @@ public class BackFiller extends LoadPredictor {
         return loads;
     }
 
-    private static final class PseudoExecutorSlot extends ExecutorSlot {
+    private TentativePlan makeTentativePlan(BuildableItem bi) {
+        if (recursion) {
+			return null;
+		}
+        recursion = true;
+        try {
+            // pretend for now that all executors are available and decide some assignment that's executable.
+            List<PseudoExecutorSlot> slots = new ArrayList<>();
+            for (Computer c : Jenkins.get().getComputers()) {
+                if (c.isOffline()) {
+					continue;
+				}
+                c.getExecutors().forEach(e -> slots.add(new PseudoExecutorSlot(e)));
+            }
+
+            // also ignore all load predictions as we just want to figure out some executable assignment
+            // and we are not trying to figure out if this task is executable right now.
+            MappingWorksheet worksheet = new MappingWorksheet(bi, slots, Collections.emptyList());
+            Mapping m = Jenkins.get().getQueue().getLoadBalancer().map(bi.task, worksheet);
+            if (m==null) {
+				return null;
+			}
+
+            // figure out how many executors we need on each computer?
+            Map<Computer,Integer> footprint = new HashMap<>();
+            m.toMap().entrySet().forEach(e -> {
+                Computer c = e.getValue().computer;
+                Integer v = footprint.get(c);
+                if (v==null) {
+					v = 0;
+				}
+                v += e.getKey().size();
+                footprint.put(c,v);
+            });
+
+            // the point of a tentative plan is to displace other jobs to create a point in time
+            // where this task can start executing. An incorrectly estimated duration is not
+            // a problem in this regard, as we just need enough idle executors in the right moment.
+            // The downside of guessing the duration wrong is that we can end up creating tentative plans
+            // afterward that may be incorrect, but those plans will be rebuilt.
+            long d = bi.task.getEstimatedDuration();
+            if (d<=0) {
+				d = TimeUnit.MINUTES.toMillis(5);
+			}
+
+            TimeRange slot = new TimeRange(System.currentTimeMillis(), d);
+
+            // now, based on the real predicted loads, figure out the approximation of when we can
+            // start executing this guy.
+            for (Entry<Computer, Integer> e : footprint.entrySet()) {
+                Computer computer = e.getKey();
+                Timeline timeline = new Timeline();
+                for (LoadPredictor lp : LoadPredictor.all()) {
+                    for (FutureLoad fl : Iterables.limit(lp.predict(worksheet, computer, slot.start, slot.end),100)) {
+                        timeline.insert(fl.startTime, fl.startTime+fl.duration, fl.numExecutors);
+                    }
+                }
+
+                Long x = timeline.fit(slot.start, slot.duration, computer.countExecutors()-e.getValue());
+                // if no suitable range was found in [slot.start,slot.end), slot.end would be a good approximation
+                if (x==null) {
+					x = slot.end;
+				}
+                slot = slot.shiftTo(x);
+            }
+
+            TentativePlan tp = new TentativePlan(footprint, slot);
+            bi.addAction(tp);
+            return tp;
+        } finally {
+            recursion = false;
+        }
+    }
+
+	/**
+     * Once this feature stabilizes, move it to the heavyjob plugin
+     */
+    @Extension
+    public static BackFiller newInstance() {
+        if (SystemProperties.getBoolean(BackFiller.class.getName())) {
+			return new BackFiller();
+		}
+        return null;
+    }
+
+	private static final class PseudoExecutorSlot extends ExecutorSlot {
         private Executor executor;
 
         private PseudoExecutorSlot(Executor executor) {
@@ -86,70 +180,6 @@ public class BackFiller extends LoadPredictor {
         @Override
         protected void set(WorkUnit p) {
             throw new UnsupportedOperationException();
-        }
-    }
-
-    private TentativePlan makeTentativePlan(BuildableItem bi) {
-        if (recursion)  return null;
-        recursion = true;
-        try {
-            // pretend for now that all executors are available and decide some assignment that's executable.
-            List<PseudoExecutorSlot> slots = new ArrayList<>();
-            for (Computer c : Jenkins.get().getComputers()) {
-                if (c.isOffline())  continue;
-                for (Executor e : c.getExecutors()) {
-                    slots.add(new PseudoExecutorSlot(e));
-                }
-            }
-
-            // also ignore all load predictions as we just want to figure out some executable assignment
-            // and we are not trying to figure out if this task is executable right now.
-            MappingWorksheet worksheet = new MappingWorksheet(bi, slots, Collections.emptyList());
-            Mapping m = Jenkins.get().getQueue().getLoadBalancer().map(bi.task, worksheet);
-            if (m==null)    return null;
-
-            // figure out how many executors we need on each computer?
-            Map<Computer,Integer> footprint = new HashMap<>();
-            for (Entry<WorkChunk, ExecutorChunk> e : m.toMap().entrySet()) {
-                Computer c = e.getValue().computer;
-                Integer v = footprint.get(c);
-                if (v==null)    v = 0;
-                v += e.getKey().size();
-                footprint.put(c,v);
-            }
-
-            // the point of a tentative plan is to displace other jobs to create a point in time
-            // where this task can start executing. An incorrectly estimated duration is not
-            // a problem in this regard, as we just need enough idle executors in the right moment.
-            // The downside of guessing the duration wrong is that we can end up creating tentative plans
-            // afterward that may be incorrect, but those plans will be rebuilt.
-            long d = bi.task.getEstimatedDuration();
-            if (d<=0)    d = TimeUnit.MINUTES.toMillis(5);
-
-            TimeRange slot = new TimeRange(System.currentTimeMillis(), d);
-
-            // now, based on the real predicted loads, figure out the approximation of when we can
-            // start executing this guy.
-            for (Entry<Computer, Integer> e : footprint.entrySet()) {
-                Computer computer = e.getKey();
-                Timeline timeline = new Timeline();
-                for (LoadPredictor lp : LoadPredictor.all()) {
-                    for (FutureLoad fl : Iterables.limit(lp.predict(worksheet, computer, slot.start, slot.end),100)) {
-                        timeline.insert(fl.startTime, fl.startTime+fl.duration, fl.numExecutors);
-                    }
-                }
-
-                Long x = timeline.fit(slot.start, slot.duration, computer.countExecutors()-e.getValue());
-                // if no suitable range was found in [slot.start,slot.end), slot.end would be a good approximation
-                if (x==null)    x = slot.end;
-                slot = slot.shiftTo(x);
-            }
-
-            TentativePlan tp = new TentativePlan(footprint, slot);
-            bi.addAction(tp);
-            return tp;
-        } finally {
-            recursion = false;
         }
     }
 
@@ -177,7 +207,9 @@ public class BackFiller extends LoadPredictor {
         }
 
         public TimeRange shiftTo(long newStart) {
-            if (newStart==start)    return this;
+            if (newStart==start) {
+				return this;
+			}
             return new TimeRange(newStart,duration);
         }
     }
@@ -198,15 +230,5 @@ public class BackFiller extends LoadPredictor {
         public boolean isStale() {
             return range.end < System.currentTimeMillis();
         }
-    }
-
-    /**
-     * Once this feature stabilizes, move it to the heavyjob plugin
-     */
-    @Extension
-    public static BackFiller newInstance() {
-        if (SystemProperties.getBoolean(BackFiller.class.getName()))
-            return new BackFiller();
-        return null;
     }
 }

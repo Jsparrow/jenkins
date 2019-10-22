@@ -39,7 +39,8 @@ public class SystemLogLink extends ManagementLink {
         return "clipboard.png";
     }
 
-    public String getDisplayName() {
+    @Override
+	public String getDisplayName() {
         return Messages.SystemLogLink_DisplayName();
     }
 

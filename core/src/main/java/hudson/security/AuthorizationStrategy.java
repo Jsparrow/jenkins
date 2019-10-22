@@ -63,6 +63,24 @@ import java.util.Collections;
 @StaplerAccessibleType
 public abstract class AuthorizationStrategy extends AbstractDescribableImpl<AuthorizationStrategy> implements ExtensionPoint {
     /**
+     * All registered {@link SecurityRealm} implementations.
+     *
+     * @deprecated since 1.286
+     *      Use {@link #all()} for read access, and {@link Extension} for registration.
+     */
+    @Deprecated
+    public static final DescriptorList<AuthorizationStrategy> LIST = new DescriptorList<>(AuthorizationStrategy.class);
+
+	/**
+     * {@link AuthorizationStrategy} that implements the semantics
+     * of unsecured Hudson where everyone has full control.
+     *
+     * <p>
+     * This singleton is safe because {@link Unsecured} is stateless.
+     */
+    public static final AuthorizationStrategy UNSECURED = new Unsecured();
+
+	/**
      * Returns the instance of {@link ACL} where all the other {@link ACL} instances
      * for all the other model objects eventually delegate.
      * <p>
@@ -70,7 +88,7 @@ public abstract class AuthorizationStrategy extends AbstractDescribableImpl<Auth
      */
     public abstract @Nonnull ACL getRootACL();
 
-    /**
+	/**
      * @deprecated since 1.277
      *      Override {@link #getACL(Job)} instead.
      */
@@ -79,11 +97,11 @@ public abstract class AuthorizationStrategy extends AbstractDescribableImpl<Auth
     	return getACL((Job)project);
     }
 
-    public @Nonnull ACL getACL(@Nonnull Job<?,?> project) {
+	public @Nonnull ACL getACL(@Nonnull Job<?,?> project) {
     	return getRootACL();
     }
 
-    /**
+	/**
      * Implementation can choose to provide different ACL for different views.
      * This can be used as a basis for more fine-grained access control.
      *
@@ -105,8 +123,8 @@ public abstract class AuthorizationStrategy extends AbstractDescribableImpl<Auth
                 return hasPermission;
         });
     }
-    
-    /**
+
+	/**
      * Implementation can choose to provide different ACL for different items.
      * This can be used as a basis for more fine-grained access control.
      *
@@ -119,7 +137,7 @@ public abstract class AuthorizationStrategy extends AbstractDescribableImpl<Auth
         return getRootACL();
     }
 
-    /**
+	/**
      * Implementation can choose to provide different ACL per user.
      * This can be used as a basis for more fine-grained access control.
      *
@@ -132,7 +150,7 @@ public abstract class AuthorizationStrategy extends AbstractDescribableImpl<Auth
         return getRootACL();
     }
 
-    /**
+	/**
      * Implementation can choose to provide different ACL for different computers.
      * This can be used as a basis for more fine-grained access control.
      *
@@ -145,7 +163,7 @@ public abstract class AuthorizationStrategy extends AbstractDescribableImpl<Auth
         return getACL(computer.getNode());
     }
 
-    /**
+	/**
      * Implementation can choose to provide different ACL for different {@link Cloud}s.
      * This can be used as a basis for more fine-grained access control.
      *
@@ -158,11 +176,11 @@ public abstract class AuthorizationStrategy extends AbstractDescribableImpl<Auth
         return getRootACL();
     }
 
-    public @Nonnull ACL getACL(@Nonnull Node node) {
+	public @Nonnull ACL getACL(@Nonnull Node node) {
         return getRootACL();
     }
 
-    /**
+	/**
      * Returns the list of all group/role names used in this authorization strategy,
      * and the ACL returned from the {@link #getRootACL()} method.
      * <p>
@@ -178,52 +196,34 @@ public abstract class AuthorizationStrategy extends AbstractDescribableImpl<Auth
      */
     public abstract @Nonnull Collection<String> getGroups();
 
-    /**
+	/**
      * Returns all the registered {@link AuthorizationStrategy} descriptors.
      */
     public static @Nonnull DescriptorExtensionList<AuthorizationStrategy,Descriptor<AuthorizationStrategy>> all() {
         return Jenkins.get().getDescriptorList(AuthorizationStrategy.class);
     }
 
-    /**
-     * All registered {@link SecurityRealm} implementations.
-     *
-     * @deprecated since 1.286
-     *      Use {@link #all()} for read access, and {@link Extension} for registration.
-     */
-    @Deprecated
-    public static final DescriptorList<AuthorizationStrategy> LIST = new DescriptorList<>(AuthorizationStrategy.class);
-    
-    /**
-     * {@link AuthorizationStrategy} that implements the semantics
-     * of unsecured Hudson where everyone has full control.
-     *
-     * <p>
-     * This singleton is safe because {@link Unsecured} is stateless.
-     */
-    public static final AuthorizationStrategy UNSECURED = new Unsecured();
+	public static final class Unsecured extends AuthorizationStrategy implements Serializable {
+        private static final ACL UNSECURED_ACL = ACL.lambda((a, p) -> true);
 
-    public static final class Unsecured extends AuthorizationStrategy implements Serializable {
-        /**
+		/**
          * Maintains the singleton semantics.
          */
         private Object readResolve() {
             return UNSECURED;
         }
 
-        @Override
+		@Override
         public @Nonnull ACL getRootACL() {
             return UNSECURED_ACL;
         }
 
-        @Override
+		@Override
         public @Nonnull Collection<String> getGroups() {
             return Collections.emptySet();
         }
 
-        private static final ACL UNSECURED_ACL = ACL.lambda((a, p) -> true);
-
-        @Extension @Symbol("unsecured")
+		@Extension @Symbol("unsecured")
         public static final class DescriptorImpl extends Descriptor<AuthorizationStrategy> {
             @Override
             public String getDisplayName() {

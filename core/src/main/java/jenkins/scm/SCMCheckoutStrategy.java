@@ -70,11 +70,13 @@ public abstract class SCMCheckoutStrategy extends AbstractDescribableImpl<SCMChe
      */
     public void preCheckout(AbstractBuild<?,?> build, Launcher launcher, BuildListener listener) throws IOException, InterruptedException {
         AbstractProject<?, ?> project = build.getProject();
-        if (project instanceof BuildableItemWithBuildWrappers) {
-               BuildableItemWithBuildWrappers biwbw = (BuildableItemWithBuildWrappers) project;
-               for (BuildWrapper bw : biwbw.getBuildWrappersList())
-                   bw.preCheckout(build,launcher,listener);
-           }
+        if (!(project instanceof BuildableItemWithBuildWrappers)) {
+			return;
+		}
+		BuildableItemWithBuildWrappers biwbw = (BuildableItemWithBuildWrappers) project;
+		for (BuildWrapper bw : biwbw.getBuildWrappersList()) {
+			bw.preCheckout(build,launcher,listener);
+		}
     }
 
     /**

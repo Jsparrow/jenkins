@@ -74,7 +74,9 @@ class SortedIntList extends AbstractList<Integer> {
 
     @Override
     public Integer get(int index) {
-        if (size<=index)    throw new IndexOutOfBoundsException();
+        if (size<=index) {
+			throw new IndexOutOfBoundsException();
+		}
         return data[index];
     }
 
@@ -99,11 +101,12 @@ class SortedIntList extends AbstractList<Integer> {
     }
 
     private void ensureCapacity(int i) {
-        if (data.length<i) {
-            int[] r = new int[Math.max(data.length*2,i)];
-            System.arraycopy(data,0,r,0,size);
-            data = r;
-        }
+        if (data.length >= i) {
+			return;
+		}
+		int[] r = new int[Math.max(data.length*2,i)];
+		System.arraycopy(data,0,r,0,size);
+		data = r;
     }
 
     /**
@@ -148,7 +151,9 @@ class SortedIntList extends AbstractList<Integer> {
 
     public void removeValue(int n) {
         int idx = find(n);
-        if (idx<0)  return;
+        if (idx<0) {
+			return;
+		}
         System.arraycopy(data,idx+1,data,idx,size-(idx+1));
         size--;
     }

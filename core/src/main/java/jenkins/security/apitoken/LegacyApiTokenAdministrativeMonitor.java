@@ -98,13 +98,12 @@ public class LegacyApiTokenAdministrativeMonitor extends AdministrativeMonitor {
     @Restricted(NoExternalUse.class)
     public @Nullable ApiTokenProperty.TokenInfoAndStats getLegacyStatsOf(@Nonnull User user, ApiTokenStore.HashedToken legacyToken) {
         ApiTokenProperty apiTokenProperty = user.getProperty(ApiTokenProperty.class);
-        if (legacyToken != null) {
-            ApiTokenStats.SingleTokenStats legacyStats = apiTokenProperty.getTokenStats().findTokenStatsById(legacyToken.getUuid());
-            return new ApiTokenProperty.TokenInfoAndStats(legacyToken, legacyStats);
-        }
-        
-        // in case the legacy token was revoked during the request
-        return null;
+        if (legacyToken == null) {
+			// in case the legacy token was revoked during the request
+			return null;
+		}
+		ApiTokenStats.SingleTokenStats legacyStats = apiTokenProperty.getTokenStats().findTokenStatsById(legacyToken.getUuid());
+		return new ApiTokenProperty.TokenInfoAndStats(legacyToken, legacyStats);
     }
     
     /**

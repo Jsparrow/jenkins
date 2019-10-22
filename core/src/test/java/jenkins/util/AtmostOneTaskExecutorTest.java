@@ -15,7 +15,8 @@ public class AtmostOneTaskExecutorTest {
     public void doubleBooking() throws Exception {
         AtomicInteger counter = new AtomicInteger();
         OneShotEvent lock = new OneShotEvent();
-        Future<?> f1, f2;
+        Future<?> f1;
+		Future<?> f2;
 
         ExecutorService base = Executors.newCachedThreadPool();
         AtmostOneTaskExecutor<?> es = new AtmostOneTaskExecutor<Void>(base, () -> {

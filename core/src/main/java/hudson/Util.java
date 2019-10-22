@@ -107,8 +107,103 @@ public class Util {
     private static final long ONE_DAY_MS = 24 * ONE_HOUR_MS;
     private static final long ONE_MONTH_MS = 30 * ONE_DAY_MS;
     private static final long ONE_YEAR_MS = 365 * ONE_DAY_MS;
+	/**
+     * Pattern for capturing variables. Either $xyz, ${xyz} or ${a.b} but not $a.b, while ignoring "$$"
+      */
+    private static final Pattern VARIABLE = Pattern.compile("\\$([A-Za-z0-9_]+|\\{[A-Za-z0-9_.]+\\}|\\$)");
+	private static final Pattern errorCodeParser = Pattern.compile(".*CreateProcess.*error=([0-9]+).*");
+	private static final boolean[] uriMap = new boolean[123];
+	static {
+        String raw =
+    "!  $ &'()*+,-. 0123456789   =  @ABCDEFGHIJKLMNOPQRSTUVWXYZ    _ abcdefghijklmnopqrstuvwxyz";
+  //  "# %         /          :;< >?                           [\]^ `                          {|}~
+  //  ^--so these are encoded
+        int i;
+        // Encode control chars and space
+        for (i = 0; i < 33; i++) {
+			uriMap[i] = true;
+		}
+        for (int j = 0; j < raw.length(); i++, j++)
+		 {
+			uriMap[i] = (raw.charAt(j) == ' ');
+        // If we add encodeQuery() just add a 2nd map to encode &+=
+        // queryMap[38] = queryMap[43] = queryMap[61] = true;
+		}
+    }
 
-    /**
+	private static final AtomicBoolean warnedSymlinks = new AtomicBoolean();
+	public static final FastDateFormat XS_DATETIME_FORMATTER = FastDateFormat.getInstance("yyyy-MM-dd'T'HH:mm:ss'Z'",new SimpleTimeZone(0,"GMT"));
+	// Note: RFC822 dates must not be localized!
+    public static final FastDateFormat RFC822_DATETIME_FORMATTER
+            = FastDateFormat.getInstance("EEE, dd MMM yyyy HH:mm:ss Z", Locale.US);
+	private static final Logger LOGGER = Logger.getLogger(Util.class.getName());
+	/**
+     * On Unix environment that cannot run "ln", set this to true.
+     */
+    public static boolean NO_SYMLINK = SystemProperties.getBoolean(Util.class.getName()+".noSymLink");
+	public static boolean SYMLINK_ESCAPEHATCH = SystemProperties.getBoolean(Util.class.getName()+".symlinkEscapeHatch");
+	/**
+     * The number of times we will attempt to delete files/directory trees
+     * before giving up and throwing an exception.<br/>
+     * Specifying a value less than 1 is invalid and will be treated as if
+     * a value of 1 (i.e. one attempt, no retries) was specified.
+     * <p>
+     * e.g. if some of the child directories are big, it might take long enough
+     * to delete that it allows others to create new files in the directory we
+     * are trying to empty, causing problems like JENKINS-10113.
+     * Or, if we're on Windows, then deletes can fail for transient reasons
+     * regardless of external activity; see JENKINS-15331.
+     * Whatever the reason, this allows us to do multiple attempts before we
+     * give up, thus improving build reliability.
+     */
+    @Restricted(value = NoExternalUse.class)
+    static int DELETION_MAX = Math.max(1, SystemProperties.getInteger(Util.class.getName() + ".maxFileDeletionRetries", 3));
+	/**
+     * The time (in milliseconds) that we will wait between attempts to
+     * delete files when retrying.<br>
+     * This has no effect unless {@link #DELETION_MAX} is non-zero.
+     * <p>
+     * If zero, we will not delay between attempts.<br>
+     * If negative, we will wait an (linearly) increasing multiple of this value
+     * between attempts.
+     */
+    @Restricted(value = NoExternalUse.class)
+    static int WAIT_BETWEEN_DELETION_RETRIES = SystemProperties.getInteger(Util.class.getName() + ".deletionRetryWait", 100);
+	/**
+     * If this flag is set to true then we will request a garbage collection
+     * after a deletion failure before we next retry the delete.<br>
+     * It defaults to <code>false</code> and is ignored unless
+     * {@link #DELETION_MAX} is greater than 1.
+     * <p>
+     * Setting this flag to true <i>may</i> resolve some problems on Windows,
+     * and also for directory trees residing on an NFS share, <b>but</b> it can
+     * have a negative impact on performance and may have no effect at all (GC
+     * behavior is JVM-specific).
+     * <p>
+     * Warning: This should only ever be used if you find that your builds are
+     * failing because Jenkins is unable to delete files, that this failure is
+     * because Jenkins itself has those files locked "open", and even then it
+     * should only be used on agents with relatively few executors (because the
+     * garbage collection can impact the performance of all job executors on
+     * that slave).<br/>
+     * i.e. Setting this flag is a act of last resort - it is <em>not</em>
+     * recommended, and should not be used on the main Jenkins server
+     * unless you can tolerate the performance impact.
+     */
+    @Restricted(value = NoExternalUse.class)
+    static boolean GC_AFTER_FAILED_DELETE = SystemProperties.getBoolean(Util.class.getName() + ".performGCOnFailedDelete");
+	/**
+     * If this flag is true, native implementations of {@link FilePath#chmod}
+     * and {@link hudson.util.IOUtils#mode} are used instead of NIO.
+     * <p>
+     * This should only be enabled if the setgid/setuid/sticky bits are
+     * intentionally set on the Jenkins installation and they are being
+     * overwritten by Jenkins erroneously.
+     */
+    @Restricted(value = NoExternalUse.class)
+    public static boolean NATIVE_CHMOD_MODE = SystemProperties.getBoolean(Util.class.getName() + ".useNativeChmodAndMode");
+
+	/**
      * Creates a filtered sublist.
      * @since 1.176
      */
@@ -116,13 +211,14 @@ public class Util {
     public static <T> List<T> filter( @Nonnull Iterable<?> base, @Nonnull Class<T> type ) {
         List<T> r = new ArrayList<>();
         for (Object i : base) {
-            if(type.isInstance(i))
-                r.add(type.cast(i));
+            if(type.isInstance(i)) {
+				r.add(type.cast(i));
+			}
         }
         return r;
     }
 
-    /**
+	/**
      * Creates a filtered sublist.
      */
     @Nonnull
@@ -130,12 +226,7 @@ public class Util {
         return filter((Iterable)base,type);
     }
 
-    /**
-     * Pattern for capturing variables. Either $xyz, ${xyz} or ${a.b} but not $a.b, while ignoring "$$"
-      */
-    private static final Pattern VARIABLE = Pattern.compile("\\$([A-Za-z0-9_]+|\\{[A-Za-z0-9_.]+\\}|\\$)");
-
-    /**
+	/**
      * Replaces the occurrence of '$key' by {@code properties.get('key')}.
      *
      * <p>
@@ -147,7 +238,7 @@ public class Util {
         return replaceMacro(s, new VariableResolver.ByMap<>(properties));
     }
 
-    /**
+	/**
      * Replaces the occurrence of '$key' by {@code resolver.get('key')}.
      *
      * <p>
@@ -162,7 +253,9 @@ public class Util {
         int idx=0;
         while(true) {
             Matcher m = VARIABLE.matcher(s);
-            if(!m.find(idx))   return s;
+            if(!m.find(idx)) {
+				return s;
+			}
 
             String key = m.group().substring(1);
 
@@ -171,20 +264,22 @@ public class Util {
             if(key.charAt(0)=='$') {
                value = "$";
             } else {
-               if(key.charAt(0)=='{')  key = key.substring(1,key.length()-1);
+               if(key.charAt(0)=='{') {
+				key = key.substring(1,key.length()-1);
+			}
                value = resolver.resolve(key);
             }
 
-            if(value==null)
-                idx = m.end(); // skip this
-            else {
-                s = s.substring(0,m.start())+value+s.substring(m.end());
+            if(value==null) {
+				idx = m.end(); // skip this
+			} else {
+                s = new StringBuilder().append(s.substring(0,m.start())).append(value).append(s.substring(m.end())).toString();
                 idx = m.start() + value.length();
             }
         }
     }
 
-    /**
+	/**
      * Reads the entire contents of the text file at <code>logfile</code> into a
      * string using the {@link Charset#defaultCharset() default charset} for
      * decoding. If no such file exists, an empty string is returned.
@@ -201,7 +296,7 @@ public class Util {
         return loadFile(logfile, Charset.defaultCharset());
     }
 
-    /**
+	/**
      * Reads the entire contents of the text file at <code>logfile</code> into a
      * string using <code>charset</code> for decoding. If no such file exists,
      * an empty string is returned.
@@ -235,7 +330,7 @@ public class Util {
         }
     }
 
-    /**
+	/**
      * Deletes the contents of the given directory (but not the directory itself)
      * recursively.
      * It does not take no for an answer - if necessary, it will have multiple
@@ -248,7 +343,7 @@ public class Util {
         deleteContentsRecursive(fileToPath(file), PathRemover.PathChecker.ALLOW_ALL);
     }
 
-    /**
+	/**
      * Deletes the given directory contents (but not the directory itself) recursively using a PathChecker.
      * @param path a directory to delete
      * @param pathChecker a security check to validate a path before deleting
@@ -259,7 +354,7 @@ public class Util {
         newPathRemover(pathChecker).forceRemoveDirectoryContents(path);
     }
 
-    /**
+	/**
      * Deletes this file (and does not take no for an answer).
      * If necessary, it will have multiple attempts at deleting things.
      *
@@ -270,7 +365,7 @@ public class Util {
         newPathRemover(PathRemover.PathChecker.ALLOW_ALL).forceRemoveFile(fileToPath(f));
     }
 
-    /**
+	/**
      * Deletes the given directory (including its contents) recursively.
      * It does not take no for an answer - if necessary, it will have multiple
      * attempts at deleting things.
@@ -282,7 +377,7 @@ public class Util {
         deleteRecursive(fileToPath(dir), PathRemover.PathChecker.ALLOW_ALL);
     }
 
-    /**
+	/**
      * Deletes the given directory and contents recursively using a filter.
      * @param dir a directory to delete
      * @param pathChecker a security check to validate a path before deleting
@@ -293,7 +388,7 @@ public class Util {
         newPathRemover(pathChecker).forceRemoveRecursive(dir);
     }
 
-    /*
+	/*
      * Copyright 2001-2004 The Apache Software Foundation.
      *
      * Licensed under the Apache License, Version 2.0 (the "License");
@@ -317,7 +412,7 @@ public class Util {
         return isSymlink(fileToPath(file));
     }
 
-    @Restricted(NoExternalUse.class)
+	@Restricted(NoExternalUse.class)
     public static boolean isSymlink(@Nonnull Path path) {
         /*
          *  Windows Directory Junctions are effectively the same as Linux symlinks to directories.
@@ -339,7 +434,7 @@ public class Util {
         }
     }
 
-    /**
+	/**
      * A mostly accurate check of whether a path is a relative path or not. This is designed to take a path against
      * an unknown operating system so may give invalid results.
      *
@@ -348,10 +443,13 @@ public class Util {
      * @since 1.606
      */
     public static boolean isRelativePath(String path) {
-        if (path.startsWith("/"))
-            return false;
+        if (path.startsWith("/")) {
+			return false;
+		}
         if (path.startsWith("\\\\") && path.length() > 3 && path.indexOf('\\', 3) != -1)
-            return false; // a UNC path which is the most absolute you can get on windows
+		 {
+			return false; // a UNC path which is the most absolute you can get on windows
+		}
         if (path.length() >= 3 && ':' == path.charAt(1)) {
             // never mind that the drive mappings can be changed between sessions, we just want to
             // know if the 3rd character is a `\` (or a '/' is acceptable too)
@@ -363,7 +461,7 @@ public class Util {
         return true;
     }
 
-    /**
+	/**
      * A check if a file path is a descendant of a parent path
      * @param forParent the parent the child should be a descendant of
      * @param potentialChild the path to check
@@ -378,7 +476,7 @@ public class Util {
         return child.startsWith(parent);
     }
 
-    /**
+	/**
      * Creates a new temporary directory.
      */
     public static File createTempDir() throws IOException {
@@ -404,24 +502,23 @@ public class Util {
         return tempPath.toFile();
     }
 
-    private static final Pattern errorCodeParser = Pattern.compile(".*CreateProcess.*error=([0-9]+).*");
-
-    /**
+	/**
      * On Windows, error messages for IOException aren't very helpful.
      * This method generates additional user-friendly error message to the listener
      */
     public static void displayIOException(@Nonnull IOException e, @Nonnull TaskListener listener ) {
         String msg = getWin32ErrorMessage(e);
-        if(msg!=null)
-            listener.getLogger().println(msg);
+        if(msg!=null) {
+			listener.getLogger().println(msg);
+		}
     }
 
-    @CheckForNull
+	@CheckForNull
     public static String getWin32ErrorMessage(@Nonnull IOException e) {
         return getWin32ErrorMessage((Throwable)e);
     }
 
-    /**
+	/**
      * Extracts the Win32 error message from {@link Throwable} if possible.
      *
      * @return
@@ -442,12 +539,13 @@ public class Util {
             }
         }
 
-        if(e.getCause()!=null)
-            return getWin32ErrorMessage(e.getCause());
+        if(e.getCause()!=null) {
+			return getWin32ErrorMessage(e.getCause());
+		}
         return null; // no message
     }
 
-    /**
+	/**
      * Gets a human readable message for the given Win32 error code.
      *
      * @return
@@ -464,7 +562,7 @@ public class Util {
         }
     }
 
-    /**
+	/**
      * Guesses the current host name.
      */
     @Nonnull
@@ -476,7 +574,7 @@ public class Util {
         }
     }
 
-    /**
+	/**
      * @deprecated Use {@link IOUtils#copy(InputStream, OutputStream)}
      */
     @Deprecated
@@ -484,7 +582,7 @@ public class Util {
         IOUtils.copy(in, out);
     }
 
-    /**
+	/**
      * @deprecated Use {@link IOUtils#copy(Reader, Writer)}
      */
     @Deprecated
@@ -492,7 +590,7 @@ public class Util {
         IOUtils.copy(in, out);
     }
 
-    /**
+	/**
      * @deprecated Use {@link IOUtils#copy(InputStream, OutputStream)} in a {@code try}-with-resources block
      */
     @Deprecated
@@ -502,7 +600,7 @@ public class Util {
         }
     }
 
-    /**
+	/**
      * @deprecated Use {@link IOUtils#copy(Reader, Writer)} in a {@code try}-with-resources block
      */
     @Deprecated
@@ -512,7 +610,7 @@ public class Util {
         }
     }
 
-    /**
+	/**
      * Tokenizes the text separated by delimiters.
      *
      * <p>
@@ -527,12 +625,12 @@ public class Util {
         return QuotedStringTokenizer.tokenize(s,delimiter);
     }
 
-    @Nonnull
+	@Nonnull
     public static String[] tokenize(@Nonnull String s) {
         return tokenize(s," \t\n\r\f");
     }
 
-    /**
+	/**
      * Converts the map format of the environment variables to the K=V format in the array.
      */
     @Nonnull
@@ -541,32 +639,35 @@ public class Util {
         int idx=0;
 
         for (final Map.Entry<String,String> e : m.entrySet()) {
-            r[idx++] = e.getKey() + '=' + e.getValue();
+            r[idx++] = new StringBuilder().append(e.getKey()).append('=').append(e.getValue()).toString();
         }
         return r;
     }
 
-    public static int min(int x, @Nonnull int... values) {
+	public static int min(int x, @Nonnull int... values) {
         for (int i : values) {
-            if(i<x)
-                x=i;
+            if(i<x) {
+				x=i;
+			}
         }
         return x;
     }
 
-    @CheckForNull
+	@CheckForNull
     public static String nullify(@CheckForNull String v) {
         return fixEmpty(v);
     }
 
-    @Nonnull
+	@Nonnull
     public static String removeTrailingSlash(@Nonnull String s) {
-        if(s.endsWith("/")) return s.substring(0,s.length()-1);
-        else                return s;
+        if(s.endsWith("/")) {
+			return s.substring(0,s.length()-1);
+		} else {
+			return s;
+		}
     }
 
-
-    /**
+	/**
      * Ensure string ends with suffix
      *
      * @param subject Examined string
@@ -578,14 +679,18 @@ public class Util {
     @Nullable
     public static String ensureEndsWith(@CheckForNull String subject, @CheckForNull String suffix) {
 
-        if (subject == null) return null;
+        if (subject == null) {
+			return null;
+		}
 
-        if (subject.endsWith(suffix)) return subject;
+        if (subject.endsWith(suffix)) {
+			return subject;
+		}
 
         return subject + suffix;
     }
 
-    /**
+	/**
      * Computes MD5 digest of the given input stream.
      *
      * @param source
@@ -617,7 +722,7 @@ public class Util {
         */
     }
 
-    @Nonnull
+	@Nonnull
     public static String getDigestOf(@Nonnull String text) {
         try {
             return getDigestOf(new ByteArrayInputStream(text.getBytes(StandardCharsets.UTF_8)));
@@ -626,7 +731,7 @@ public class Util {
         }
     }
 
-    /**
+	/**
      * Computes the MD5 digest of a file.
      * @param file a file
      * @return a 32-character string
@@ -639,7 +744,7 @@ public class Util {
         return getDigestOf(Files.newInputStream(fileToPath(file)));
     }
 
-    /**
+	/**
      * Converts a string into 128-bit AES key.
      * @since 1.308
      */
@@ -658,33 +763,37 @@ public class Util {
         }
     }
 
-    @Nonnull
+	@Nonnull
     public static String toHexString(@Nonnull byte[] data, int start, int len) {
         StringBuilder buf = new StringBuilder();
         for( int i=0; i<len; i++ ) {
             int b = data[start+i]&0xFF;
-            if(b<16)    buf.append('0');
+            if(b<16) {
+				buf.append('0');
+			}
             buf.append(Integer.toHexString(b));
         }
         return buf.toString();
     }
 
-    @Nonnull
+	@Nonnull
     public static String toHexString(@Nonnull byte[] bytes) {
         return toHexString(bytes,0,bytes.length);
     }
 
-    @Nonnull
+	@Nonnull
     public static byte[] fromHexString(@Nonnull String data) {
-        if (data.length() % 2 != 0)
-            throw new IllegalArgumentException("data must have an even number of hexadecimal digits");
+        if (data.length() % 2 != 0) {
+			throw new IllegalArgumentException("data must have an even number of hexadecimal digits");
+		}
         byte[] r = new byte[data.length() / 2];
-        for (int i = 0; i < data.length(); i += 2)
-            r[i / 2] = (byte) Integer.parseInt(data.substring(i, i + 2), 16);
+        for (int i = 0; i < data.length(); i += 2) {
+			r[i / 2] = (byte) Integer.parseInt(data.substring(i, i + 2), 16);
+		}
         return r;
     }
 
-    /**
+	/**
      * Returns a human readable text of the time duration, for example "3 minutes 40 seconds".
      * This version should be used for representing a duration of some activity (like build)
      *
@@ -708,28 +817,28 @@ public class Util {
         duration %= ONE_SECOND_MS;
         long millisecs = duration;
 
-        if (years > 0)
-            return makeTimeSpanString(years, Messages.Util_year(years), months, Messages.Util_month(months));
-        else if (months > 0)
-            return makeTimeSpanString(months, Messages.Util_month(months), days, Messages.Util_day(days));
-        else if (days > 0)
-            return makeTimeSpanString(days, Messages.Util_day(days), hours, Messages.Util_hour(hours));
-        else if (hours > 0)
-            return makeTimeSpanString(hours, Messages.Util_hour(hours), minutes, Messages.Util_minute(minutes));
-        else if (minutes > 0)
-            return makeTimeSpanString(minutes, Messages.Util_minute(minutes), seconds, Messages.Util_second(seconds));
-        else if (seconds >= 10)
-            return Messages.Util_second(seconds);
-        else if (seconds >= 1)
-            return Messages.Util_second(seconds+(float)(millisecs/100)/10); // render "1.2 sec"
-        else if(millisecs>=100)
-            return Messages.Util_second((float)(millisecs/10)/100); // render "0.12 sec".
-        else
-            return Messages.Util_millisecond(millisecs);
+        if (years > 0) {
+			return makeTimeSpanString(years, Messages.Util_year(years), Messages.Util_month(months));
+		} else if (months > 0) {
+			return makeTimeSpanString(months, Messages.Util_month(months), Messages.Util_day(days));
+		} else if (days > 0) {
+			return makeTimeSpanString(days, Messages.Util_day(days), Messages.Util_hour(hours));
+		} else if (hours > 0) {
+			return makeTimeSpanString(hours, Messages.Util_hour(hours), Messages.Util_minute(minutes));
+		} else if (minutes > 0) {
+			return makeTimeSpanString(minutes, Messages.Util_minute(minutes), Messages.Util_second(seconds));
+		} else if (seconds >= 10) {
+			return Messages.Util_second(seconds);
+		} else if (seconds >= 1) {
+			return Messages.Util_second(seconds+(float)(millisecs/100)/10); // render "1.2 sec"
+		} else if(millisecs>=100) {
+			return Messages.Util_second((float)(millisecs/10)/100); // render "0.12 sec".
+		} else {
+			return Messages.Util_millisecond(millisecs);
+		}
     }
 
-
-    /**
+	/**
      * Create a string representation of a time duration.  If the quantity of
      * the most significant unit is big (>=10), then we use only that most
      * significant unit in the string representation. If the quantity of the
@@ -741,16 +850,15 @@ public class Util {
     @Nonnull
     private static String makeTimeSpanString(long bigUnit,
                                              @Nonnull String bigLabel,
-                                             long smallUnit,
                                              @Nonnull String smallLabel) {
         String text = bigLabel;
-        if (bigUnit < 10)
-            text += ' ' + smallLabel;
+        if (bigUnit < 10) {
+			text += ' ' + smallLabel;
+		}
         return text;
     }
 
-
-    /**
+	/**
      * Get a human readable string representing strings like "xxx days ago",
      * which should be used to point to the occurrence of an event in the past.
      * @deprecated Actually identical to {@link #getTimeSpanString}, does not add {@code ago}.
@@ -761,8 +869,7 @@ public class Util {
         return getTimeSpanString(duration);
     }
 
-
-    /**
+	/**
      * Combines number and unit, with a plural suffix if needed.
      *
      * @deprecated
@@ -773,27 +880,25 @@ public class Util {
     @Nonnull
     @Deprecated
     public static String combine(long n, @Nonnull String suffix) {
-        String s = Long.toString(n)+' '+suffix;
-        if(n!=1)
-        	// Just adding an 's' won't work in most natural languages, even English has exception to the rule (e.g. copy/copies).
+        String s = new StringBuilder().append(Long.toString(n)).append(' ').append(suffix).toString();
+        if(n!=1) {
+			// Just adding an 's' won't work in most natural languages, even English has exception to the rule (e.g. copy/copies).
             s += "s";
+		}
         return s;
     }
 
-    /**
+	/**
      * Create a sub-list by only picking up instances of the specified type.
      */
     @Nonnull
     public static <T> List<T> createSubList(@Nonnull Collection<?> source, @Nonnull Class<T> type ) {
         List<T> r = new ArrayList<>();
-        for (Object item : source) {
-            if(type.isInstance(item))
-                r.add(type.cast(item));
-        }
+        source.stream().filter(type::isInstance).forEach(item -> r.add(type.cast(item)));
         return r;
     }
 
-    /**
+	/**
      * Escapes non-ASCII characters in URL.
      *
      * <p>
@@ -836,22 +941,7 @@ public class Util {
         }
     }
 
-    private static final boolean[] uriMap = new boolean[123];
-    static {
-        String raw =
-    "!  $ &'()*+,-. 0123456789   =  @ABCDEFGHIJKLMNOPQRSTUVWXYZ    _ abcdefghijklmnopqrstuvwxyz";
-  //  "# %         /          :;< >?                           [\]^ `                          {|}~
-  //  ^--so these are encoded
-        int i;
-        // Encode control chars and space
-        for (i = 0; i < 33; i++) uriMap[i] = true;
-        for (int j = 0; j < raw.length(); i++, j++)
-            uriMap[i] = (raw.charAt(j) == ' ');
-        // If we add encodeQuery() just add a 2nd map to encode &+=
-        // queryMap[38] = queryMap[43] = queryMap[61] = true;
-    }
-
-    /**
+	/**
      * Encode a single path component for use in an HTTP URL.
      * Escapes all non-ASCII, general unsafe (space and {@code "#%<>[\]^`{|}~})
      * and HTTP special characters ({@code /;:?}) as specified in RFC1738.
@@ -919,77 +1009,80 @@ public class Util {
         return escaped ? out.toString() : s;
     }
 
-    private static char toDigit(int n) {
+	private static char toDigit(int n) {
         return (char)(n < 10 ? '0' + n : 'A' + n - 10);
     }
 
-    /**
+	/**
      * Surrounds by a single-quote.
      */
     public static String singleQuote(String s) {
-        return '\''+s+'\'';
+        return new StringBuilder().append('\'').append(s).append('\'').toString();
     }
 
-    /**
+	/**
      * Escapes HTML unsafe characters like &lt;, &amp; to the respective character entities.
      */
     @Nullable
     public static String escape(@CheckForNull String text) {
-        if (text==null)     return null;
+        if (text==null) {
+			return null;
+		}
         StringBuilder buf = new StringBuilder(text.length()+64);
         for( int i=0; i<text.length(); i++ ) {
             char ch = text.charAt(i);
-            if(ch=='\n')
-                buf.append("<br>");
-            else
-            if(ch=='<')
-                buf.append("&lt;");
-            else
-            if(ch=='>')
-                buf.append("&gt;");
-            else
-            if(ch=='&')
-                buf.append("&amp;");
-            else
-            if(ch=='"')
-                buf.append("&quot;");
-            else
-            if(ch=='\'')
-                buf.append("&#039;");
-            else
+            if(ch=='\n') {
+				buf.append("<br>");
+			} else
+            if(ch=='<') {
+				buf.append("&lt;");
+			} else
+            if(ch=='>') {
+				buf.append("&gt;");
+			} else
+            if(ch=='&') {
+				buf.append("&amp;");
+			} else
+            if(ch=='"') {
+				buf.append("&quot;");
+			} else
+            if(ch=='\'') {
+				buf.append("&#039;");
+			} else
             if(ch==' ') {
                 // All spaces in a block of consecutive spaces are converted to
                 // non-breaking space (&nbsp;) except for the last one.  This allows
                 // significant whitespace to be retained without prohibiting wrapping.
                 char nextCh = i+1 < text.length() ? text.charAt(i+1) : 0;
                 buf.append(nextCh==' ' ? "&nbsp;" : " ");
-            }
-            else
-                buf.append(ch);
+            } else {
+				buf.append(ch);
+			}
         }
         return buf.toString();
     }
 
-    @Nonnull
+	@Nonnull
     public static String xmlEscape(@Nonnull String text) {
         StringBuilder buf = new StringBuilder(text.length()+64);
         for( int i=0; i<text.length(); i++ ) {
             char ch = text.charAt(i);
-            if(ch=='<')
-                buf.append("&lt;");
-            else
-            if(ch=='>')
-                buf.append("&gt;");
-            else
-            if(ch=='&')
-                buf.append("&amp;");
-            else
-                buf.append(ch);
+            if(ch=='<') {
+				buf.append("&lt;");
+			} else
+            if(ch=='>') {
+				buf.append("&gt;");
+			} else
+            if(ch=='&') {
+				buf.append("&amp;");
+			} else {
+				buf.append(ch);
+			}
         }
         return buf.toString();
     }
 
-    /**
+	/**
      * Creates an empty file if nonexistent or truncates the existing file.
      * Note: The behavior of this method in the case where the file already
      * exists is unlike the POSIX <code>touch</code> utility which merely
@@ -999,10 +1092,10 @@ public class Util {
         Files.newOutputStream(fileToPath(file)).close();
     }
 
-    /**
+	/**
      * Copies a single file by using Ant.
      */
-    public static void copyFile(@Nonnull File src, @Nonnull File dst) throws BuildException {
+    public static void copyFile(@Nonnull File src, @Nonnull File dst) {
         Copy cp = new Copy();
         cp.setProject(new org.apache.tools.ant.Project());
         cp.setTofile(dst);
@@ -1011,7 +1104,7 @@ public class Util {
         cp.execute();
     }
 
-    /**
+	/**
      * Convert null to "".
      */
     @Nonnull
@@ -1019,7 +1112,7 @@ public class Util {
         return fixNull(s, "");
     }
 
-    /**
+	/**
      * Convert {@code null} to a default value.
      * @param defaultValue Default value. It may be immutable or not, depending on the implementation.
      * @since 2.144
@@ -1029,27 +1122,31 @@ public class Util {
         return s != null ? s : defaultValue;
     }
 
-    /**
+	/**
      * Convert empty string to null.
      */
     @CheckForNull
     public static String fixEmpty(@CheckForNull String s) {
-        if(s==null || s.length()==0)    return null;
+        if(s==null || s.isEmpty()) {
+			return null;
+		}
         return s;
     }
 
-    /**
+	/**
      * Convert empty string to null, and trim whitespace.
      *
      * @since 1.154
      */
     @CheckForNull
     public static String fixEmptyAndTrim(@CheckForNull String s) {
-        if(s==null)    return null;
+        if(s==null) {
+			return null;
+		}
         return fixEmpty(s.trim());
     }
 
-    /**
+	/**
      *
      * @param l list to check.
      * @param <T>
@@ -1063,7 +1160,7 @@ public class Util {
         return fixNull(l, Collections.emptyList());
     }
 
-    /**
+	/**
      *
      * @param l set to check.
      * @param <T>
@@ -1077,7 +1174,7 @@ public class Util {
         return fixNull(l, Collections.emptySet());
     }
 
-    /**
+	/**
      *
      * @param l collection to check.
      * @param <T>
@@ -1091,7 +1188,7 @@ public class Util {
         return fixNull(l, Collections.emptySet());
     }
 
-    /**
+	/**
      *
      * @param l iterable to check.
      * @param <T>
@@ -1105,21 +1202,23 @@ public class Util {
         return fixNull(l, Collections.emptySet());
     }
 
-    /**
+	/**
      * Cuts all the leading path portion and get just the file name.
      */
     @Nonnull
     public static String getFileName(@Nonnull String filePath) {
         int idx = filePath.lastIndexOf('\\');
-        if(idx>=0)
-            return getFileName(filePath.substring(idx+1));
+        if(idx>=0) {
+			return getFileName(filePath.substring(idx+1));
+		}
         idx = filePath.lastIndexOf('/');
-        if(idx>=0)
-            return getFileName(filePath.substring(idx+1));
+        if(idx>=0) {
+			return getFileName(filePath.substring(idx+1));
+		}
         return filePath;
     }
 
-    /**
+	/**
      * Concatenate multiple strings by inserting a separator.
      */
     @Nonnull
@@ -1127,28 +1226,33 @@ public class Util {
         StringBuilder buf = new StringBuilder();
         boolean first=true;
         for (Object s : strings) {
-            if(first)   first=false;
-            else        buf.append(separator);
+            if(first) {
+				first=false;
+			} else {
+				buf.append(separator);
+			}
             buf.append(s);
         }
         return buf.toString();
     }
 
-    /**
+	/**
      * Combines all the given collections into a single list.
      */
     @Nonnull
     public static <T> List<T> join(@Nonnull Collection<? extends T>... items) {
         int size = 0;
-        for (Collection<? extends T> item : items)
-            size += item.size();
+        for (Collection<? extends T> item : items) {
+			size += item.size();
+		}
         List<T> r = new ArrayList<>(size);
-        for (Collection<? extends T> item : items)
-            r.addAll(item);
+        for (Collection<? extends T> item : items) {
+			r.addAll(item);
+		}
         return r;
     }
 
-    /**
+	/**
      * Creates Ant {@link FileSet} with the base dir and include pattern.
      *
      * <p>
@@ -1188,12 +1292,12 @@ public class Util {
         return fs;
     }
 
-    @Nonnull
+	@Nonnull
     public static FileSet createFileSet(@Nonnull File baseDir, @Nonnull String includes) {
         return createFileSet(baseDir,includes,null);
     }
 
-    /**
+	/**
      * Creates a symlink to targetPath at baseDir+symlinkPath.
      * <p>
      * If there's a prior symlink at baseDir+symlinkPath, it will be overwritten.
@@ -1242,14 +1346,13 @@ public class Util {
         }
     }
 
-    private static final AtomicBoolean warnedSymlinks = new AtomicBoolean();
-    private static void warnWindowsSymlink() {
+	private static void warnWindowsSymlink() {
         if (warnedSymlinks.compareAndSet(false, true)) {
             LOGGER.warning("Symbolic links enabled on this platform but disabled for this user; run as administrator or use Local Security Policy > Security Settings > Local Policies > User Rights Assignment > Create symbolic links");
         }
     }
 
-    /**
+	/**
      * @deprecated as of 1.456
      *      Use {@link #resolveSymlink(File)}
      */
@@ -1258,7 +1361,7 @@ public class Util {
         return resolveSymlink(link);
     }
 
-    /**
+	/**
      * Resolves a symlink to the {@link File} that points to.
      *
      * @return null
@@ -1267,14 +1370,19 @@ public class Util {
     @CheckForNull
     public static File resolveSymlinkToFile(@Nonnull File link) throws InterruptedException, IOException {
         String target = resolveSymlink(link);
-        if (target==null)   return null;
+        if (target==null) {
+			return null;
+		}
 
         File f = new File(target);
-        if (f.isAbsolute()) return f;   // absolute symlink
+        if (f.isAbsolute())
+		 {
+			return f;   // absolute symlink
+		}
         return new File(link.getParentFile(),target);   // relative symlink
     }
 
-    /**
+	/**
      * Resolves symlink, if the given file is a symlink. Otherwise return null.
      * <p>
      * If the resolution fails, report an error.
@@ -1302,7 +1410,7 @@ public class Util {
         }
     }
 
-    /**
+	/**
      * Encodes the URL by RFC 2396.
      *
      * I thought there's another spec that refers to UTF-8 as the encoding,
@@ -1324,17 +1432,17 @@ public class Util {
         }
     }
 
-    /**
+	/**
      * Wraps with the error icon and the CSS class to render error message.
      * @since 1.173
      */
     @Nonnull
     public static String wrapToErrorSpan(@Nonnull String s) {
-        s = "<span class=error style='display:inline-block'>"+s+"</span>";
+        s = new StringBuilder().append("<span class=error style='display:inline-block'>").append(s).append("</span>").toString();
         return s;
     }
 
-    /**
+	/**
      * Returns the parsed string if parsed successful; otherwise returns the default number.
      * If the string is null, empty or a ParseException is thrown then the defaultNumber
      * is returned.
@@ -1344,7 +1452,7 @@ public class Util {
      */
     @CheckForNull
     public static Number tryParseNumber(@CheckForNull String numberStr, @CheckForNull Number defaultNumber) {
-        if ((numberStr == null) || (numberStr.length() == 0)) {
+        if ((numberStr == null) || (numberStr.isEmpty())) {
             return defaultNumber;
         }
         try {
@@ -1354,7 +1462,7 @@ public class Util {
         }
     }
 
-    /**
+	/**
      * Checks if the method defined on the base type with the given arguments
      * is overridden in the given derived type.
      */
@@ -1362,7 +1470,7 @@ public class Util {
         return !getMethod(base, methodName, types).equals(getMethod(derived, methodName, types));
     }
 
-    private static Method getMethod(@Nonnull Class clazz, @Nonnull String methodName, @Nonnull Class... types) {
+	private static Method getMethod(@Nonnull Class clazz, @Nonnull String methodName, @Nonnull Class... types) {
         Method res = null;
         try {
             res = clazz.getDeclaredMethod(methodName, types);
@@ -1387,7 +1495,7 @@ public class Util {
         return res;
     }
 
-    /**
+	/**
      * Returns a file name by changing its extension.
      *
      * @param ext
@@ -1397,11 +1505,14 @@ public class Util {
     public static File changeExtension(@Nonnull File dst, @Nonnull String ext) {
         String p = dst.getPath();
         int pos = p.lastIndexOf('.');
-        if (pos<0)  return new File(p+ext);
-        else        return new File(p.substring(0,pos)+ext);
+        if (pos<0) {
+			return new File(p+ext);
+		} else {
+			return new File(p.substring(0,pos)+ext);
+		}
     }
 
-    /**
+	/**
      * Null-safe String intern method.
      * @return A canonical representation for the string object. Null for null input strings
      */
@@ -1410,7 +1521,7 @@ public class Util {
         return s==null ? s : s.intern();
     }
 
-    /**
+	/**
      * Return true if the systemId denotes an absolute URI .
      *
      * The same algorithm can be seen in {@link URI}, but
@@ -1424,13 +1535,16 @@ public class Util {
     @Restricted(NoExternalUse.class)
     public static boolean isAbsoluteUri(@Nonnull String uri) {
         int idx = uri.indexOf(':');
-        if (idx<0)  return false;   // no ':'. can't be absolute
+        if (idx<0)
+		 {
+			return false;   // no ':'. can't be absolute
+		}
 
         // #, ?, and / must not be before ':'
         return idx<_indexOf(uri, '#') && idx<_indexOf(uri,'?') && idx<_indexOf(uri,'/');
     }
 
-    /**
+	/**
      * Return true iff the parameter does not denote an absolute URI and not a scheme-relative URI.
      * @since 2.3 / 1.651.2
      */
@@ -1438,17 +1552,19 @@ public class Util {
         return !isAbsoluteUri(uri) && !uri.startsWith("//");
     }
 
-    /**
+	/**
      * Works like {@link String#indexOf(int)} but 'not found' is returned as s.length(), not -1.
      * This enables more straight-forward comparison.
      */
     private static int _indexOf(@Nonnull String s, char ch) {
         int idx = s.indexOf(ch);
-        if (idx<0)  return s.length();
+        if (idx<0) {
+			return s.length();
+		}
         return idx;
     }
 
-    /**
+	/**
      * Loads a key/value pair string as {@link Properties}
      * @since 1.392
      */
@@ -1458,8 +1574,8 @@ public class Util {
         p.load(new StringReader(properties));
         return p;
     }
-    
-    /**
+
+	/**
      * Closes the item and logs error to the log in the case of error.
      * Logging will be performed on the {@code WARNING} level.
      * @param toClose Item to close. Nothing will happen if it is {@code null}
@@ -1484,7 +1600,7 @@ public class Util {
         }
     }
 
-    @Restricted(NoExternalUse.class)
+	@Restricted(NoExternalUse.class)
     public static int permissionsToMode(Set<PosixFilePermission> permissions) {
         PosixFilePermission[] allPermissions = PosixFilePermission.values();
         int result = 0;
@@ -1495,7 +1611,7 @@ public class Util {
         return result;
     }
 
-    @Restricted(NoExternalUse.class)
+	@Restricted(NoExternalUse.class)
     public static Set<PosixFilePermission> modeToPermissions(int mode) throws IOException {
          // Anything larger is a file type, not a permission.
         int PERMISSIONS_MASK = 07777;
@@ -1516,7 +1632,7 @@ public class Util {
         return result;
     }
 
-    /**
+	/**
      * Converts a {@link File} into a {@link Path} and checks runtime exceptions.
      * @throws IOException if {@code f.toPath()} throws {@link InvalidPathException}.
      */
@@ -1528,8 +1644,8 @@ public class Util {
             throw new IOException(e);
         }
     }
-    
-    /**
+
+	/**
      * Compute the number of calendar days elapsed since the given date.
      * As it's only the calendar days difference that matter, "11.00pm" to "2.00am the day after" returns 1,
      * even if there are only 3 hours between. As well as "10am" to "2pm" both on the same day, returns 0.
@@ -1540,8 +1656,8 @@ public class Util {
         LocalDate bLocal = b.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
         return ChronoUnit.DAYS.between(aLocal, bLocal);
     }
-    
-    /**
+
+	/**
      * @return positive number of days between the given date and now
      * @see #daysBetween(Date, Date)
      */
@@ -1549,8 +1665,8 @@ public class Util {
     public static long daysElapsedSince(@Nonnull Date date){
         return Math.max(0, daysBetween(date, new Date()));
     }
-    
-    /**
+
+	/**
      * Find the specific ancestor, or throw an exception.
      * Useful for an ancestor we know is inside the URL to ease readability
      */
@@ -1558,91 +1674,12 @@ public class Util {
     public static @Nonnull <T> T getNearestAncestorOfTypeOrThrow(@Nonnull StaplerRequest request, @Nonnull Class<T> clazz) {
         T t = request.findAncestorObject(clazz);
         if (t == null) {
-            throw new IllegalArgumentException("No ancestor of type " + clazz.getName() + " in the request");
+            throw new IllegalArgumentException(new StringBuilder().append("No ancestor of type ").append(clazz.getName()).append(" in the request").toString());
         }
         return t;
     }
 
-    public static final FastDateFormat XS_DATETIME_FORMATTER = FastDateFormat.getInstance("yyyy-MM-dd'T'HH:mm:ss'Z'",new SimpleTimeZone(0,"GMT"));
-
-    // Note: RFC822 dates must not be localized!
-    public static final FastDateFormat RFC822_DATETIME_FORMATTER
-            = FastDateFormat.getInstance("EEE, dd MMM yyyy HH:mm:ss Z", Locale.US);
-
-    private static final Logger LOGGER = Logger.getLogger(Util.class.getName());
-
-    /**
-     * On Unix environment that cannot run "ln", set this to true.
-     */
-    public static boolean NO_SYMLINK = SystemProperties.getBoolean(Util.class.getName()+".noSymLink");
-
-    public static boolean SYMLINK_ESCAPEHATCH = SystemProperties.getBoolean(Util.class.getName()+".symlinkEscapeHatch");
-
-    /**
-     * The number of times we will attempt to delete files/directory trees
-     * before giving up and throwing an exception.<br/>
-     * Specifying a value less than 1 is invalid and will be treated as if
-     * a value of 1 (i.e. one attempt, no retries) was specified.
-     * <p>
-     * e.g. if some of the child directories are big, it might take long enough
-     * to delete that it allows others to create new files in the directory we
-     * are trying to empty, causing problems like JENKINS-10113.
-     * Or, if we're on Windows, then deletes can fail for transient reasons
-     * regardless of external activity; see JENKINS-15331.
-     * Whatever the reason, this allows us to do multiple attempts before we
-     * give up, thus improving build reliability.
-     */
-    @Restricted(value = NoExternalUse.class)
-    static int DELETION_MAX = Math.max(1, SystemProperties.getInteger(Util.class.getName() + ".maxFileDeletionRetries", 3));
-
-    /**
-     * The time (in milliseconds) that we will wait between attempts to
-     * delete files when retrying.<br>
-     * This has no effect unless {@link #DELETION_MAX} is non-zero.
-     * <p>
-     * If zero, we will not delay between attempts.<br>
-     * If negative, we will wait an (linearly) increasing multiple of this value
-     * between attempts.
-     */
-    @Restricted(value = NoExternalUse.class)
-    static int WAIT_BETWEEN_DELETION_RETRIES = SystemProperties.getInteger(Util.class.getName() + ".deletionRetryWait", 100);
-
-    /**
-     * If this flag is set to true then we will request a garbage collection
-     * after a deletion failure before we next retry the delete.<br>
-     * It defaults to <code>false</code> and is ignored unless
-     * {@link #DELETION_MAX} is greater than 1.
-     * <p>
-     * Setting this flag to true <i>may</i> resolve some problems on Windows,
-     * and also for directory trees residing on an NFS share, <b>but</b> it can
-     * have a negative impact on performance and may have no effect at all (GC
-     * behavior is JVM-specific).
-     * <p>
-     * Warning: This should only ever be used if you find that your builds are
-     * failing because Jenkins is unable to delete files, that this failure is
-     * because Jenkins itself has those files locked "open", and even then it
-     * should only be used on agents with relatively few executors (because the
-     * garbage collection can impact the performance of all job executors on
-     * that slave).<br/>
-     * i.e. Setting this flag is a act of last resort - it is <em>not</em>
-     * recommended, and should not be used on the main Jenkins server
-     * unless you can tolerate the performance impact.
-     */
-    @Restricted(value = NoExternalUse.class)
-    static boolean GC_AFTER_FAILED_DELETE = SystemProperties.getBoolean(Util.class.getName() + ".performGCOnFailedDelete");
-
-    private static PathRemover newPathRemover(@Nonnull PathRemover.PathChecker pathChecker) {
+	private static PathRemover newPathRemover(@Nonnull PathRemover.PathChecker pathChecker) {
         return PathRemover.newFilteredRobustRemover(pathChecker, DELETION_MAX - 1, GC_AFTER_FAILED_DELETE, WAIT_BETWEEN_DELETION_RETRIES);
     }
-
-    /**
-     * If this flag is true, native implementations of {@link FilePath#chmod}
-     * and {@link hudson.util.IOUtils#mode} are used instead of NIO.
-     * <p>
-     * This should only be enabled if the setgid/setuid/sticky bits are
-     * intentionally set on the Jenkins installation and they are being
-     * overwritten by Jenkins erroneously.
-     */
-    @Restricted(value = NoExternalUse.class)
-    public static boolean NATIVE_CHMOD_MODE = SystemProperties.getBoolean(Util.class.getName() + ".useNativeChmodAndMode");
 }

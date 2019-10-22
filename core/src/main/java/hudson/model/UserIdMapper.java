@@ -62,26 +62,26 @@ public class UserIdMapper {
     private transient File usersDirectory;
     private Map<String, String> idToDirectoryNameMap = new ConcurrentHashMap<>();
 
-    static UserIdMapper getInstance() {
-        return ExtensionList.lookupSingleton(UserIdMapper.class);
-    }
-
     public UserIdMapper() {
     }
 
-    @Initializer(after = InitMilestone.PLUGINS_STARTED, before = InitMilestone.JOB_LOADED)
+	static UserIdMapper getInstance() {
+        return ExtensionList.lookupSingleton(UserIdMapper.class);
+    }
+
+	@Initializer(after = InitMilestone.PLUGINS_STARTED, before = InitMilestone.JOB_LOADED)
     public File init() throws IOException {
         usersDirectory = createUsersDirectoryAsNeeded();
         load();
         return usersDirectory;
     }
 
-    @CheckForNull File getDirectory(String userId) {
+	@CheckForNull File getDirectory(String userId) {
         String directoryName = idToDirectoryNameMap.get(getIdStrategy().keyFor(userId));
         return directoryName == null ? null : new File(usersDirectory, directoryName);
     }
 
-    File putIfAbsent(String userId, boolean saveToDisk) throws IOException {
+	File putIfAbsent(String userId, boolean saveToDisk) throws IOException {
         String idKey = getIdStrategy().keyFor(userId);
         String directoryName = idToDirectoryNameMap.get(idKey);
         File directory = null;
@@ -101,46 +101,46 @@ public class UserIdMapper {
         return directory == null ? new File(usersDirectory, directoryName) : directory;
     }
 
-    boolean isMapped(String userId) {
+	boolean isMapped(String userId) {
         return idToDirectoryNameMap.containsKey(getIdStrategy().keyFor(userId));
     }
 
-    Set<String> getConvertedUserIds() {
+	Set<String> getConvertedUserIds() {
         return Collections.unmodifiableSet(idToDirectoryNameMap.keySet());
     }
 
-    void remove(String userId) throws IOException {
+	void remove(String userId) throws IOException {
         idToDirectoryNameMap.remove(getIdStrategy().keyFor(userId));
         save();
     }
 
-    void clear() {
+	void clear() {
         idToDirectoryNameMap.clear();
     }
 
-    void reload() throws IOException {
+	void reload() throws IOException {
         clear();
         load();
     }
 
-    protected IdStrategy getIdStrategy() {
+	protected IdStrategy getIdStrategy() {
         return User.idStrategy();
     }
 
-    protected File getUsersDirectory() {
+	protected File getUsersDirectory() {
         return User.getRootDir();
     }
 
-    private XmlFile getXmlConfigFile() {
+	private XmlFile getXmlConfigFile() {
         File file = getConfigFile(usersDirectory);
         return new XmlFile(XSTREAM, file);
     }
 
-    static File getConfigFile(File usersDirectory) {
+	static File getConfigFile(File usersDirectory) {
         return new File(usersDirectory, MAPPING_FILE);
     }
 
-    private File createDirectoryForNewUser(String userId) throws IOException {
+	private File createDirectoryForNewUser(String userId) throws IOException {
         try {
             Path tempDirectory = Files.createTempDirectory(Util.fileToPath(usersDirectory), generatePrefix(userId));
             return tempDirectory.toFile();
@@ -150,12 +150,12 @@ public class UserIdMapper {
         }
     }
 
-    private String generatePrefix(String userId) {
+	private String generatePrefix(String userId) {
         String fullPrefix = PREFIX_PATTERN.matcher(userId).replaceAll("");
         return fullPrefix.length() > PREFIX_MAX - 1 ? fullPrefix.substring(0, PREFIX_MAX - 1) + '_' : fullPrefix + '_';
     }
 
-    private File createUsersDirectoryAsNeeded() throws IOException {
+	private File createUsersDirectoryAsNeeded() throws IOException {
         File usersDirectory = getUsersDirectory();
         if (!usersDirectory.exists()) {
             try {
@@ -168,7 +168,7 @@ public class UserIdMapper {
         return usersDirectory;
     }
 
-    synchronized void save() throws IOException {
+	synchronized void save() throws IOException {
         try {
             getXmlConfigFile().write(this);
         } catch (IOException ioe) {
@@ -177,7 +177,7 @@ public class UserIdMapper {
         }
     }
 
-    private void load() throws IOException {
+	private void load() throws IOException {
         UserIdMigrator migrator = new UserIdMigrator(usersDirectory, getIdStrategy());
         if (migrator.needsMigration()) {
             try {

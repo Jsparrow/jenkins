@@ -99,20 +99,30 @@ import org.kohsuke.stapler.export.ExportedBean;
 public abstract class ParameterDefinition implements
         Describable<ParameterDefinition>, ExtensionPoint, Serializable {
 
-    private final String name;
+    /**
+     * A list of available parameter definition types
+     * @deprecated as of 1.286
+     *      Use {@link #all()} for read access, and {@link Extension} for registration.
+     */
+    @Deprecated
+    public static final DescriptorList<ParameterDefinition> LIST = new DescriptorList<>(ParameterDefinition.class);
 
-    private final String description;
+	private static final Logger LOGGER = Logger.getLogger(ParameterDefinition.class.getName());
 
-    public ParameterDefinition(String name) {
+	private final String name;
+
+	private final String description;
+
+	public ParameterDefinition(String name) {
         this(name, null);
     }
 
-    public ParameterDefinition(String name, String description) {
+	public ParameterDefinition(String name, String description) {
         this.name = name;
         this.description = description;
     }
 
-    /**
+	/**
      * Create a new instance of this parameter definition and use the passed
      * parameter value as the default value.
      *
@@ -123,22 +133,22 @@ public abstract class ParameterDefinition implements
         return this;
     }
 
-    @Exported
+	@Exported
     public String getType() {
     	return this.getClass().getSimpleName();
     }
-    
-    @Exported
+
+	@Exported
     public String getName() {
         return name;
     }
 
-    @Exported
+	@Exported
     public String getDescription() {
         return description;
     }
 
-    /**
+	/**
      * return parameter description, applying the configured MarkupFormatter for jenkins instance.
      * @since 1.521
      */
@@ -151,7 +161,7 @@ public abstract class ParameterDefinition implements
         }
     }
 
-    /**
+	/**
      * {@inheritDoc}
      */
     @Override
@@ -159,7 +169,7 @@ public abstract class ParameterDefinition implements
         return (ParameterDescriptor) Jenkins.get().getDescriptorOrDie(getClass());
     }
 
-    /**
+	/**
      * Create a parameter value from a form submission.
      *
      * <p>
@@ -168,8 +178,8 @@ public abstract class ParameterDefinition implements
      */
     @CheckForNull
     public abstract ParameterValue createValue(StaplerRequest req, JSONObject jo);
-    
-    /**
+
+	/**
      * Create a parameter value from a GET with query string.
      * If no value is available in the request, it returns a default value if possible, or null.
      *
@@ -188,8 +198,7 @@ public abstract class ParameterDefinition implements
     @CheckForNull
     public abstract ParameterValue createValue(StaplerRequest req);
 
-
-    /**
+	/**
      * Create a parameter value from the string given in the CLI.
      *
      * @param command
@@ -204,10 +213,10 @@ public abstract class ParameterDefinition implements
      */
     @CheckForNull
     public ParameterValue createValue(CLICommand command, String value) throws IOException, InterruptedException {
-        throw new AbortException("CLI parameter submission is not supported for the "+getClass()+" type. Please file a bug report for this");
+        throw new AbortException(new StringBuilder().append("CLI parameter submission is not supported for the ").append(getClass()).append(" type. Please file a bug report for this").toString());
     }
-    
-    /**
+
+	/**
      * Returns default parameter value for this definition.
      * 
      * @return default parameter value or null if no defaults are available
@@ -219,22 +228,14 @@ public abstract class ParameterDefinition implements
         return null;
     }
 
-    /**
+	/**
      * Returns all the registered {@link ParameterDefinition} descriptors.
      */
     public static DescriptorExtensionList<ParameterDefinition,ParameterDescriptor> all() {
         return Jenkins.get().getDescriptorList(ParameterDefinition.class);
     }
 
-    /**
-     * A list of available parameter definition types
-     * @deprecated as of 1.286
-     *      Use {@link #all()} for read access, and {@link Extension} for registration.
-     */
-    @Deprecated
-    public static final DescriptorList<ParameterDefinition> LIST = new DescriptorList<>(ParameterDefinition.class);
-
-    public abstract static class ParameterDescriptor extends
+	public abstract static class ParameterDescriptor extends
             Descriptor<ParameterDefinition> {
 
         protected ParameterDescriptor(Class<? extends ParameterDefinition> klazz) {
@@ -260,6 +261,4 @@ public abstract class ParameterDefinition implements
             return "Parameter";
         }
     }
-
-    private static final Logger LOGGER = Logger.getLogger(ParameterDefinition.class.getName());
 }

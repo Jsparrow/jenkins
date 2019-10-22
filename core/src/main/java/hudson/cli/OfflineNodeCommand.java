@@ -81,7 +81,7 @@ public class OfflineNodeCommand extends CLICommand {
                     throw e;
                 }
 
-                stderr.println(node_s + ": " + e.getMessage());
+                stderr.println(new StringBuilder().append(node_s).append(": ").append(e.getMessage()).toString());
                 errorOccurred = true;
                 continue;
             }

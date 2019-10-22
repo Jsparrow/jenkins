@@ -93,7 +93,8 @@ public class DirScannerTest {
             this.filename = filename;
         }
     
-        public void visit(File f, String relativePath) throws IOException {
+        @Override
+		public void visit(File f, String relativePath) throws IOException {
             if (relativePath.endsWith(filename)) {
                 found = true;
             }

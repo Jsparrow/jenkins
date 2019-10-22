@@ -56,7 +56,8 @@ public class FingerprintCleanupThread extends AsyncPeriodicWork {
         super("Fingerprint cleanup");
     }
 
-    public long getRecurrencePeriod() {
+    @Override
+	public long getRecurrencePeriod() {
         return DAY;
     }
 
@@ -68,7 +69,8 @@ public class FingerprintCleanupThread extends AsyncPeriodicWork {
         return ExtensionList.lookup(AsyncPeriodicWork.class).get(FingerprintCleanupThread.class);
     }
 
-    public void execute(TaskListener listener) {
+    @Override
+	public void execute(TaskListener listener) {
         int numFiles = 0;
 
         File root = new File(getRootDir(), FINGERPRINTS_DIR_NAME);
@@ -79,8 +81,9 @@ public class FingerprintCleanupThread extends AsyncPeriodicWork {
                 for(File file2 : files2) {
                     File[] files3 = file2.listFiles(f -> f.isFile() && FINGERPRINT_FILE_PATTERN.matcher(f.getName()).matches());
                     for(File file3 : files3) {
-                        if(check(file3, listener))
-                            numFiles++;
+                        if(check(file3, listener)) {
+							numFiles++;
+						}
                     }
                     deleteIfEmpty(file2);
                 }
@@ -88,7 +91,7 @@ public class FingerprintCleanupThread extends AsyncPeriodicWork {
             }
         }
 
-        listener.getLogger().println("Cleaned up "+numFiles+" records");
+        listener.getLogger().println(new StringBuilder().append("Cleaned up ").append(numFiles).append(" records").toString());
     }
 
     /**
@@ -96,9 +99,13 @@ public class FingerprintCleanupThread extends AsyncPeriodicWork {
      */
     private void deleteIfEmpty(File dir) {
         String[] r = dir.list();
-        if(r==null)     return; // can happen in a rare occasion
-        if(r.length==0)
-            dir.delete();
+        if(r==null)
+		 {
+			return; // can happen in a rare occasion
+		}
+        if(r.length==0) {
+			dir.delete();
+		}
     }
 
     /**

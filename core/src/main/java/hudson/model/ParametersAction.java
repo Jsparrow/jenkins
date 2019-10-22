@@ -85,21 +85,23 @@ public class ParametersAction implements RunAction2, Iterable<ParameterValue>, Q
     public static final String SAFE_PARAMETERS_SYSTEM_PROPERTY_NAME = ParametersAction.class.getName() +
             ".safeParameters";
 
-    private Set<String> safeParameters;
+	private static final Logger LOGGER = Logger.getLogger(ParametersAction.class.getName());
 
-    private @Nonnull List<ParameterValue> parameters;
+	private Set<String> safeParameters;
 
-    private List<String> parameterDefinitionNames;
+	private @Nonnull List<ParameterValue> parameters;
 
-    /**
+	private List<String> parameterDefinitionNames;
+
+	/**
      * @deprecated since 1.283; kept to avoid warnings loading old build data, but now transient.
      */
     @Deprecated
     private transient AbstractBuild<?, ?> build;
 
-    private transient Run<?, ?> run;
+	private transient Run<?, ?> run;
 
-    public ParametersAction(@Nonnull List<ParameterValue> parameters) {
+	public ParametersAction(@Nonnull List<ParameterValue> parameters) {
         this.parameters = new ArrayList<>(parameters);
         String paramNames = SystemProperties.getString(SAFE_PARAMETERS_SYSTEM_PROPERTY_NAME);
         safeParameters = new TreeSet<>();
@@ -108,7 +110,7 @@ public class ParametersAction implements RunAction2, Iterable<ParameterValue>, Q
         }
     }
 
-    /**
+	/**
      * Constructs a new action with additional safe parameters.
      * The additional safe parameters should be only those considered safe to override the environment
      * and what is declared in the project config in addition to those specified by the user in
@@ -125,28 +127,34 @@ public class ParametersAction implements RunAction2, Iterable<ParameterValue>, Q
             safeParameters.addAll(additionalSafeParameters);
         }
     }
-    
-    public ParametersAction(ParameterValue... parameters) {
+
+	public ParametersAction(ParameterValue... parameters) {
         this(Arrays.asList(parameters));
     }
 
-    public void createBuildWrappers(AbstractBuild<?,?> build, Collection<? super BuildWrapper> result) {
+	public void createBuildWrappers(AbstractBuild<?,?> build, Collection<? super BuildWrapper> result) {
         for (ParameterValue p : getParameters()) {
-            if (p == null) continue;
+            if (p == null) {
+				continue;
+			}
             BuildWrapper w = p.createBuildWrapper(build);
-            if(w!=null) result.add(w);
+            if(w!=null) {
+				result.add(w);
+			}
         }
     }
 
-    @Override
+	@Override
     public void buildEnvironment(Run<?,?> run, EnvVars env) {
         for (ParameterValue p : getParameters()) {
-            if (p == null) continue;
+            if (p == null) {
+				continue;
+			}
             p.buildEnvironment(run, env);
         }
     }
 
-    // TODO do we need an EnvironmentContributingAction variant that takes Run so this can implement it?
+	// TODO do we need an EnvironmentContributingAction variant that takes Run so this can implement it?
 
     /**
      * Performs a variable substitution to the given text and return it.
@@ -155,7 +163,7 @@ public class ParametersAction implements RunAction2, Iterable<ParameterValue>, Q
         return Util.replaceMacro(text,createVariableResolver(build));
     }
 
-    /**
+	/**
      * Creates an {@link VariableResolver} that aggregates all the parameters.
      *
      * <p>
@@ -165,72 +173,85 @@ public class ParametersAction implements RunAction2, Iterable<ParameterValue>, Q
         VariableResolver[] resolvers = new VariableResolver[getParameters().size()+1];
         int i=0;
         for (ParameterValue p : getParameters()) {
-            if (p == null) continue;
+            if (p == null) {
+				continue;
+			}
             resolvers[i++] = p.createVariableResolver(build);
         }
             
         resolvers[i] = build.getBuildVariableResolver();
 
-        return new VariableResolver.Union<String>(resolvers);
+        return new VariableResolver.Union<>(resolvers);
     }
-    
-    public Iterator<ParameterValue> iterator() {
+
+	@Override
+	public Iterator<ParameterValue> iterator() {
         return getParameters().iterator();
     }
 
-    @Exported(visibility=2)
+	@Exported(visibility=2)
     public List<ParameterValue> getParameters() {
         return Collections.unmodifiableList(filter(parameters));
     }
 
-    public ParameterValue getParameter(String name) {
+	public ParameterValue getParameter(String name) {
         for (ParameterValue p : parameters) {
-            if (p == null) continue;
-            if (p.getName().equals(name))
-                return p;
+            if (p == null) {
+				continue;
+			}
+            if (p.getName().equals(name)) {
+				return p;
+			}
         }
         return null;
     }
 
-    public Label getAssignedLabel(SubTask task) {
+	@Override
+	public Label getAssignedLabel(SubTask task) {
         for (ParameterValue p : getParameters()) {
-            if (p == null) continue;
+            if (p == null) {
+				continue;
+			}
             Label l = p.getAssignedLabel(task);
-            if (l!=null)    return l;
+            if (l!=null) {
+				return l;
+			}
         }
         return null;
     }
 
-    public String getDisplayName() {
+	@Override
+	public String getDisplayName() {
         return Messages.ParameterAction_DisplayName();
     }
 
-    public String getIconFileName() {
+	@Override
+	public String getIconFileName() {
         return "document-properties.png";
     }
 
-    public String getUrlName() {
+	@Override
+	public String getUrlName() {
         return "parameters";
     }
 
-    /**
+	/**
      * Allow an other build of the same project to be scheduled, if it has other parameters.
      */
-    public boolean shouldSchedule(List<Action> actions) {
+    @Override
+	public boolean shouldSchedule(List<Action> actions) {
         List<ParametersAction> others = Util.filter(actions, ParametersAction.class);
         if (others.isEmpty()) {
             return !parameters.isEmpty();
         } else {
             // I don't think we need multiple ParametersActions, but let's be defensive
             Set<ParameterValue> params = new HashSet<>();
-            for (ParametersAction other: others) {
-                params.addAll(other.parameters);
-            }
+            others.forEach(other -> params.addAll(other.parameters));
             return !params.equals(new HashSet<>(this.parameters));
         }
     }
 
-    /**
+	/**
      * Creates a new {@link ParametersAction} that contains all the parameters in this action
      * with the overrides / new values given as parameters.
      * @return New {@link ParametersAction}. The result may contain null {@link ParameterValue}s
@@ -246,12 +267,16 @@ public class ParametersAction implements RunAction2, Iterable<ParameterValue>, Q
         Set<String> names = newHashSet();
 
         for(ParameterValue v : overrides) {
-            if (v == null) continue;
+            if (v == null) {
+				continue;
+			}
             names.add(v.getName());
         }
 
         for (ParameterValue v : parameters) {
-            if (v == null) continue;
+            if (v == null) {
+				continue;
+			}
             if (!names.contains(v.getName())) {
                 combinedParameters.add(v);
             }
@@ -260,7 +285,7 @@ public class ParametersAction implements RunAction2, Iterable<ParameterValue>, Q
         return new ParametersAction(combinedParameters, this.safeParameters);
     }
 
-    /*
+	/*
      * Creates a new {@link ParametersAction} that contains all the parameters in this action
      * with the overrides / new values given as another {@link ParametersAction}.
      * @return New {@link ParametersAction}. The result may contain null {@link ParameterValue}s
@@ -282,19 +307,20 @@ public class ParametersAction implements RunAction2, Iterable<ParameterValue>, Q
         return parametersAction;
     }
 
-    private Object readResolve() {
+	private Object readResolve() {
         if (parameters == null) { // JENKINS-39495
             parameters = Collections.emptyList();
         }
-        if (build != null)
-            OldDataMonitor.report(build, "1.283");
+        if (build != null) {
+			OldDataMonitor.report(build, "1.283");
+		}
         if (safeParameters == null) {
             safeParameters = Collections.emptySet();
         }
         return this;
     }
 
-    @Override
+	@Override
     public void onAttached(Run<?, ?> r) {
         ParametersDefinitionProperty p = r.getParent().getProperty(ParametersDefinitionProperty.class);
         if (p != null) {
@@ -305,12 +331,12 @@ public class ParametersAction implements RunAction2, Iterable<ParameterValue>, Q
         this.run = r;
     }
 
-    @Override
+	@Override
     public void onLoad(Run<?, ?> r) {
         this.run = r;
     }
 
-    private List<? extends ParameterValue> filter(List<ParameterValue> parameters) {
+	private List<? extends ParameterValue> filter(List<ParameterValue> parameters) {
         if (this.run == null) {
             return parameters;
         }
@@ -326,21 +352,19 @@ public class ParametersAction implements RunAction2, Iterable<ParameterValue>, Q
 
         List<ParameterValue> filteredParameters = new ArrayList<>();
 
-        for (ParameterValue v : this.parameters) {
+        this.parameters.forEach(v -> {
             if (this.parameterDefinitionNames.contains(v.getName()) || isSafeParameter(v.getName())) {
                 filteredParameters.add(v);
             } else if (shouldKeepFlag == null) {
-                LOGGER.log(Level.WARNING, "Skipped parameter `{0}` as it is undefined on `{1}`. Set `-D{2}=true` to allow "
-                        + "undefined parameters to be injected as environment variables or `-D{3}=[comma-separated list]` to whitelist specific parameter names, "
-                        + "even though it represents a security breach or `-D{2}=false` to no longer show this message.",
+                LOGGER.log(Level.WARNING, new StringBuilder().append("Skipped parameter `{0}` as it is undefined on `{1}`. Set `-D{2}=true` to allow ").append("undefined parameters to be injected as environment variables or `-D{3}=[comma-separated list]` to whitelist specific parameter names, ").append("even though it represents a security breach or `-D{2}=false` to no longer show this message.").toString(),
                         new Object [] { v.getName(), run.getParent().getFullName(), KEEP_UNDEFINED_PARAMETERS_SYSTEM_PROPERTY_NAME, SAFE_PARAMETERS_SYSTEM_PROPERTY_NAME });
             }
-        }
+        });
 
         return filteredParameters;
     }
 
-    /**
+	/**
      * Returns all parameters.
      *
      * Be careful in how you process them. It will return parameters even not being defined as
@@ -354,10 +378,8 @@ public class ParametersAction implements RunAction2, Iterable<ParameterValue>, Q
         return Collections.unmodifiableList(parameters);
     }
 
-    private boolean isSafeParameter(String name) {
+	private boolean isSafeParameter(String name) {
         return safeParameters.contains(name);
     }
-
-    private static final Logger LOGGER = Logger.getLogger(ParametersAction.class.getName());
 
 }

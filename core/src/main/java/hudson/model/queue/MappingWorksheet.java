@@ -48,6 +48,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import static java.lang.Math.*;
+import java.util.stream.Collectors;
 
 /**
  * Defines a mapping problem for answering "where do we execute this task?"
@@ -93,18 +94,111 @@ public class MappingWorksheet {
      */
     public final BuildableItem item;
 
-    private static class ReadOnlyList<E> extends AbstractList<E> {
+    public MappingWorksheet(BuildableItem item, List<? extends ExecutorSlot> offers) {
+        this(item,offers,LoadPredictor.all());
+    }
+
+	public MappingWorksheet(BuildableItem item, List<? extends ExecutorSlot> offers, Collection<? extends LoadPredictor> loadPredictors) {
+        this.item = item;
+        
+        // group executors by their computers
+        Map<Computer,List<ExecutorSlot>> j = new HashMap<>();
+        offers.forEach(o -> {
+            Computer c = o.getExecutor().getOwner();
+            List<ExecutorSlot> l = j.computeIfAbsent(c, k -> new ArrayList<>());
+            l.add(o);
+        });
+
+        {// take load prediction into account and reduce the available executor pool size accordingly
+            long duration = item.task.getEstimatedDuration();
+            if (duration > 0) {
+                long now = System.currentTimeMillis();
+                for (Entry<Computer, List<ExecutorSlot>> e : j.entrySet()) {
+                    final List<ExecutorSlot> list = e.getValue();
+                    final int max = e.getKey().countExecutors();
+
+                    // build up the prediction model. cut the chase if we hit the max.
+                    Timeline timeline = new Timeline();
+                    int peak = 0;
+                    OUTER:
+                    for (LoadPredictor lp : loadPredictors) {
+                        for (FutureLoad fl : Iterables.limit(lp.predict(this,e.getKey(), now, now + duration),100)) {
+                            peak = max(peak,timeline.insert(fl.startTime, fl.startTime+fl.duration, fl.numExecutors));
+                            if (peak>=max) {
+								break OUTER;
+							}
+                        }
+                    }
+
+                    int minIdle = max-peak; // minimum number of idle nodes during this time period
+                    // total predicted load could exceed available executors [JENKINS-8882]
+                    if (minIdle<0) {
+                        // Should we toss a warning/info message?
+                        minIdle = 0;
+                    }
+                    if (minIdle<list.size()) {
+						e.setValue(list.subList(0,minIdle));
+					}
+                }
+            }
+        }
+
+        // build into the final shape
+        List<ExecutorChunk> executors = new ArrayList<>();
+        for (List<ExecutorSlot> group : j.values()) {
+            if (group.isEmpty())
+			 {
+				continue;   // evict empty group
+			}
+            ExecutorChunk ec = new ExecutorChunk(group, executors.size());
+            if (ec.node==null)
+			 {
+				continue;   // evict out of sync node
+			}
+            executors.add(ec);
+        }
+        this.executors = ImmutableList.copyOf(executors);
+
+        // group execution units into chunks. use of LinkedHashMap ensures that the main work comes at the top
+        Map<Object,List<SubTask>> m = new LinkedHashMap<>();
+        item.task.getSubTasks().forEach(meu -> {
+            Object c = meu.getSameNodeConstraint();
+            if (c==null) {
+				c = new Object();
+			}
+
+            List<SubTask> l = m.computeIfAbsent(c, k -> new ArrayList<>());
+            l.add(meu);
+        });
+
+        // build into the final shape
+        List<WorkChunk> works = new ArrayList<>();
+        m.values().forEach(group -> works.add(new WorkChunk(group, works.size())));
+        this.works = ImmutableList.copyOf(works);
+    }
+
+	public WorkChunk works(int index) {
+        return works.get(index);
+    }
+
+	public ExecutorChunk executors(int index) {
+        return executors.get(index);
+    }
+
+	private static class ReadOnlyList<E> extends AbstractList<E> {
         protected final List<E> base;
 
         ReadOnlyList(List<E> base) {
             this.base = base;
         }
 
-        public E get(int index) {
+        @Override
+		public E get(int index) {
             return base.get(index);
         }
 
-        public int size() {
+        @Override
+		public int size() {
             return base.size();
         }
     }
@@ -129,13 +223,19 @@ public class MappingWorksheet {
          */
         public boolean canAccept(WorkChunk c) {
             if (this.size()<c.size())
-                return false;   // too small compared towork
+			 {
+				return false;   // too small compared towork
+			}
 
             if (c.assignedLabel!=null && !c.assignedLabel.contains(node))
-                return false;   // label mismatch
+			 {
+				return false;   // label mismatch
+			}
 
             if (!(Node.SKIP_BUILD_CHECK_ON_FLYWEIGHTS && item.task instanceof Queue.FlyweightTask) && !nodeAcl.hasPermission(item.authenticate(), Computer.BUILD))
-                return false;   // tasks don't have a permission to run on this node
+			 {
+				return false;   // tasks don't have a permission to run on this node
+			}
 
             return true;
         }
@@ -159,8 +259,9 @@ public class MappingWorksheet {
             assert capacity() >= wc.size();
             int e = 0;
             for (SubTask s : wc) {
-                while (!get(e).isAvailable())
-                    e++;
+                while (!get(e).isAvailable()) {
+					e++;
+				}
                 get(e++).set(wuc.createWorkUnit(s));
             }
         }
@@ -212,17 +313,16 @@ public class MappingWorksheet {
         private Label getAssignedLabel(SubTask task) {
             for (LabelAssignmentAction laa : item.getActions(LabelAssignmentAction.class)) {
                 Label l = laa.getAssignedLabel(task);
-                if (l!=null)    return l;
+                if (l!=null) {
+					return l;
+				}
             }
             return task.getAssignedLabel();
         }
 
         public List<ExecutorChunk> applicableExecutorChunks() {
             List<ExecutorChunk> r = new ArrayList<>(executors.size());
-            for (ExecutorChunk e : executors) {
-                if (e.canAccept(this))
-                    r.add(e);
-            }
+            r.addAll(executors.stream().filter(e -> e.canAccept(this)).collect(Collectors.toList()));
             return r;
         }
     }
@@ -271,8 +371,9 @@ public class MappingWorksheet {
          */
         public Map<WorkChunk,ExecutorChunk> toMap() {
             Map<WorkChunk,ExecutorChunk> r = new HashMap<>();
-            for (int i=0; i<size(); i++)
-                r.put(get(i),assigned(i));
+            for (int i=0; i<size(); i++) {
+				r.put(get(i),assigned(i));
+			}
             return r;
         }
 
@@ -283,11 +384,16 @@ public class MappingWorksheet {
             int[] used = new int[executors.size()];
             for (int i=0; i<mapping.length; i++) {
                 ExecutorChunk ec = mapping[i];
-                if (ec==null)   continue;
+                if (ec==null) {
+					continue;
+				}
                 if (!ec.canAccept(works(i)))
-                    return false;   // invalid assignment
-                if ((used[ec.index] += works(i).size()) > ec.capacity())
-                    return false;
+				 {
+					return false;   // invalid assignment
+				}
+                if ((used[ec.index] += works(i).size()) > ec.capacity()) {
+					return false;
+				}
             }
             return true;
         }
@@ -297,7 +403,12 @@ public class MappingWorksheet {
          */
         public boolean isCompletelyValid() {
             for (ExecutorChunk ec : mapping)
-                if (ec==null)   return false;   // unassigned
+			 {
+				if (ec==null)
+				 {
+					return false;   // unassigned
+				}
+			}
             return isPartiallyValid();
         }
 
@@ -306,101 +417,21 @@ public class MappingWorksheet {
          * as defined by the mapping.
          */
         public void execute(WorkUnitContext wuc) {
-            if (!isCompletelyValid())
-                throw new IllegalStateException();
+            if (!isCompletelyValid()) {
+				throw new IllegalStateException();
+			}
 
-            for (int i=0; i<size(); i++)
-                assigned(i).execute(get(i),wuc);
+            for (int i=0; i<size(); i++) {
+				assigned(i).execute(get(i),wuc);
+			}
         }
     }
 
-    public MappingWorksheet(BuildableItem item, List<? extends ExecutorSlot> offers) {
-        this(item,offers,LoadPredictor.all());
-    }
-
-    public MappingWorksheet(BuildableItem item, List<? extends ExecutorSlot> offers, Collection<? extends LoadPredictor> loadPredictors) {
-        this.item = item;
-        
-        // group executors by their computers
-        Map<Computer,List<ExecutorSlot>> j = new HashMap<>();
-        for (ExecutorSlot o : offers) {
-            Computer c = o.getExecutor().getOwner();
-            List<ExecutorSlot> l = j.computeIfAbsent(c, k -> new ArrayList<>());
-            l.add(o);
-        }
-
-        {// take load prediction into account and reduce the available executor pool size accordingly
-            long duration = item.task.getEstimatedDuration();
-            if (duration > 0) {
-                long now = System.currentTimeMillis();
-                for (Entry<Computer, List<ExecutorSlot>> e : j.entrySet()) {
-                    final List<ExecutorSlot> list = e.getValue();
-                    final int max = e.getKey().countExecutors();
-
-                    // build up the prediction model. cut the chase if we hit the max.
-                    Timeline timeline = new Timeline();
-                    int peak = 0;
-                    OUTER:
-                    for (LoadPredictor lp : loadPredictors) {
-                        for (FutureLoad fl : Iterables.limit(lp.predict(this,e.getKey(), now, now + duration),100)) {
-                            peak = max(peak,timeline.insert(fl.startTime, fl.startTime+fl.duration, fl.numExecutors));
-                            if (peak>=max)  break OUTER;
-                        }
-                    }
-
-                    int minIdle = max-peak; // minimum number of idle nodes during this time period
-                    // total predicted load could exceed available executors [JENKINS-8882]
-                    if (minIdle<0) {
-                        // Should we toss a warning/info message?
-                        minIdle = 0;
-                    }
-                    if (minIdle<list.size())
-                        e.setValue(list.subList(0,minIdle));
-                }
-            }
-        }
-
-        // build into the final shape
-        List<ExecutorChunk> executors = new ArrayList<>();
-        for (List<ExecutorSlot> group : j.values()) {
-            if (group.isEmpty())    continue;   // evict empty group
-            ExecutorChunk ec = new ExecutorChunk(group, executors.size());
-            if (ec.node==null)  continue;   // evict out of sync node
-            executors.add(ec);
-        }
-        this.executors = ImmutableList.copyOf(executors);
-
-        // group execution units into chunks. use of LinkedHashMap ensures that the main work comes at the top
-        Map<Object,List<SubTask>> m = new LinkedHashMap<>();
-        for (SubTask meu : item.task.getSubTasks()) {
-            Object c = meu.getSameNodeConstraint();
-            if (c==null)    c = new Object();
-
-            List<SubTask> l = m.computeIfAbsent(c, k -> new ArrayList<>());
-            l.add(meu);
-        }
-
-        // build into the final shape
-        List<WorkChunk> works = new ArrayList<>();
-        for (List<SubTask> group : m.values()) {
-            works.add(new WorkChunk(group,works.size()));
-        }
-        this.works = ImmutableList.copyOf(works);
-    }
-
-    public WorkChunk works(int index) {
-        return works.get(index);
-    }
-
-    public ExecutorChunk executors(int index) {
-        return executors.get(index);
-    }
-
-    public static abstract class ExecutorSlot {
+    public abstract static class ExecutorSlot {
         public abstract Executor getExecutor();
 
         public abstract boolean isAvailable();
 
-        protected abstract void set(WorkUnit p) throws UnsupportedOperationException;
+        protected abstract void set(WorkUnit p);
     }
 }

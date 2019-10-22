@@ -117,49 +117,6 @@ public class Retrier <V>{
         private Class<?>[] duringActionExceptions;
 
         /**
-         * Set the number of attempts trying to perform the action.
-         * @param attempts number of attempts
-         * @return this builder
-         */
-        public @Nonnull Builder<V> withAttempts(int attempts) {
-            this.attempts = attempts;
-            return this;
-        }
-
-        /**
-         * Set the time in milliseconds to wait for the next attempt.
-         * @param millis milliseconds to wait
-         * @return this builder
-         */
-        public @Nonnull Builder<V> withDelay(long millis) {
-            this.delay = millis;
-            return this;
-        }
-
-        /**
-         * Set all the exceptions that are allowed and indicate that the action was failed. When an exception of this
-         * type or a child type is raised, a listener can be called ({@link #withDuringActionExceptionListener(BiFunction)}).
-         * In any case, the retrier continues its process, retrying to perform the action again, as it was a normal failure.
-         * @param exceptions exceptions that indicate that the action was failed.
-         * @return this builder
-         */
-        public @Nonnull Builder<V> withDuringActionExceptions(@CheckForNull Class<?>[] exceptions) {
-            this.duringActionExceptions = exceptions;
-            return this;
-        }
-
-        /**
-         * Set the listener to be executed when an allowed exception is raised when performing the action. The listener
-         * could even change the result of the action if needed.
-         * @param exceptionListener the listener to call to
-         * @return this builder
-         */
-        public @Nonnull Builder<V> withDuringActionExceptionListener(@Nonnull BiFunction<Integer, Exception, V>  exceptionListener) {
-            this.duringActionExceptionListener = exceptionListener;
-            return this;
-        }
-
-        /**
          * Constructor of the builder with the required parameters.
          * @param callable Action to perform
          * @param checkResult Method to check if the result of the action was a success
@@ -172,7 +129,50 @@ public class Retrier <V>{
             this.checkResult = checkResult;
         }
 
-        /**
+		/**
+         * Set the number of attempts trying to perform the action.
+         * @param attempts number of attempts
+         * @return this builder
+         */
+        public @Nonnull Builder<V> withAttempts(int attempts) {
+            this.attempts = attempts;
+            return this;
+        }
+
+		/**
+         * Set the time in milliseconds to wait for the next attempt.
+         * @param millis milliseconds to wait
+         * @return this builder
+         */
+        public @Nonnull Builder<V> withDelay(long millis) {
+            this.delay = millis;
+            return this;
+        }
+
+		/**
+         * Set all the exceptions that are allowed and indicate that the action was failed. When an exception of this
+         * type or a child type is raised, a listener can be called ({@link #withDuringActionExceptionListener(BiFunction)}).
+         * In any case, the retrier continues its process, retrying to perform the action again, as it was a normal failure.
+         * @param exceptions exceptions that indicate that the action was failed.
+         * @return this builder
+         */
+        public @Nonnull Builder<V> withDuringActionExceptions(@CheckForNull Class<?>[] exceptions) {
+            this.duringActionExceptions = exceptions;
+            return this;
+        }
+
+		/**
+         * Set the listener to be executed when an allowed exception is raised when performing the action. The listener
+         * could even change the result of the action if needed.
+         * @param exceptionListener the listener to call to
+         * @return this builder
+         */
+        public @Nonnull Builder<V> withDuringActionExceptionListener(@Nonnull BiFunction<Integer, Exception, V>  exceptionListener) {
+            this.duringActionExceptionListener = exceptionListener;
+            return this;
+        }
+
+		/**
          * Create a Retrier object with the specification set in this builder.
          * @return the retrier
          */

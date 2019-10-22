@@ -20,13 +20,6 @@ public class ProcessTreeTest {
 
     @Rule public ChannelRule channels = new ChannelRule();
 
-    static class  Tag implements Serializable {
-        ProcessTree tree;
-        OSProcess p;
-        int id;
-        private static final long serialVersionUID = 1L;
-    }
-    
     @Test public void remoting() throws Exception {
         Assume.assumeFalse("on some platforms where we fail to list any processes", ProcessTree.get()==ProcessTree.DEFAULT);
 
@@ -44,20 +37,29 @@ public class ProcessTreeTest {
         t.p.act(new ProcessCallableImpl());
     }
 
+	static class  Tag implements Serializable {
+        private static final long serialVersionUID = 1L;
+		ProcessTree tree;
+		OSProcess p;
+		int id;
+    }
+    
     private static class MyCallable extends MasterToSlaveCallable<Tag, IOException> implements Serializable {
-        public Tag call() throws IOException {
+        private static final long serialVersionUID = 1L;
+
+		@Override
+		public Tag call() throws IOException {
             Tag t = new Tag();
             t.tree = ProcessTree.get();
             t.p = t.tree.iterator().next();
             t.id = t.p.getPid();
             return t;
         }
-
-        private static final long serialVersionUID = 1L;
     }
 
     private static class ProcessCallableImpl implements ProcessCallable<Void> {
-        public Void invoke(OSProcess process, VirtualChannel channel) throws IOException {
+        @Override
+		public Void invoke(OSProcess process, VirtualChannel channel) throws IOException {
             assertNotNull(process);
             assertNotNull(channel);
             return null;

@@ -59,19 +59,20 @@ public class RedactSecretJsonInErrorMessageSanitizer implements JsonInErrorMessa
         if (jsonObject.has(REDACT_KEY)) {
             Object value = jsonObject.get(REDACT_KEY);
             if (value instanceof JSONArray) {
-                for (Object o : jsonObject.getJSONArray(REDACT_KEY)) {
+                jsonObject.getJSONArray(REDACT_KEY).forEach(o -> {
                     if (o instanceof String) {
                         redactedKeySet.add((String) o);
                     } else {
                         // array, object, null, number, boolean
-                        LOGGER.log(Level.WARNING, "Unsupported type " + o.getClass().getName() + " for " + REDACT_KEY + ", please use either a single String value or an Array");
+                        LOGGER.log(Level.WARNING, new StringBuilder().append("Unsupported type ").append(o.getClass().getName()).append(" for ").append(REDACT_KEY).append(", please use either a single String value or an Array")
+								.toString());
                     }
-                }
+                });
             } else if (value instanceof String) {
                 redactedKeySet.add((String) value);
             } else {
                 // object, null, number, boolean
-                LOGGER.log(Level.WARNING, "Unsupported type " + value.getClass().getName() + " for " + REDACT_KEY + ", please use either a single String value or an Array");
+                LOGGER.log(Level.WARNING, new StringBuilder().append("Unsupported type ").append(value.getClass().getName()).append(" for ").append(REDACT_KEY).append(", please use either a single String value or an Array").toString());
             }
         }
         return redactedKeySet;

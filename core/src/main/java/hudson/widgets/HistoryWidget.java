@@ -53,37 +53,41 @@ import java.util.List;
  * @author Kohsuke Kawaguchi
  */
 public class HistoryWidget<O extends ModelObject,T> extends Widget {
-    /**
+    static final int THRESHOLD = SystemProperties.getInteger(HistoryWidget.class.getName()+".threshold",30);
+
+	/**
      * The given data model of records. Newer ones first.
      */
     public Iterable<T> baseList;
 
-    /**
+	/**
      * Indicates the next build number that client ajax should fetch.
      */
     private String nextBuildNumberToFetch;
 
-    /**
+	/**
      * URL of the {@link #owner}.
      */
     public final String baseUrl;
 
-    public final O owner;
+	public final O owner;
 
-    private boolean trimmed;
+	private boolean trimmed;
 
-    public final Adapter<? super T> adapter;
+	public final Adapter<? super T> adapter;
 
-    final Long newerThan;
-    final Long olderThan;
-    final String searchString;
+	final Long newerThan;
 
-    /**
+	final Long olderThan;
+
+	final String searchString;
+
+	/**
      * First transient build record. Everything >= this will be discarded when AJAX call is made.
      */
     private String firstTransientBuildKey;
 
-    /**
+	/**
      * @param owner
      *      The parent model object that owns this widget.
      */
@@ -98,23 +102,23 @@ public class HistoryWidget<O extends ModelObject,T> extends Widget {
         this.searchString = currentRequest.getParameter("search");
     }
 
-    /**
+	/**
      * Title of the widget.
      */
     public String getDisplayName() {
         return Messages.BuildHistoryWidget_DisplayName();
     }
 
-    @Override
+	@Override
     public String getUrlName() {
         return "buildHistory";
     }
 
-    public String getFirstTransientBuildKey() {
+	public String getFirstTransientBuildKey() {
         return firstTransientBuildKey;
     }
 
-    /**
+	/**
      * Calculates the first transient build record. Everything ≥ this will be discarded when AJAX call is made.
      *
      * @param historyPageFilter
@@ -128,7 +132,7 @@ public class HistoryWidget<O extends ModelObject,T> extends Widget {
         return historyPageFilter;
     }
 
-    private Iterable<HistoryPageEntry<T>> updateFirstTransientBuildKey(Iterable<HistoryPageEntry<T>> source) {
+	private Iterable<HistoryPageEntry<T>> updateFirstTransientBuildKey(Iterable<HistoryPageEntry<T>> source) {
         String key=null;
         for (HistoryPageEntry<T> t : source) {
             if(adapter.isBuilding(t.getEntry())) {
@@ -139,7 +143,7 @@ public class HistoryWidget<O extends ModelObject,T> extends Widget {
         return source;
     }
 
-    /**
+	/**
      * The records to be rendered this time.
      */
     public Iterable<HistoryPageEntry<T>> getRenderList() {
@@ -157,7 +161,7 @@ public class HistoryWidget<O extends ModelObject,T> extends Widget {
         }
     }
 
-    private List<HistoryPageEntry<T>> toPageEntries(Iterable<T> historyItemList) {
+	private List<HistoryPageEntry<T>> toPageEntries(Iterable<T> historyItemList) {
         Iterator<T> iterator = historyItemList.iterator();
 
         if (!iterator.hasNext()) {
@@ -172,7 +176,7 @@ public class HistoryWidget<O extends ModelObject,T> extends Widget {
         return pageEntries;
     }
 
-    /**
+	/**
      * Get a {@link jenkins.widgets.HistoryPageFilter} for rendering a page of queue items.
      */
     public HistoryPageFilter getHistoryPageFilter() {
@@ -183,7 +187,7 @@ public class HistoryWidget<O extends ModelObject,T> extends Widget {
         return updateFirstTransientBuildKey(historyPageFilter);
     }
 
-    protected HistoryPageFilter<T> newPageFilter() {
+	protected HistoryPageFilter<T> newPageFilter() {
         HistoryPageFilter<T> historyPageFilter = new HistoryPageFilter<>(THRESHOLD);
 
         if (newerThan != null) {
@@ -199,15 +203,15 @@ public class HistoryWidget<O extends ModelObject,T> extends Widget {
         return historyPageFilter;
     }
 
-    public boolean isTrimmed() {
+	public boolean isTrimmed() {
         return trimmed;
     }
 
-    public void setTrimmed(boolean trimmed) {
+	public void setTrimmed(boolean trimmed) {
         this.trimmed = trimmed;
     }
 
-    /**
+	/**
      * Handles AJAX requests from browsers to update build history.
      *
      * @param n
@@ -230,9 +234,12 @@ public class HistoryWidget<O extends ModelObject,T> extends Widget {
                 if(adapter.compare(t,n)>=0) {
                     items.add(t);
                     if(adapter.isBuilding(t))
-                    nn = adapter.getKey(t); // the next fetch should start from youngest build in progress
-                } else
-                    break;
+					 {
+						nn = adapter.getKey(t); // the next fetch should start from youngest build in progress
+					}
+                } else {
+					break;
+				}
             }
 
             if (nn==null) {
@@ -255,27 +262,15 @@ public class HistoryWidget<O extends ModelObject,T> extends Widget {
         req.getView(page,"ajaxBuildHistory.jelly").forward(req,rsp);
     }
 
-    static final int THRESHOLD = SystemProperties.getInteger(HistoryWidget.class.getName()+".threshold",30);
-
-    public String getNextBuildNumberToFetch() {
+	public String getNextBuildNumberToFetch() {
         return nextBuildNumberToFetch;
     }
 
-    public void setNextBuildNumberToFetch(String nextBuildNumberToFetch) {
+	public void setNextBuildNumberToFetch(String nextBuildNumberToFetch) {
         this.nextBuildNumberToFetch = nextBuildNumberToFetch;
     }
 
-    public interface Adapter<T> {
-        /**
-         * If record is newer than the key, return a positive number.
-         */
-        int compare(T record, String key);
-        String getKey(T record);
-        boolean isBuilding(T record);
-        String getNextKey(String key);
-    }
-
-    private Long getPagingParam(@CheckForNull StaplerRequest currentRequest, @CheckForNull String name) {
+	private Long getPagingParam(@CheckForNull StaplerRequest currentRequest, @CheckForNull String name) {
         if (currentRequest == null || name == null) {
             return null;
         }
@@ -289,5 +284,15 @@ public class HistoryWidget<O extends ModelObject,T> extends Widget {
         } catch (NumberFormatException nfe) {
             return null;
         }
+    }
+
+	public interface Adapter<T> {
+        /**
+         * If record is newer than the key, return a positive number.
+         */
+        int compare(T record, String key);
+        String getKey(T record);
+        boolean isBuilding(T record);
+        String getNextKey(String key);
     }
 }

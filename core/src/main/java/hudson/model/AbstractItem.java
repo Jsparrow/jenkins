@@ -114,31 +114,50 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
 
     private static final Logger LOGGER = Logger.getLogger(AbstractItem.class.getName());
 
-    /**
+	static final Pattern SECRET_PATTERN = Pattern.compile(new StringBuilder().append(">(").append(Secret.ENCRYPTED_VALUE_PATTERN).append(")<").toString());
+
+	/**
+     * Escape hatch for StaplerProxy-based access control
+     */
+    @Restricted(NoExternalUse.class)
+    public static /* Script Console modifiable */ boolean SKIP_PERMISSION_CHECK = Boolean.getBoolean(AbstractItem.class.getName() + ".skipPermissionCheck");
+
+	/**
+     * Replaceable pronoun of that points to a job. Defaults to "Job"/"Project" depending on the context.
+     */
+    public static final Message<AbstractItem> PRONOUN = new Message<>();
+
+	/**
+     * Replaceable noun for describing the kind of task that this item represents. Defaults to "Build".
+     */
+    public static final Message<AbstractItem> TASK_NOUN = new Message<>();
+
+	/**
      * Project name.
      */
     protected /*final*/ transient String name;
 
-    /**
+	/**
      * Project description. Can be HTML.
      */
     protected volatile String description;
 
-    private transient ItemGroup parent;
-    
-    protected String displayName;
+	private transient ItemGroup parent;
 
-    protected AbstractItem(ItemGroup parent, String name) {
+	protected String displayName;
+
+	protected AbstractItem(ItemGroup parent, String name) {
         this.parent = parent;
         doSetName(name);
     }
 
-    @Exported(visibility=999)
+	@Override
+	@Exported(visibility=999)
     public String getName() {
         return name;
     }
 
-    /**
+	/**
      * Get the term used in the UI to represent this kind of
      * {@link Item}. Must start with a capital letter.
      */
@@ -146,7 +165,7 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         return AlternativeUiTextProvider.get(PRONOUN, this, Messages.AbstractItem_Pronoun());
     }
 
-    /**
+	/**
      * Gets the term used in the UI to represent the kind of {@link Queue.Task} associated with this kind of
      * {@link Item}. Must start with a capital letter. Defaults to "Build".
      * @since 2.50
@@ -155,7 +174,8 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         return AlternativeUiTextProvider.get(TASK_NOUN, this, Messages.AbstractItem_TaskNoun());
     }
 
-    @Exported
+	@Override
+	@Exported
     /**
      * @return The display name of this object, or if it is not set, the name
      * of the object.
@@ -167,8 +187,8 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         // if the displayName is not set, then return the name as we use to do
         return getName();
     }
-    
-    @Exported
+
+	@Exported
     /**
      * This is intended to be used by the Job configuration pages where
      * we want to return null if the display name is not set.
@@ -178,8 +198,8 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
     public String getDisplayNameOrNull() {
         return displayName;
     }
-    
-    /**
+
+	/**
      * This method exists so that the Job configuration pages can use 
      * getDisplayNameOrNull so that nothing is shown in the display name text
      * box if the display name is not set.
@@ -189,28 +209,29 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
     public void setDisplayNameOrNull(String displayName) throws IOException {
         setDisplayName(displayName);
     }
-    
-    public void setDisplayName(String displayName) throws IOException {
+
+	public void setDisplayName(String displayName) throws IOException {
         this.displayName = Util.fixEmptyAndTrim(displayName);
         save();
     }
-             
-    public File getRootDir() {
+
+	@Override
+	public File getRootDir() {
         return getParent().getRootDirFor(this);
     }
 
-    /**
+	/**
      * This bridge method is to maintain binary compatibility with {@link TopLevelItem#getParent()}.
      */
     @WithBridgeMethods(value=Jenkins.class,castRequired=true)
     @Override public @Nonnull ItemGroup getParent() {
         if (parent == null) {
-            throw new IllegalStateException("no parent set on " + getClass().getName() + "[" + name + "]");
+            throw new IllegalStateException(new StringBuilder().append("no parent set on ").append(getClass().getName()).append("[").append(name).append("]").toString());
         }
         return parent;
     }
 
-    /**
+	/**
      * Gets the project description HTML.
      */
     @Exported
@@ -218,7 +239,7 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         return description;
     }
 
-    /**
+	/**
      * Sets the project description HTML.
      */
     public void setDescription(String description) throws IOException {
@@ -227,7 +248,7 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         ItemListener.fireOnUpdated(this);
     }
 
-    /**
+	/**
      * Just update {@link #name} without performing the rename operation,
      * which would involve copying files and etc.
      */
@@ -235,7 +256,7 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         this.name = name;
     }
 
-    /**
+	/**
      * Controls whether the default rename action is available for this item.
      *
      * @return whether {@link #name} can be modified by a user
@@ -247,7 +268,7 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         return false;
     }
 
-    /**
+	/**
      * Renames this item
      */
     @RequirePOST
@@ -266,7 +287,7 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         return HttpResponses.redirectTo("../" + newName);
     }
 
-    /**
+	/**
      * Called by {@link #doConfirmRename} and {@code rename.jelly} to validate renames.
      * @return {@link FormValidation#ok} if this item can be renamed as specified, otherwise
      * {@link FormValidation#error} with a message explaining the problem.
@@ -302,11 +323,11 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         return FormValidation.ok();
     }
 
-    /**
+	/**
      * Check new name for job
      * @param newName - New name for job.
      */
-    private void checkIfNameIsUsed(@Nonnull String newName) throws Failure {
+    private void checkIfNameIsUsed(@Nonnull String newName) {
         try {
             Item item = getParent().getItem(newName);
             if (item != null) {
@@ -334,7 +355,7 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         }
     }
 
-    /**
+	/**
      * Allows subclasses to block renames for domain-specific reasons. Generic validation of the new name
      * (e.g., null checking, checking for illegal characters, and checking that the name is not in use)
      * always happens prior to calling this method.
@@ -344,11 +365,11 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
      * @since 2.110
      * @see Job#checkRename
      */
-    protected void checkRename(@Nonnull String newName) throws Failure {
+    protected void checkRename(@Nonnull String newName) {
 
     }
 
-    /**
+	/**
      * Renames this item.
      * Not all the Items need to support this operation, but if you decide to do so,
      * you can use this method.
@@ -366,12 +387,14 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         synchronized (parent) {
             synchronized (this) {
                 // sanity check
-                if (newName == null)
-                    throw new IllegalArgumentException("New name is not given");
+                if (newName == null) {
+					throw new IllegalArgumentException("New name is not given");
+				}
 
                 // noop?
-                if (this.name.equals(newName))
-                    return;
+                if (this.name.equals(newName)) {
+					return;
+				}
 
                 // the lookup is case insensitive, so we should not fail if this item was the “existing” one
                 // to allow people to rename "Foo" to "foo", for example.
@@ -406,8 +429,9 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
                         }
                     }
 
-                    if (interrupted)
-                        Thread.currentThread().interrupt();
+                    if (interrupted) {
+						Thread.currentThread().interrupt();
+					}
 
                     if (!renamed) {
                         // failed to rename. it must be that some lengthy
@@ -442,8 +466,9 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
                     success = true;
                 } finally {
                     // if failed, back out the rename.
-                    if (!success)
-                        doSetName(oldName);
+                    if (!success) {
+						doSetName(oldName);
+					}
                 }
 
                 parent.onRenamed(this, oldName, newName);
@@ -452,8 +477,7 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         ItemListener.fireLocationChange(this, oldFullName);
     }
 
-
-    /**
+	/**
      * Notify this item it's been moved to another location, replaced by newItem (might be the same object, but not guaranteed).
      * This method is executed <em>after</em> the item root directory has been moved to it's new location.
      * <p>
@@ -466,26 +490,35 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         newItem.onLoad(destination, name);
     }
 
-    /**
+	/**
      * Gets all the jobs that this {@link Item} contains as descendants.
      */
-    public abstract Collection<? extends Job> getAllJobs();
+    @Override
+	public abstract Collection<? extends Job> getAllJobs();
 
-    @Exported
+	@Override
+	@Exported
     public final String getFullName() {
         String n = getParent().getFullName();
-        if(n.length()==0)   return getName();
-        else                return n+'/'+getName();
+        if(n.isEmpty()) {
+			return getName();
+		} else {
+			return new StringBuilder().append(n).append('/').append(getName()).toString();
+		}
     }
 
-    @Exported
+	@Override
+	@Exported
     public final String getFullDisplayName() {
         String n = getParent().getFullDisplayName();
-        if(n.length()==0)   return getDisplayName();
-        else                return n+" » "+getDisplayName();
+        if(n.isEmpty()) {
+			return getDisplayName();
+		} else {
+			return new StringBuilder().append(n).append(" » ").append(getDisplayName()).toString();
+		}
     }
-    
-    /**
+
+	/**
      * Gets the display name of the current item relative to the given group.
      *
      * @since 1.515
@@ -496,8 +529,8 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
     public String getRelativeDisplayNameFrom(ItemGroup p) {
         return Functions.getRelativeDisplayNameFrom(this, p);
     }
-    
-    /**
+
+	/**
      * This method only exists to disambiguate {@link #getRelativeNameFrom(ItemGroup)} and {@link #getRelativeNameFrom(Item)}
      * @since 1.512
      * @see #getRelativeNameFrom(ItemGroup)
@@ -506,16 +539,17 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         return getRelativeNameFrom(p);
     }
 
-    /**
+	/**
      * Called right after when a {@link Item} is loaded from disk.
      * This is an opportunity to do a post load processing.
      */
-    public void onLoad(ItemGroup<? extends Item> parent, String name) throws IOException {
+    @Override
+	public void onLoad(ItemGroup<? extends Item> parent, String name) throws IOException {
         this.parent = parent;
         doSetName(name);
     }
 
-    /**
+	/**
      * When a {@link Item} is copied from existing one,
      * the files are first copied on the file system,
      * then it will be loaded, then this method will be invoked
@@ -527,10 +561,12 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
      * @param src
      *      Item from which it's copied from. The same type as {@code this}. Never null.
      */
-    public void onCopiedFrom(Item src) {
+    @Override
+	public void onCopiedFrom(Item src) {
     }
 
-    public final String getUrl() {
+	@Override
+	public final String getUrl() {
         // try to stick to the current view if possible
         StaplerRequest req = Stapler.getCurrentRequest();
         String shortUrl = getShortUrl();
@@ -570,68 +606,60 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         return base + shortUrl;
     }
 
-    public String getShortUrl() {
+	@Override
+	public String getShortUrl() {
         String prefix = getParent().getUrlChildPrefix();
         String subdir = Util.rawEncode(getName());
-        return prefix.equals(".") ? subdir + '/' : prefix + '/' + subdir + '/';
+        return ".".equals(prefix) ? subdir + '/' : new StringBuilder().append(prefix).append('/').append(subdir).append('/').toString();
     }
 
-    public String getSearchUrl() {
+	@Override
+	public String getSearchUrl() {
         return getShortUrl();
     }
 
-    @Override
+	@Override
     @Exported(visibility=999,name="url")
     public final String getAbsoluteUrl() {
         return Item.super.getAbsoluteUrl();
     }
 
-    /**
+	/**
      * Remote API access.
      */
     public final Api getApi() {
         return new Api(this);
     }
 
-    /**
+	/**
      * Returns the {@link ACL} for this object.
      */
-    public ACL getACL() {
+    @Override
+	public ACL getACL() {
         return Jenkins.get().getAuthorizationStrategy().getACL(this);
     }
 
-    /**
+	/**
      * Save the settings to a file.
      */
-    public synchronized void save() throws IOException {
-        if(BulkChange.contains(this))   return;
+    @Override
+	public synchronized void save() throws IOException {
+        if(BulkChange.contains(this)) {
+			return;
+		}
         getConfigFile().write(this);
         SaveableListener.fireOnChange(this, getConfigFile());
     }
 
-    public final XmlFile getConfigFile() {
+	public final XmlFile getConfigFile() {
         return Items.getConfigFile(this);
     }
 
-    private Object writeReplace() {
+	private Object writeReplace() {
         return XmlFile.replaceIfNotAtTopLevel(this, () -> new Replacer(this));
     }
-    private static class Replacer {
-        private final String fullName;
-        Replacer(AbstractItem i) {
-            fullName = i.getFullName();
-        }
-        private Object readResolve() {
-            Jenkins j = Jenkins.getInstanceOrNull();
-            if (j == null) {
-                return null;
-            }
-            // Will generally only work if called after job loading:
-            return j.getItemByFullName(fullName);
-        }
-    }
 
-    /**
+	/**
      * Accepts the new description.
      */
     @RequirePOST
@@ -642,7 +670,7 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         rsp.sendRedirect(".");  // go to the top page
     }
 
-    /**
+	/**
      * Deletes this item.
      * Note on the funny name: for reasons of historical compatibility, this URL is {@code /doDelete}
      * since it predates {@code <l:confirmationLink>}. {@code /delete} goes to a Jelly page
@@ -667,10 +695,11 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
                 break;
             }
         }
-        rsp.sendRedirect2(req.getContextPath() + '/' + url);
+        rsp.sendRedirect2(new StringBuilder().append(req.getContextPath()).append('/').append(url).toString());
     }
 
-    public void delete( StaplerRequest req, StaplerResponse rsp ) throws IOException, ServletException {
+	@Override
+	public void delete( StaplerRequest req, StaplerResponse rsp ) throws IOException, ServletException {
         try {
             doDoDelete(req,rsp);
         } catch (InterruptedException e) {
@@ -679,14 +708,15 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         }
     }
 
-    /**
+	/**
      * Deletes this item.
      *
      * <p>
      * Any exception indicates the deletion has failed, but {@link AbortException} would prevent the caller
      * from showing the stack trace. This
      */
-    public void delete() throws IOException, InterruptedException {
+    @Override
+	public void delete() throws IOException, InterruptedException {
         checkPermission(DELETE);
         boolean responsibleForAbortingBuilds = !ItemDeletion.contains(this);
         boolean ownsRegistration = ItemDeletion.register(this);
@@ -791,7 +821,7 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         Jenkins.get().rebuildDependencyGraphAsync();
     }
 
-    /**
+	/**
      * Does the real job of deleting the item.
      */
     protected void performDelete() throws IOException, InterruptedException {
@@ -799,19 +829,19 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         Util.deleteRecursive(getRootDir());
     }
 
-    /**
+	/**
      * Accepts {@code config.xml} submission, as well as serve it.
      */
     @WebMethod(name = "config.xml")
     public void doConfigDotXml(StaplerRequest req, StaplerResponse rsp)
             throws IOException {
-        if (req.getMethod().equals("GET")) {
+        if ("GET".equals(req.getMethod())) {
             // read
             rsp.setContentType("application/xml");
             writeConfigDotXml(rsp.getOutputStream());
             return;
         }
-        if (req.getMethod().equals("POST")) {
+        if ("POST".equals(req.getMethod())) {
             // submission
             updateByXml((Source)new StreamSource(req.getReader()));
             return;
@@ -821,8 +851,7 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         rsp.sendError(SC_BAD_REQUEST);
     }
 
-    static final Pattern SECRET_PATTERN = Pattern.compile(">(" + Secret.ENCRYPTED_VALUE_PATTERN + ")<");
-    /**
+	/**
      * Writes {@code config.xml} to the specified output stream.
      * The user must have at least {@link #EXTENDED_READ}.
      * If he lacks {@link #CONFIGURE}, then any {@link Secret}s detected will be masked out.
@@ -848,7 +877,7 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         }
     }
 
-    /**
+	/**
      * @deprecated as of 1.473
      *      Use {@link #updateByXml(Source)}
      */
@@ -857,7 +886,7 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         updateByXml((Source)source);
     }
 
-    /**
+	/**
      * Updates an Item by its XML definition.
      * @param source source of the Item's new definition.
      *               The source should be either a <code>StreamSource</code> or a <code>SAXSource</code>, other
@@ -881,7 +910,7 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
             if (o!=this) {
                 // ensure that we've got the same job type. extending this code to support updating
                 // to different job type requires destroying & creating a new job type
-                throw new IOException("Expecting "+this.getClass()+" but got "+o.getClass()+" instead");
+                throw new IOException(new StringBuilder().append("Expecting ").append(this.getClass()).append(" but got ").append(o.getClass()).append(" instead").toString());
             }
 
             Items.whileUpdatingByXml(new NotReallyRoleSensitiveCallable<Void,IOException>() {
@@ -901,7 +930,7 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         }
     }
 
-    /**
+	/**
      * Reloads this job from the disk.
      *
      * Exposed through CLI as well.
@@ -928,8 +957,7 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         SaveableListener.fireOnChange(this, getConfigFile());
     }
 
-
-    /**
+	/**
      * {@inheritDoc}
      */
     @Override
@@ -940,11 +968,12 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         return getName();
     }
 
-    @Override public String toString() {
-        return super.toString() + '[' + (parent != null ? getFullName() : "?/" + name) + ']';
+	@Override public String toString() {
+        return new StringBuilder().append(super.toString()).append('[').append(parent != null ? getFullName() : "?/" + name).append(']')
+				.toString();
     }
 
-    @Override
+	@Override
     @Restricted(NoExternalUse.class)
     public Object getTarget() {
         if (!SKIP_PERMISSION_CHECK) {
@@ -956,13 +985,7 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         return this;
     }
 
-    /**
-     * Escape hatch for StaplerProxy-based access control
-     */
-    @Restricted(NoExternalUse.class)
-    public static /* Script Console modifiable */ boolean SKIP_PERMISSION_CHECK = Boolean.getBoolean(AbstractItem.class.getName() + ".skipPermissionCheck");
-
-    /**
+	/**
      * Used for CLI binding.
      */
     @CLIResolver
@@ -978,14 +1001,19 @@ public abstract class AbstractItem extends Actionable implements Item, HttpDelet
         return item;
     }
 
-    /**
-     * Replaceable pronoun of that points to a job. Defaults to "Job"/"Project" depending on the context.
-     */
-    public static final Message<AbstractItem> PRONOUN = new Message<>();
-
-    /**
-     * Replaceable noun for describing the kind of task that this item represents. Defaults to "Build".
-     */
-    public static final Message<AbstractItem> TASK_NOUN = new Message<>();
+    private static class Replacer {
+        private final String fullName;
+        Replacer(AbstractItem i) {
+            fullName = i.getFullName();
+        }
+        private Object readResolve() {
+            Jenkins j = Jenkins.getInstanceOrNull();
+            if (j == null) {
+                return null;
+            }
+            // Will generally only work if called after job loading:
+            return j.getItemByFullName(fullName);
+        }
+    }
 
 }

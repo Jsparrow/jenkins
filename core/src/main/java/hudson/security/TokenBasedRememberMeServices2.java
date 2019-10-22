@@ -77,7 +77,23 @@ public class TokenBasedRememberMeServices2 extends TokenBasedRememberMeServices 
     public static /* Script Console modifiable */ boolean SKIP_TOO_FAR_EXPIRATION_DATE_CHECK = 
             SystemProperties.getBoolean(TokenBasedRememberMeServices2.class.getName() + ".skipTooFarExpirationDateCheck");
 
-    /**
+	/**
+     * Used to compute the token signature securely.
+     */
+    private static final HMACConfidentialKey MAC = new HMACConfidentialKey(TokenBasedRememberMeServices.class,"mac");
+
+	private static final Method SET_HTTP_ONLY;
+
+	static {
+		Method m = null;
+		try {
+			m = Cookie.class.getMethod("setHttpOnly", boolean.class);
+		} catch (NoSuchMethodException x) { // 3.0+
+		}
+        SET_HTTP_ONLY = m;
+	}
+
+	/**
      * Decorate {@link UserDetailsService} so that we can use information stored in
      * {@link LastGrantedAuthoritiesProperty}.
      *
@@ -92,7 +108,7 @@ public class TokenBasedRememberMeServices2 extends TokenBasedRememberMeServices 
         super.setUserDetailsService(new ImpersonatingUserDetailsService(userDetailsService));
     }
 
-    @Override
+	@Override
     protected String makeTokenSignature(long tokenExpiryTime, UserDetails userDetails) {
         String userSeed;
         if (UserSeedProperty.DISABLE_USER_SEED) {
@@ -113,19 +129,18 @@ public class TokenBasedRememberMeServices2 extends TokenBasedRememberMeServices 
         return MAC.mac(token);
     }
 
-    @Override
+	@Override
     protected String retrievePassword(Authentication successfulAuthentication) {
         return "N/A";
     }
 
-    @Override
+	@Override
 	public void loginSuccess(HttpServletRequest request, HttpServletResponse response,
 			Authentication successfulAuthentication) {
 		// Exit if the principal hasn't asked to be remembered
 		if (!rememberMeRequested(request, getParameter())) {
 			if (logger.isDebugEnabled()) {
-				logger.debug("Did not send remember-me cookie (principal did not set parameter '" +
-						getParameter() + "')");
+				logger.debug(new StringBuilder().append("Did not send remember-me cookie (principal did not set parameter '").append(getParameter()).append("')").toString());
 			}
 
 			return;
@@ -134,8 +149,7 @@ public class TokenBasedRememberMeServices2 extends TokenBasedRememberMeServices 
 		Jenkins j = Jenkins.getInstanceOrNull();
 		if (j != null && j.isDisableRememberMe()) {
 			if (logger.isDebugEnabled()) {
-				logger.debug("Did not send remember-me cookie because 'Remember Me' is disabled in " +
-						"security configuration (principal did set parameter '" + getParameter() + "')");
+				logger.debug(new StringBuilder().append("Did not send remember-me cookie because 'Remember Me' is disabled in ").append("security configuration (principal did set parameter '").append(getParameter()).append("')").toString());
 			}
 			// TODO log warning when receiving remember-me request despite the feature being disabled?
 			return;
@@ -149,17 +163,16 @@ public class TokenBasedRememberMeServices2 extends TokenBasedRememberMeServices 
 		String username = ((UserDetails) successfulAuthentication.getPrincipal()).getUsername();
 
 		String signatureValue = makeTokenSignature(expiryTime, (UserDetails)successfulAuthentication.getPrincipal());
-		String tokenValue = username + ":" + expiryTime + ":" + signatureValue;
+		String tokenValue = new StringBuilder().append(username).append(":").append(expiryTime).append(":").append(signatureValue).toString();
 		String tokenValueBase64 = Base64.getEncoder().encodeToString(tokenValue.getBytes());
 		response.addCookie(makeValidCookie(tokenValueBase64, request, tokenValiditySeconds));
 
 		if (logger.isDebugEnabled()) {
-			logger.debug("Added remember-me cookie for user '" + username + "', expiry: '" + new Date(expiryTime)
-							+ "'");
+			logger.debug(new StringBuilder().append("Added remember-me cookie for user '").append(username).append("', expiry: '").append(new Date(expiryTime)).append("'").toString());
 		}
 	}
 
-    @Override
+	@Override
     public Authentication autoLogin(HttpServletRequest request, HttpServletResponse response) {
         if(Jenkins.get().isDisableRememberMe()){
             cancelCookie(request, response, null);
@@ -167,7 +180,7 @@ public class TokenBasedRememberMeServices2 extends TokenBasedRememberMeServices 
         }else {
             try {
                 // we use a patched version of the super.autoLogin
-                String rememberMeValue = findRememberMeCookieValue(request, response);
+                String rememberMeValue = findRememberMeCookieValue(request);
                 if (rememberMeValue == null) {
                     return null;
                 }
@@ -179,10 +192,10 @@ public class TokenBasedRememberMeServices2 extends TokenBasedRememberMeServices 
         }
     }
 
-    /**
+	/**
      * Patched version of the super.autoLogin with a time-independent equality check for the token validation
      */
-    private String findRememberMeCookieValue(HttpServletRequest request, HttpServletResponse response) {
+    private String findRememberMeCookieValue(HttpServletRequest request) {
         Cookie[] cookies = request.getCookies();
 
         if ((cookies == null) || (cookies.length == 0)) {
@@ -198,13 +211,13 @@ public class TokenBasedRememberMeServices2 extends TokenBasedRememberMeServices 
         return null;
     }
 
-    // Taken from TokenBasedRememberMeService with slight modification
+	// Taken from TokenBasedRememberMeService with slight modification
     // around the token equality check to avoid timing attack
     // and reducing drastically the information provided in the log to avoid potential disclosure
     private @CheckForNull Authentication retrieveAuthFromCookie(HttpServletRequest request, HttpServletResponse response, String cookieValueBase64){
         String cookieValue = decodeCookieBase64(cookieValueBase64);
         if (cookieValue == null) {
-            String reason = "Cookie token was not Base64 encoded; value was '" + cookieValueBase64 + "'";
+            String reason = new StringBuilder().append("Cookie token was not Base64 encoded; value was '").append(cookieValueBase64).append("'").toString();
             cancelCookie(request, response, reason);
             return null;
         }
@@ -280,7 +293,7 @@ public class TokenBasedRememberMeServices2 extends TokenBasedRememberMeServices 
         return auth;
     }
 
-    /**
+	/**
      * @return the decoded base64 of the cookie or {@code null} if the value was not correctly encoded
      */
     private @CheckForNull String decodeCookieBase64(@Nonnull String base64EncodedValue){
@@ -299,21 +312,21 @@ public class TokenBasedRememberMeServices2 extends TokenBasedRememberMeServices 
         }
     }
 
-    @Override
+	@Override
     protected Cookie makeValidCookie(String tokenValueBase64, HttpServletRequest request, long maxAge) {
         Cookie cookie = super.makeValidCookie(tokenValueBase64, request, maxAge);
         secureCookie(cookie, request);
         return cookie;
     }
 
-    @Override 
+	@Override 
     protected Cookie makeCancelCookie(HttpServletRequest request) {
         Cookie cookie = super.makeCancelCookie(request);
         secureCookie(cookie, request);
         return cookie;
     }
-    
-    /**
+
+	/**
      * Force always the http-only flag and depending on the request, put also the secure flag.
      */
     private void secureCookie(Cookie cookie, HttpServletRequest request){
@@ -332,7 +345,7 @@ public class TokenBasedRememberMeServices2 extends TokenBasedRememberMeServices 
         cookie.setSecure(request.isSecure());
     }
 
-    /**
+	/**
      * In addition to the expiration requested by the super class, we also check the expiration is not too far in the future.
      * Especially to detect maliciously crafted cookie.
      */
@@ -353,20 +366,4 @@ public class TokenBasedRememberMeServices2 extends TokenBasedRememberMeServices 
         }
         return false;
     }
-
-    /**
-     * Used to compute the token signature securely.
-     */
-    private static final HMACConfidentialKey MAC = new HMACConfidentialKey(TokenBasedRememberMeServices.class,"mac");
-
-    private static final Method SET_HTTP_ONLY;
-
-	static {
-		Method m = null;
-		try {
-			m = Cookie.class.getMethod("setHttpOnly", boolean.class);
-		} catch (NoSuchMethodException x) { // 3.0+
-		}
-        SET_HTTP_ONLY = m;
-	}
 }

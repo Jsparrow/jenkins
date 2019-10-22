@@ -25,20 +25,22 @@ public abstract class AbstractCloudImpl extends Cloud {
     }
 
     protected void setInstanceCapStr(String value) {
-        if(value==null || value.equals(""))
-            this.instanceCap = Integer.MAX_VALUE;
-        else
-            this.instanceCap = Integer.parseInt(value);
+        if(value==null || "".equals(value)) {
+			this.instanceCap = Integer.MAX_VALUE;
+		} else {
+			this.instanceCap = Integer.parseInt(value);
+		}
     }
 
     /**
      * Gets the instance cap as string. Used primarily for form binding.
      */
     public String getInstanceCapStr() {
-        if(instanceCap==Integer.MAX_VALUE)
-            return "";
-        else
-            return String.valueOf(instanceCap);
+        if(instanceCap==Integer.MAX_VALUE) {
+			return "";
+		} else {
+			return String.valueOf(instanceCap);
+		}
     }
 
     /**

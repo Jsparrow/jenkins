@@ -50,6 +50,37 @@ import jenkins.util.JenkinsJVM;
 public abstract class ProcessKillingVeto implements ExtensionPoint {
 
     /**
+     * @return All ProcessKillingVeto extensions currently registered. An empty
+     *         list if Jenkins is not available, never null.
+     */
+    public static List<ProcessKillingVeto> all() {
+        if (JenkinsJVM.isJenkinsJVM()) {
+            return _all();
+        }
+        return Collections.emptyList();
+    }
+
+	/**
+     * As classloading is lazy, the classes referenced in this method will not be resolved
+     * until the first time the method is invoked, so we use this method to guard access to Jenkins JVM only classes.
+     *
+     * @return All ProcessKillingVeto extensions currently registered.
+     */
+    private static List<ProcessKillingVeto> _all() {
+        return ExtensionList.lookup(ProcessKillingVeto.class);
+    }
+
+	/**
+     * Ask the extension whether it vetoes killing of the given process
+     * 
+     * @param p The process that is about to be killed
+     * @return a {@link VetoCause} if the process should <em>not</em> be killed,
+     *         null else.
+     */
+    @CheckForNull
+    public abstract VetoCause vetoProcessKilling(@Nonnull IOSProcess p);
+
+	/**
      * Describes the cause for a process killing veto.
      */
     public static class VetoCause {
@@ -69,35 +100,4 @@ public abstract class ProcessKillingVeto implements ExtensionPoint {
             return message;
         }
     }
-
-    /**
-     * @return All ProcessKillingVeto extensions currently registered. An empty
-     *         list if Jenkins is not available, never null.
-     */
-    public static List<ProcessKillingVeto> all() {
-        if (JenkinsJVM.isJenkinsJVM()) {
-            return _all();
-        }
-        return Collections.emptyList();
-    }
-
-    /**
-     * As classloading is lazy, the classes referenced in this method will not be resolved
-     * until the first time the method is invoked, so we use this method to guard access to Jenkins JVM only classes.
-     *
-     * @return All ProcessKillingVeto extensions currently registered.
-     */
-    private static List<ProcessKillingVeto> _all() {
-        return ExtensionList.lookup(ProcessKillingVeto.class);
-    }
-
-    /**
-     * Ask the extension whether it vetoes killing of the given process
-     * 
-     * @param p The process that is about to be killed
-     * @return a {@link VetoCause} if the process should <em>not</em> be killed,
-     *         null else.
-     */
-    @CheckForNull
-    public abstract VetoCause vetoProcessKilling(@Nonnull IOSProcess p);
 }

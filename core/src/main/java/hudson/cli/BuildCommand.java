@@ -68,45 +68,47 @@ import jenkins.triggers.SCMTriggerItem;
  */
 @Extension
 public class BuildCommand extends CLICommand {
-    @Override
+    protected static final String BUILD_SCHEDULING_REFUSED = "Build scheduling Refused by an extension, hence not in Queue.";
+
+	@Argument(metaVar="JOB",usage="Name of the job to build",required=true)
+    public Job<?,?> job;
+
+	@Option(name="-f", usage="Follow the build progress. Like -s only interrupts are not passed through to the build.")
+    public boolean follow = false;
+
+	@Option(name="-s",usage="Wait until the completion/abortion of the command. Interrupts are passed through to the build.")
+    public boolean sync = false;
+
+	@Option(name="-w",usage="Wait until the start of the command")
+    public boolean wait = false;
+
+	@Option(name="-c",usage="Check for SCM changes before starting the build, and if there's no change, exit without doing a build")
+    public boolean checkSCM = false;
+
+	@Option(name="-p",usage="Specify the build parameters in the key=value format.")
+    public Map<String,String> parameters = new HashMap<>();
+
+	@Option(name="-v",usage="Prints out the console output of the build. Use with -s")
+    public boolean consoleOutput = false;
+
+	@Option(name="-r") @Deprecated
+    public int retryCnt = 10;
+
+	@Override
     public String getShortDescription() {
         return Messages.BuildCommand_ShortDescription();
     }
 
-    @Argument(metaVar="JOB",usage="Name of the job to build",required=true)
-    public Job<?,?> job;
-
-    @Option(name="-f", usage="Follow the build progress. Like -s only interrupts are not passed through to the build.")
-    public boolean follow = false;
-
-    @Option(name="-s",usage="Wait until the completion/abortion of the command. Interrupts are passed through to the build.")
-    public boolean sync = false;
-
-    @Option(name="-w",usage="Wait until the start of the command")
-    public boolean wait = false;
-
-    @Option(name="-c",usage="Check for SCM changes before starting the build, and if there's no change, exit without doing a build")
-    public boolean checkSCM = false;
-
-    @Option(name="-p",usage="Specify the build parameters in the key=value format.")
-    public Map<String,String> parameters = new HashMap<>();
-
-    @Option(name="-v",usage="Prints out the console output of the build. Use with -s")
-    public boolean consoleOutput = false;
-
-    @Option(name="-r") @Deprecated
-    public int retryCnt = 10;
-
-    protected static final String BUILD_SCHEDULING_REFUSED = "Build scheduling Refused by an extension, hence not in Queue.";
-
-    protected int run() throws Exception {
+	@Override
+	protected int run() throws Exception {
         job.checkPermission(Item.BUILD);
 
         ParametersAction a = null;
         if (!parameters.isEmpty()) {
             ParametersDefinitionProperty pdp = job.getProperty(ParametersDefinitionProperty.class);
-            if (pdp==null)
-                throw new IllegalStateException(job.getFullDisplayName()+" is not parameterized but the -p option was specified.");
+            if (pdp==null) {
+				throw new IllegalStateException(job.getFullDisplayName()+" is not parameterized but the -p option was specified.");
+			}
 
             //TODO: switch to type annotations after the migration to Java 1.8
             List<ParameterValue> values = new ArrayList<>();
@@ -129,8 +131,9 @@ public class BuildCommand extends CLICommand {
 
             // handle missing parameters by adding as default values ISSUE JENKINS-7162
             for(ParameterDefinition pd :  pdp.getParameterDefinitions()) {
-                if (parameters.containsKey(pd.getName()))
-                    continue;
+                if (parameters.containsKey(pd.getName())) {
+					continue;
+				}
 
                 // not passed in use default
                 ParameterValue defaultValue = pd.getDefaultParameterValue();
@@ -145,14 +148,16 @@ public class BuildCommand extends CLICommand {
 
         if (checkSCM) {
             SCMTriggerItem item = SCMTriggerItem.SCMTriggerItems.asSCMTriggerItem(job);
-            if (item == null)
-                throw new AbortException(job.getFullDisplayName()+" has no SCM trigger, but checkSCM was specified");
+            if (item == null) {
+				throw new AbortException(job.getFullDisplayName()+" has no SCM trigger, but checkSCM was specified");
+			}
             // preemptively check for a polling veto
             if (SCMDecisionHandler.firstShouldPollVeto(job) != null) {
                 return 0;
             }
-            if (!item.poll(new StreamTaskListener(stdout, getClientCharset())).hasChanges())
-                return 0;
+            if (!item.poll(new StreamTaskListener(stdout, getClientCharset())).hasChanges()) {
+				return 0;
+			}
         }
 
         if (!job.isBuildable()) {
@@ -201,7 +206,7 @@ public class BuildCommand extends CLICommand {
                         }
                     }
                     f.get();    // wait for the completion
-                    stdout.println("Completed "+b.getFullDisplayName()+" : "+b.getResult());
+                    stdout.println(new StringBuilder().append("Completed ").append(b.getFullDisplayName()).append(" : ").append(b.getResult()).toString());
                     return b.getResult().ordinal;
                 } catch (InterruptedException e) {
                     if (follow) {
@@ -220,25 +225,15 @@ public class BuildCommand extends CLICommand {
         return 0;
     }
 
-    @Override
+	@Override
     protected void printUsageSummary(PrintStream stderr) {
         stderr.println(
-            "Starts a build, and optionally waits for a completion.\n" +
-            "Aside from general scripting use, this command can be\n" +
-            "used to invoke another job from within a build of one job.\n" +
-            "With the -s option, this command changes the exit code based on\n" +
-            "the outcome of the build (exit code 0 indicates a success)\n" +
-            "and interrupting the command will interrupt the job.\n" +
-            "With the -f option, this command changes the exit code based on\n" +
-            "the outcome of the build (exit code 0 indicates a success)\n" +
-            "however, unlike -s, interrupting the command will not interrupt\n" +
-            "the job (exit code 125 indicates the command was interrupted).\n" +
-            "With the -c option, a build will only run if there has been\n" +
-            "an SCM change."
+            new StringBuilder().append("Starts a build, and optionally waits for a completion.\n").append("Aside from general scripting use, this command can be\n").append("used to invoke another job from within a build of one job.\n").append("With the -s option, this command changes the exit code based on\n").append("the outcome of the build (exit code 0 indicates a success)\n").append("and interrupting the command will interrupt the job.\n").append("With the -f option, this command changes the exit code based on\n").append("the outcome of the build (exit code 0 indicates a success)\n")
+					.append("however, unlike -s, interrupting the command will not interrupt\n").append("the job (exit code 125 indicates the command was interrupted).\n").append("With the -c option, a build will only run if there has been\n").append("an SCM change.").toString()
         );
     }
 
-    public static class CLICause extends UserIdCause {
+	public static class CLICause extends UserIdCause {
 
     	private String startedBy;
 

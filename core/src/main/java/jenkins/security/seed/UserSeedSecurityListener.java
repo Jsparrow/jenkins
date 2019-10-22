@@ -66,17 +66,17 @@ public class UserSeedSecurityListener extends SecurityListener {
             return; 
         }
 
-        if (!UserSeedProperty.DISABLE_USER_SEED) {
-            User user = User.getById(username, true);
-
-            UserSeedProperty userSeed = user.getProperty(UserSeedProperty.class);
-            if (userSeed == null) {
-                // if you want to filter out the user seed property, you should consider using the DISABLE_USER_SEED instead
-                return;
-            }
-            String sessionSeed = userSeed.getSeed();
-            // normally invalidated before
-            session.setAttribute(UserSeedProperty.USER_SESSION_SEED, sessionSeed);
-        }
+        if (UserSeedProperty.DISABLE_USER_SEED) {
+			return;
+		}
+		User user = User.getById(username, true);
+		UserSeedProperty userSeed = user.getProperty(UserSeedProperty.class);
+		if (userSeed == null) {
+		    // if you want to filter out the user seed property, you should consider using the DISABLE_USER_SEED instead
+		    return;
+		}
+		String sessionSeed = userSeed.getSeed();
+		// normally invalidated before
+		session.setAttribute(UserSeedProperty.USER_SESSION_SEED, sessionSeed);
     }
 }

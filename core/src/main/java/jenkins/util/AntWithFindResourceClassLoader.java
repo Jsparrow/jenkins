@@ -31,11 +31,13 @@ public class AntWithFindResourceClassLoader extends AntClassLoader implements Cl
     }
 
     public void addPathFiles(Collection<File> paths) throws IOException {
-        for (File f : paths)
-            addPathFile(f);
+        for (File f : paths) {
+			addPathFile(f);
+		}
     }
 
-    public void close() throws IOException {
+    @Override
+	public void close() throws IOException {
         cleanup();
     }
 
@@ -50,7 +52,7 @@ public class AntWithFindResourceClassLoader extends AntClassLoader implements Cl
             File pathComponent = (File) e.nextElement();
             url = getResourceURL(pathComponent, name);
             if (url != null) {
-                log("Resource " + name + " loaded from ant loader", Project.MSG_DEBUG);
+                log(new StringBuilder().append("Resource ").append(name).append(" loaded from ant loader").toString(), Project.MSG_DEBUG);
             }
         }
 

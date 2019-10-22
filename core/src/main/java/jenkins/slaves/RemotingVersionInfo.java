@@ -48,8 +48,6 @@ public class RemotingVersionInfo {
     @Nonnull
     private static VersionNumber MINIMUM_SUPPORTED_VERSION;
 
-    private RemotingVersionInfo() {}
-
     static {
         Properties props = new Properties();
         try (InputStream is = RemotingVersionInfo.class.getResourceAsStream(RESOURCE_NAME)) {
@@ -64,7 +62,9 @@ public class RemotingVersionInfo {
         MINIMUM_SUPPORTED_VERSION = extractVersion(props, "remoting.minimum.supported.version");
     }
 
-    @Nonnull
+	private RemotingVersionInfo() {}
+
+	@Nonnull
     private static VersionNumber extractVersion(@Nonnull Properties props, @Nonnull String propertyName)
             throws ExceptionInInitializerError {
         String prop = props.getProperty(propertyName);
@@ -88,7 +88,7 @@ public class RemotingVersionInfo {
         }
     }
 
-    /**
+	/**
      * Returns a version which is embedded into the Jenkins core.
      * Note that this version <b>may</b> differ from one which is being really used in Jenkins.
      * @return Remoting version
@@ -98,7 +98,7 @@ public class RemotingVersionInfo {
         return EMBEDDED_VERSION;
     }
 
-    /**
+	/**
      * Gets Remoting version which is supported by the core.
      * Jenkins core and plugins make invoke operations on agents (e.g. {@link jenkins.security.MasterToSlaveCallable})
      * and use Remoting-internal API within them.

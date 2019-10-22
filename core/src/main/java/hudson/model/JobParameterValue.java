@@ -53,6 +53,6 @@ public class JobParameterValue extends ParameterValue {
     }
 
     @Override public String getShortDescription() {
-        return name + "=" + job.getFullDisplayName();
+        return new StringBuilder().append(name).append("=").append(job.getFullDisplayName()).toString();
     }
 }

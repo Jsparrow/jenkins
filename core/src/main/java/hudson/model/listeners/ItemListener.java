@@ -64,7 +64,7 @@ public class ItemListener implements ExtensionPoint {
      * @throws Failure to veto the operation.
      * @since 2.51
      */
-    public void onCheckCopy(Item src, ItemGroup parent) throws Failure {
+    public void onCheckCopy(Item src, ItemGroup parent) {
     }
 
     /**
@@ -173,13 +173,13 @@ public class ItemListener implements ExtensionPoint {
 
     // TODO JENKINS-21224 generalize this to a method perhaps in ExtensionList and use consistently from all listeners
     private static void forAll(final /* java.util.function.Consumer<ItemListener> */Function<ItemListener,Void> consumer) {
-        for (ItemListener l : all()) {
+        all().forEach(l -> {
             try {
                 consumer.apply(l);
             } catch (RuntimeException x) {
                 LOGGER.log(Level.WARNING, "failed to send event to listener of " + l.getClass(), x);
             }
-        }
+        });
     }
 
     public static void fireOnCopied(final Item src, final Item result) {
@@ -200,7 +200,7 @@ public class ItemListener implements ExtensionPoint {
      * @throws Failure if the copy operation has been vetoed.
      * @since 2.51
      */
-    public static void checkBeforeCopy(final Item src, final ItemGroup parent) throws Failure {
+    public static void checkBeforeCopy(final Item src, final ItemGroup parent) {
         for (ItemListener l : all()) {
             try {
                 l.onCheckCopy(src, parent);

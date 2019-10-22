@@ -123,64 +123,6 @@ public class VirtualFileTest {
             assertEquals("[sub/subsub/lowest.txt, top.txt, very/deep/path/here]", new TreeSet<>(vf.list("**", "**/mid*,**/conf*", false)).toString());
         }
     }
-    /** Roughly analogous to {@code org.jenkinsci.plugins.compress_artifacts.ZipStorage}. */
-    private static final class Ram extends VirtualFile {
-        private final Set<String> paths; // e.g., [/very/deep/path/here]
-        private final String path; // e.g., empty string or /very or /very/deep/path/here
-        Ram(Set<String> paths, String path) {
-            this.paths = paths;
-            this.path = path;
-        }
-        @Override
-        public String getName() {
-            return path.replaceFirst(".*/", "");
-        }
-        @Override
-        public URI toURI() {
-            return URI.create("ram:" + path);
-        }
-        @Override
-        public VirtualFile getParent() {
-            return new Ram(paths, path.replaceFirst("/[^/]+$", ""));
-        }
-        @Override
-        public boolean isDirectory() throws IOException {
-            return paths.stream().anyMatch(p -> p.startsWith(path + "/"));
-        }
-        @Override
-        public boolean isFile() throws IOException {
-            return paths.contains(path);
-        }
-        @Override
-        public boolean exists() throws IOException {
-            return isFile() || isDirectory();
-        }
-        @Override
-        public VirtualFile[] list() throws IOException {
-            return paths.stream().filter(p -> p.startsWith(path + "/")).map(p -> new Ram(paths, p.replaceFirst("(\\Q" + path + "\\E/[^/]+)/.+", "$1"))).toArray(VirtualFile[]::new);
-        }
-        @Override
-        public VirtualFile child(String name) {
-            return new Ram(paths, path + "/" + name);
-        }
-        @Override
-        public long length() throws IOException {
-            return 0;
-        }
-        @Override
-        public long lastModified() throws IOException {
-            return 0;
-        }
-        @Override
-        public boolean canRead() throws IOException {
-            return isFile();
-        }
-        @Override
-        public InputStream open() throws IOException {
-            return new NullInputStream(0);
-        }
-    }
-
     @Issue("JENKINS-26810")
     @Test public void readLink() throws Exception {
         assumeFalse("Symlinks do not work well on Windows", Functions.isWindows());
@@ -199,7 +141,7 @@ public class VirtualFileTest {
         }
     }
 
-    //  root
+	//  root
     //      /a
     //          /aa
     //              /aaa
@@ -246,7 +188,7 @@ public class VirtualFileTest {
         new FilePath(_b2).symlinkTo(b.getAbsolutePath(), TaskListener.NULL);
     }
 
-    @Issue("SECURITY-904")
+	@Issue("SECURITY-904")
     @Test public void forFile_isDescendant() throws Exception {
         this.prepareFileStructureForIsDescendant();
 
@@ -261,7 +203,7 @@ public class VirtualFileTest {
         checkCommonAssertionForIsDescendant(virtualRoot, virtualRootChildA, virtualFromA, aa.getAbsolutePath());
     }
 
-    @Test
+	@Test
     @Issue("SECURITY-904")
     public void forFilePath_isDescendant() throws Exception {
         this.prepareFileStructureForIsDescendant();
@@ -277,7 +219,7 @@ public class VirtualFileTest {
         checkCommonAssertionForIsDescendant(virtualRoot, virtualRootChildA, virtualFromA, aa.getAbsolutePath());
     }
 
-    private void checkCommonAssertionForIsDescendant(VirtualFile virtualRoot, VirtualFile virtualRootChildA, VirtualFile virtualFromA, String absolutePath) throws Exception {
+	private void checkCommonAssertionForIsDescendant(VirtualFile virtualRoot, VirtualFile virtualRootChildA, VirtualFile virtualFromA, String absolutePath) throws Exception {
         try {
             virtualRootChildA.isDescendant(absolutePath);
             fail("isDescendant should have refused the absolute path");
@@ -336,7 +278,7 @@ public class VirtualFileTest {
         assertTrue(virtualRoot.isDescendant("_b/_a/aa/aa.txt"));
     }
 
-    @Test
+	@Test
     @Issue("JENKINS-55050")
     public void forFile_listOnlyDescendants_withoutIllegal() throws Exception {
         this.prepareFileStructureForIsDescendant();
@@ -351,7 +293,7 @@ public class VirtualFileTest {
         checkCommonAssertionForList(virtualRoot, virtualFromA, virtualFromB);
     }
 
-    @Test
+	@Test
     @Issue("SECURITY-904")
     public void forFilePath_listOnlyDescendants_withoutIllegal() throws Exception {
         this.prepareFileStructureForIsDescendant();
@@ -366,7 +308,7 @@ public class VirtualFileTest {
         checkCommonAssertionForList(virtualRoot, virtualFromA, virtualFromB);
     }
 
-    private void checkCommonAssertionForList(VirtualFile virtualRoot, VirtualFile virtualFromA, VirtualFile virtualFromB) throws Exception {
+	private void checkCommonAssertionForList(VirtualFile virtualRoot, VirtualFile virtualFromA, VirtualFile virtualFromB) throws Exception {
         // outside link to folder is not returned
         assertThat(virtualFromA.listOnlyDescendants(), containsInAnyOrder(
                 VFMatcher.hasName("aa"),
@@ -407,6 +349,63 @@ public class VirtualFileTest {
                 VFMatcher.hasName("_b")
         ));
     }
+	/** Roughly analogous to {@code org.jenkinsci.plugins.compress_artifacts.ZipStorage}. */
+    private static final class Ram extends VirtualFile {
+        private final Set<String> paths; // e.g., [/very/deep/path/here]
+        private final String path; // e.g., empty string or /very or /very/deep/path/here
+        Ram(Set<String> paths, String path) {
+            this.paths = paths;
+            this.path = path;
+        }
+        @Override
+        public String getName() {
+            return path.replaceFirst(".*/", "");
+        }
+        @Override
+        public URI toURI() {
+            return URI.create("ram:" + path);
+        }
+        @Override
+        public VirtualFile getParent() {
+            return new Ram(paths, path.replaceFirst("/[^/]+$", ""));
+        }
+        @Override
+        public boolean isDirectory() throws IOException {
+            return paths.stream().anyMatch(p -> p.startsWith(path + "/"));
+        }
+        @Override
+        public boolean isFile() throws IOException {
+            return paths.contains(path);
+        }
+        @Override
+        public boolean exists() throws IOException {
+            return isFile() || isDirectory();
+        }
+        @Override
+        public VirtualFile[] list() throws IOException {
+            return paths.stream().filter(p -> p.startsWith(path + "/")).map(p -> new Ram(paths, p.replaceFirst(new StringBuilder().append("(\\Q").append(path).append("\\E/[^/]+)/.+").toString(), "$1"))).toArray(VirtualFile[]::new);
+        }
+        @Override
+        public VirtualFile child(String name) {
+            return new Ram(paths, new StringBuilder().append(path).append("/").append(name).toString());
+        }
+        @Override
+        public long length() throws IOException {
+            return 0;
+        }
+        @Override
+        public long lastModified() throws IOException {
+            return 0;
+        }
+        @Override
+        public boolean canRead() throws IOException {
+            return isFile();
+        }
+        @Override
+        public InputStream open() throws IOException {
+            return new NullInputStream(0);
+        }
+    }
 
     private abstract static class VFMatcher extends TypeSafeMatcher<VirtualFile> {
         private final String description;
@@ -415,13 +414,15 @@ public class VirtualFileTest {
             this.description = description;
         }
 
-        public void describeTo(Description description) {
+        @Override
+		public void describeTo(Description description) {
             description.appendText(this.description);
         }
 
         public static VFMatcher hasName(String expectedName) {
             return new VFMatcher("Has name: " + expectedName) {
-                protected boolean matchesSafely(VirtualFile vf) {
+                @Override
+				protected boolean matchesSafely(VirtualFile vf) {
                     return expectedName.equals(vf.getName());
                 }
             };

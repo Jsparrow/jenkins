@@ -64,10 +64,9 @@ import java.util.logging.Logger;
  * @author Kohsuke Kawaguchi
  */
 public class DescribableList<T extends Describable<T>, D extends Descriptor<T>> extends PersistedList<T> {
-    protected DescribableList() {
-    }
+    private static final Logger LOGGER = Logger.getLogger(DescribableList.class.getName());
 
-    /**
+	/**
      * @deprecated since 2008-08-15.
      *      Use {@link #DescribableList(Saveable)} 
      */
@@ -76,16 +75,19 @@ public class DescribableList<T extends Describable<T>, D extends Descriptor<T>> 
         setOwner(owner);
     }
 
-    public DescribableList(Saveable owner) {
+	public DescribableList(Saveable owner) {
         setOwner(owner);
     }
 
-    public DescribableList(Saveable owner, Collection<? extends T> initialList) {
+	public DescribableList(Saveable owner, Collection<? extends T> initialList) {
         super(initialList);
         setOwner(owner);
     }
 
-    /**
+	protected DescribableList() {
+    }
+
+	/**
      * @deprecated since 2008-08-15.
      *      Use {@link #setOwner(Saveable)}
      */
@@ -94,7 +96,7 @@ public class DescribableList<T extends Describable<T>, D extends Descriptor<T>> 
         this.owner = owner;
     }
 
-    /**
+	/**
      * Removes all instances of the same type, then add the new one.
      */
     public void replace(T item) throws IOException {
@@ -103,14 +105,16 @@ public class DescribableList<T extends Describable<T>, D extends Descriptor<T>> 
         onModified();
     }
 
-    /**
+	/**
      * Binds items in the collection to URL.
      */
     public T getDynamic(String id) {
         // by ID
-        for (T t : data)
-            if(t.getDescriptor().getId().equals(id))
-                return t;
+        for (T t : data) {
+			if(t.getDescriptor().getId().equals(id)) {
+				return t;
+			}
+		}
 
         // by position
         try {
@@ -122,18 +126,20 @@ public class DescribableList<T extends Describable<T>, D extends Descriptor<T>> 
         return null;
     }
 
-    public T get(D descriptor) {
-        for (T t : data)
-            if(t.getDescriptor()==descriptor)
-                return t;
+	public T get(D descriptor) {
+        for (T t : data) {
+			if(t.getDescriptor()==descriptor) {
+				return t;
+			}
+		}
         return null;
     }
 
-    public boolean contains(D d) {
+	public boolean contains(D d) {
         return get(d)!=null;
     }
 
-    public void remove(D descriptor) throws IOException {
+	public void remove(D descriptor) throws IOException {
         for (T t : data) {
             if(t.getDescriptor()==descriptor) {
                 data.remove(t);
@@ -143,7 +149,7 @@ public class DescribableList<T extends Describable<T>, D extends Descriptor<T>> 
         }
     }
 
-    /**
+	/**
      * Creates a detached map from the current snapshot of the data, keyed from a descriptor to an instance.
      */
     @SuppressWarnings("unchecked")
@@ -151,7 +157,7 @@ public class DescribableList<T extends Describable<T>, D extends Descriptor<T>> 
         return (Map)Descriptor.toMap(data);
     }
 
-    /**
+	/**
      * Rebuilds the list by creating a fresh instances from the submitted form.
      *
      * <p>
@@ -171,23 +177,26 @@ public class DescribableList<T extends Describable<T>, D extends Descriptor<T>> 
 
             T instance = null;
             if (o!=null) {
-                if (existing instanceof ReconfigurableDescribable)
-                    instance = (T)((ReconfigurableDescribable)existing).reconfigure(req,o);
-                else
-                    instance = d.newInstance(req, o);
+                if (existing instanceof ReconfigurableDescribable) {
+					instance = (T)((ReconfigurableDescribable)existing).reconfigure(req,o);
+				} else {
+					instance = d.newInstance(req, o);
+				}
             } else {
-                if (existing instanceof ReconfigurableDescribable)
-                    instance = (T)((ReconfigurableDescribable)existing).reconfigure(req,null);
+                if (existing instanceof ReconfigurableDescribable) {
+					instance = (T)((ReconfigurableDescribable)existing).reconfigure(req,null);
+				}
             }
 
-            if (instance!=null)
-                newList.add(instance);
+            if (instance!=null) {
+				newList.add(instance);
+			}
         }
 
         replaceBy(newList);
     }
 
-    /**
+	/**
      * @deprecated as of 1.271
      *      Use {@link #rebuild(StaplerRequest, JSONObject, List)} instead.
      */
@@ -196,7 +205,7 @@ public class DescribableList<T extends Describable<T>, D extends Descriptor<T>> 
         rebuild(req,json,descriptors);
     }
 
-    /**
+	/**
      * Rebuilds the list by creating a fresh instances from the submitted form.
      *
      * <p>
@@ -208,37 +217,35 @@ public class DescribableList<T extends Describable<T>, D extends Descriptor<T>> 
         replaceBy(Descriptor.newInstancesFromHeteroList(req,formData,key,descriptors));
     }
 
-    /**
+	/**
      * Picks up {@link DependencyDeclarer}s and allow it to build dependencies.
      */
     public void buildDependencyGraph(AbstractProject owner,DependencyGraph graph) {
-        for (Object o : this) {
-            if (o instanceof DependencyDeclarer) {
-                DependencyDeclarer dd = (DependencyDeclarer) o;
-                try {
-                    dd.buildDependencyGraph(owner,graph);
-                } catch (RuntimeException e) {
-                    LOGGER.log(Level.SEVERE, "Failed to build dependency graph for " + owner,e);
-                }
-            }
-        }
+        this.stream().filter(o -> o instanceof DependencyDeclarer).map(o -> (DependencyDeclarer) o).forEach(dd -> {
+			try {
+		        dd.buildDependencyGraph(owner,graph);
+		    } catch (RuntimeException e) {
+		        LOGGER.log(Level.SEVERE, "Failed to build dependency graph for " + owner,e);
+		    }
+		});
     }
 
-/*
-    The following two seemingly pointless method definitions are necessary to produce
-    backward compatible binary signatures. Without this we only get
-    get(Ljava/lang/Class;)Ljava/lang/Object; from PersistedList where we need
-    get(Ljava/lang/Class;)Lhudson/model/Describable;
- */
-    public <U extends T> U get(Class<U> type) {
-        return super.get(type);
-    }
+	/*
+	    The following two seemingly pointless method definitions are necessary to produce
+	    backward compatible binary signatures. Without this we only get
+	    get(Ljava/lang/Class;)Ljava/lang/Object; from PersistedList where we need
+	    get(Ljava/lang/Class;)Lhudson/model/Describable;
+	 */
+	    @Override
+		public <U extends T> U get(Class<U> type) {
+	        return super.get(type);
+	    }
 
-    public T[] toArray(T[] array) {
+	public T[] toArray(T[] array) {
         return super.toArray(array);
     }
 
-    /**
+	/**
      * @deprecated since 2008-08-15.
      *      Just implement {@link Saveable}.
      */
@@ -259,17 +266,21 @@ public class DescribableList<T extends Describable<T>, D extends Descriptor<T>> 
             copyOnWriteListConverter = new CopyOnWriteList.ConverterImpl(mapper());
         }
 
-        public boolean canConvert(Class type) {
+        @Override
+		public boolean canConvert(Class type) {
             // handle subtypes in case the onModified method is overridden.
             return DescribableList.class.isAssignableFrom(type);
         }
 
-        public void marshal(Object source, HierarchicalStreamWriter writer, MarshallingContext context) {
-            for (Object o : (DescribableList) source)
-                writeItem(o, context, writer);
+        @Override
+		public void marshal(Object source, HierarchicalStreamWriter writer, MarshallingContext context) {
+            for (Object o : (DescribableList) source) {
+				writeItem(o, context, writer);
+			}
         }
 
-        public Object unmarshal(HierarchicalStreamReader reader, UnmarshallingContext context) {
+        @Override
+		public Object unmarshal(HierarchicalStreamReader reader, UnmarshallingContext context) {
             try {
                 DescribableList r = (DescribableList) context.getRequiredType().asSubclass(DescribableList.class).newInstance();
                 CopyOnWriteList core = copyOnWriteListConverter.unmarshal(reader, context);
@@ -286,6 +297,4 @@ public class DescribableList<T extends Describable<T>, D extends Descriptor<T>> 
             }
         }
     }
-
-    private final static Logger LOGGER = Logger.getLogger(DescribableList.class.getName());
 }

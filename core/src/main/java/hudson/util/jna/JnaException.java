@@ -34,7 +34,7 @@ public class JnaException extends RuntimeException {
     private final int errorCode;
 
     public JnaException(int errorCode) {
-        super("Win32 error: "+errorCode+" - "+Util.getWin32ErrorMessage(errorCode));
+        super(new StringBuilder().append("Win32 error: ").append(errorCode).append(" - ").append(Util.getWin32ErrorMessage(errorCode)).toString());
         this.errorCode = errorCode;
     }
 

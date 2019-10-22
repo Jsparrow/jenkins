@@ -123,15 +123,18 @@ public abstract class EnvironmentContributor implements ExtensionPoint {
      */
     @Extension
     public static class EnvVarsHtml implements RootAction {
-        public String getIconFileName() {
+        @Override
+		public String getIconFileName() {
             return null;
         }
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return null;
         }
 
-        public String getUrlName() {
+        @Override
+		public String getUrlName() {
             return "env-vars.html";
         }
     }

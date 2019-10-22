@@ -58,10 +58,14 @@ abstract class ConfigFile<T,COL extends Collection<T>> extends TextFile {
         if (exists()) {
             try (LinesStream stream = linesStream()) {
                 for (String line : stream) {
-                    if (line.startsWith("#")) continue;   // comment
+                    if (line.startsWith("#"))
+					 {
+						continue;   // comment
+					}
                     T r = parse(line);
-                    if (r != null)
-                        result.add(r);
+                    if (r != null) {
+						result.add(r);
+					}
                 }
             }
         }
@@ -77,7 +81,10 @@ abstract class ConfigFile<T,COL extends Collection<T>> extends TextFile {
             BufferedReader r = new BufferedReader(new StringReader(candidate));
             String line;
             while ((line=r.readLine())!=null) {
-                if (line.startsWith("#")) continue;   // comment
+                if (line.startsWith("#"))
+				 {
+					continue;   // comment
+				}
                 parse(line);
             }
         } catch (IOException e) {
@@ -96,8 +103,9 @@ abstract class ConfigFile<T,COL extends Collection<T>> extends TextFile {
 
     public synchronized void append(String additional) throws IOException {
         String s = read();
-        if (!s.endsWith("\n"))
-            s += "\n";
+        if (!s.endsWith("\n")) {
+			s += "\n";
+		}
         s+= additional;
 
         set(s);

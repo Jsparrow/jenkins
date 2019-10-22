@@ -43,41 +43,10 @@ import java.util.List;
  * @author Kohsuke Kawaguchi
  */
 public class FullControlOnceLoggedInAuthorizationStrategy extends AuthorizationStrategy {
-    /**
-     * Whether to allow anonymous read access, for backward compatibility
-     * default is to allow it
-     */
-    private boolean denyAnonymousReadAccess = false;
-    
-    @DataBoundConstructor
-    public FullControlOnceLoggedInAuthorizationStrategy() {
-    }
-
-    @Override
-    public ACL getRootACL() {
-        return denyAnonymousReadAccess ? AUTHENTICATED_READ : ANONYMOUS_READ;
-    }
-
-    public List<String> getGroups() {
-        return Collections.emptyList();
-    }
-    
-    /**
-     * If true, anonymous read access will be allowed
-     */
-    public boolean isAllowAnonymousRead() {
-        return !denyAnonymousReadAccess;
-    }
-    
-    @DataBoundSetter
-    public void setAllowAnonymousRead(boolean allowAnonymousRead) {
-        this.denyAnonymousReadAccess = !allowAnonymousRead;
-    }
-
     private static final SparseACL AUTHENTICATED_READ = new SparseACL(null);
-    private static final SparseACL ANONYMOUS_READ = new SparseACL(null);
+	private static final SparseACL ANONYMOUS_READ = new SparseACL(null);
 
-    static {
+	static {
         ANONYMOUS_READ.add(ACL.EVERYONE, Jenkins.ADMINISTER,true);
         ANONYMOUS_READ.add(ACL.ANONYMOUS, Jenkins.ADMINISTER,false);
         ANONYMOUS_READ.add(ACL.ANONYMOUS, Permission.READ,true);
@@ -86,20 +55,52 @@ public class FullControlOnceLoggedInAuthorizationStrategy extends AuthorizationS
         AUTHENTICATED_READ.add(ACL.ANONYMOUS, Jenkins.ADMINISTER, false);
     }
 
-    /**
+	/**
      * @deprecated as of 1.643
      *      Inject descriptor via {@link Inject}.
      */
     @Restricted(NoExternalUse.class)
     public static Descriptor<AuthorizationStrategy> DESCRIPTOR;
+	/**
+     * Whether to allow anonymous read access, for backward compatibility
+     * default is to allow it
+     */
+    private boolean denyAnonymousReadAccess = false;
 
-    @Extension @Symbol("loggedInUsersCanDoAnything")
+	@DataBoundConstructor
+    public FullControlOnceLoggedInAuthorizationStrategy() {
+    }
+
+	@Override
+    public ACL getRootACL() {
+        return denyAnonymousReadAccess ? AUTHENTICATED_READ : ANONYMOUS_READ;
+    }
+
+	@Override
+	public List<String> getGroups() {
+        return Collections.emptyList();
+    }
+
+	/**
+     * If true, anonymous read access will be allowed
+     */
+    public boolean isAllowAnonymousRead() {
+        return !denyAnonymousReadAccess;
+    }
+
+	@DataBoundSetter
+    public void setAllowAnonymousRead(boolean allowAnonymousRead) {
+        this.denyAnonymousReadAccess = !allowAnonymousRead;
+    }
+
+	@Extension @Symbol("loggedInUsersCanDoAnything")
     public static class DescriptorImpl extends Descriptor<AuthorizationStrategy> {
         public DescriptorImpl() {
             DESCRIPTOR = this;
         }
 
-        public String getDisplayName() {
+        @Override
+		public String getDisplayName() {
             return Messages.FullControlOnceLoggedInAuthorizationStrategy_DisplayName();
         }
     }
